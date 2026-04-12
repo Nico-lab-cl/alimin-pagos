@@ -80,42 +80,41 @@ export default function AdminDashboard() {
             Dashboard <span className="text-white/20">Postventa</span>
           </h1>
         </div>
-
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          <div className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3">
-            <Calendar className="w-4 h-4 text-white/30" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/50">Abril 2026</span>
+          <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3 shadow-inner">
+            <Calendar className="w-4 h-4 text-accent/60" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Periodo: <span className="text-white">Abril 2026</span></span>
           </div>
           
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[240px]"
-            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1.5rem center", backgroundSize: "1rem" }}
+            className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[240px] shadow-2xl focus:border-accent/50"
+            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23d4a84b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1.5rem center", backgroundSize: "0.8rem" }}
           >
             {projects.map((p) => (
-              <option key={p.slug} value={p.slug} className="bg-[#0c1a1a]">{p.name}</option>
+              <option key={p.slug} value={p.slug} className="bg-[#0c1a1a] text-white">PROYECTO: {p.name.toUpperCase()}</option>
             ))}
           </select>
         </div>
       </div>
 
       {/* Primary Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {stats.map((s, i) => (
           <div
             key={s.label}
-            className="group relative rounded-[2.5rem] p-8 glass-card animate-slide-up"
+            className="group relative rounded-[3rem] p-10 glass-card animate-slide-up"
             style={{ animationDelay: `${i * 100}ms`, animationFillMode: "both" }}
           >
-            <div className="flex items-start justify-between mb-8">
-              <div className={`w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:scale-110 transition-transform duration-500 shadow-2xl ${s.glow}`}>
-                <s.icon className={`w-6 h-6 ${s.color}`} />
+            <div className="flex items-start justify-between mb-10">
+              <div className={`w-16 h-16 rounded-[1.5rem] bg-white/5 flex items-center justify-center border border-white/10 group-hover:scale-110 transition-all duration-700 shadow-2xl ${s.glow}`}>
+                <s.icon className={`w-7 h-7 ${s.color}`} />
               </div>
-              <ArrowUpRight className="w-5 h-5 text-white/10 group-hover:text-accent transition-colors" />
+              <ArrowUpRight className="w-6 h-6 text-white/5 group-hover:text-accent transition-all duration-500" />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">{s.label}</p>
-            <p className="text-3xl font-black text-white tracking-tighter group-hover:translate-x-1 transition-transform">{s.value}</p>
+            <p className="label-premium opacity-50 group-hover:opacity-100 transition-opacity mb-2">{s.label}</p>
+            <p className="text-4xl font-black text-white tracking-tighter group-hover:translate-x-1 transition-transform">{s.value}</p>
             
             {/* Background Accent */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full blur-[40px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
@@ -124,36 +123,36 @@ export default function AdminDashboard() {
       </div>
 
       {/* Bottom Layout: Distribution & Health */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 pb-10">
         {/* Health Chart Box */}
-        <div className="lg:col-span-2 rounded-[3rem] p-10 glass-card">
-          <div className="flex items-center justify-between mb-12">
+        <div className="lg:col-span-2 rounded-[3.5rem] p-12 glass-card">
+          <div className="flex items-center justify-between mb-16">
             <div>
-              <h3 className="text-2xl font-black tracking-tighter uppercase italic">Cartera Recaudación</h3>
-              <p className="text-xs font-medium text-white/30 uppercase tracking-widest mt-1">Análisis de estados vigentes</p>
+              <h3 className="text-3xl font-black tracking-tighter uppercase italic text-glow">Cartera Recaudación</h3>
+              <p className="label-premium mt-2">Análisis de estados vigentes y rendimiento</p>
             </div>
-            <Link href="/admin/alerts" className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-widest hover:bg-accent hover:text-[#061010] transition-all">Ver Alertas</Link>
+            <Link href="/admin/alerts" className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:btn-metallic-gold transition-all">Ver Alertas Críticas</Link>
           </div>
 
-          <div className="space-y-8">
+          <div className="space-y-10">
             {[
-              { label: "Mora Crítica", count: data?.stats?.late || 0, color: "var(--destructive)", percent: data?.stats?.total ? (data.stats.late / data.stats.total) * 100 : 0 },
-              { label: "En Período Gracia", count: data?.stats?.grace || 0, color: "var(--warning)", percent: data?.stats?.total ? (data.stats.grace / data.stats.total) * 100 : 0 },
+              { label: "Mora Crítica", count: data?.stats?.late || 0, color: "#ff4d4d", percent: data?.stats?.total ? (data.stats.late / data.stats.total) * 100 : 0 },
+              { label: "En Período Gracia", count: data?.stats?.grace || 0, color: "#fbbf24", percent: data?.stats?.total ? (data.stats.grace / data.stats.total) * 100 : 0 },
               { label: "Por Vencer (5 días)", count: data?.stats?.upcoming || 0, color: "#818cf8", percent: data?.stats?.total ? (data.stats.upcoming / data.stats.total) * 100 : 0 },
-              { label: "Al Día", count: data?.stats?.ok || 0, color: "var(--success)", percent: data?.stats?.total ? (data.stats.ok / data.stats.total) * 100 : 0 },
+              { label: "Al Día", count: data?.stats?.ok || 0, color: "#10b981", percent: data?.stats?.total ? (data.stats.ok / data.stats.total) * 100 : 0 },
             ].map((st, i) => (
               <div key={st.label} className="group animate-fade-in" style={{ animationDelay: `${500 + i * 100}ms`, animationFillMode: "both" }}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-[0.15em] opacity-40 group-hover:opacity-100 transition-opacity">{st.label}</span>
-                  <span className="text-sm font-black" style={{ color: st.color }}>{st.count} <span className="text-[10px] opacity-30 ml-1">Lotes</span></span>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="label-premium opacity-30 group-hover:opacity-100 transition-opacity">{st.label}</span>
+                  <span className="text-base font-black" style={{ color: st.color }}>{st.count} <span className="text-[11px] opacity-30 ml-2 uppercase">Unidades</span></span>
                 </div>
-                <div className="h-2.5 rounded-full bg-white/5 overflow-hidden border border-white/5">
+                <div className="h-4 rounded-full bg-white/5 overflow-hidden border border-white/5 p-1 shadow-inner">
                   <div 
-                    className="h-full rounded-full transition-all duration-1000 ease-out" 
+                    className="h-full rounded-full transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)]" 
                     style={{ 
                       width: `${st.percent}%`, 
                       background: st.color,
-                      boxShadow: `0 0 20px ${st.color}44`
+                      boxShadow: `0 0 25px ${st.color}44`
                     }} 
                   />
                 </div>
@@ -163,46 +162,47 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions Sidebar inside Dashboard */}
-        <div className="space-y-6">
-          <div className="rounded-[3rem] p-8 glass-card border-accent/20">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-[#061010]" />
+        <div className="space-y-8">
+          <div className="rounded-[3.5rem] p-10 glass-card border-accent/20">
+            <div className="flex items-center gap-5 mb-10">
+              <div className="w-14 h-14 rounded-2xl bg-accent/20 flex items-center justify-center border border-accent/30 shadow-2xl">
+                <CheckCircle className="w-7 h-7 text-accent" />
               </div>
               <div>
-                <h4 className="font-black italic uppercase tracking-tighter">Acciones</h4>
-                <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em]">Quick Console</p>
+                <h4 className="text-lg font-black italic uppercase tracking-tighter">Acciones</h4>
+                <p className="label-premium">Operaciones Rápidas</p>
               </div>
             </div>
             
-            <div className="grid gap-3">
-              <Link href="/admin/receipts" className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-accent/40 group transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Aprobar Pagos</span>
+            <div className="grid gap-4">
+              <Link href="/admin/receipts" className="flex items-center justify-between p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-accent/40 group transition-all duration-500">
+                <div className="flex items-center gap-4">
+                  <div className="w-2.5 h-2.5 rounded-full bg-accent animate-glow" />
+                  <span className="text-[11px] font-black uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">Aprobar Pagos</span>
                 </div>
-                <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all" />
+                <ChevronRight className="w-5 h-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
               </Link>
               
-              <Link href="/admin/clients" className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-accent/40 group transition-all">
-                <div className="flex items-center gap-3">
-                  <Users className="w-4 h-4 opacity-30" />
-                  <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Base Clientes</span>
+              <Link href="/admin/clients" className="flex items-center justify-between p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-accent/40 group transition-all duration-500">
+                <div className="flex items-center gap-4">
+                  <Users className="w-5 h-5 opacity-30 group-hover:opacity-100 group-hover:text-accent transition-all" />
+                  <span className="text-[11px] font-black uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">Base Clientes</span>
                 </div>
-                <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all" />
+                <ChevronRight className="w-5 h-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
               </Link>
             </div>
           </div>
 
-          <div className="rounded-[3rem] p-8 bg-gradient-to-br from-accent to-accent-dark text-[#061010] relative overflow-hidden group shadow-[0_20px_40px_rgba(212,168,75,0.2)]">
-            <Zap className="absolute -bottom-6 -right-6 w-32 h-32 opacity-10 group-hover:scale-125 group-hover:-rotate-12 transition-transform duration-700" />
+          <div className="rounded-[3.5rem] p-10 btn-metallic-gold relative overflow-hidden group shadow-[0_30px_60px_rgba(182,139,47,0.3)] min-h-[300px] flex flex-col justify-end">
+            <Zap className="absolute top-[-10%] left-[-10%] w-48 h-48 opacity-10 group-hover:scale-125 group-hover:rotate-12 transition-transform duration-1000" />
             <div className="relative z-10">
-              <h4 className="text-xl font-black uppercase italic leading-tight mb-4">Optimizar Recaudación</h4>
-              <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed opacity-60">Revisa las alertas automáticas para prevenir moras críticas en el cierre de mes.</p>
-              <button className="mt-8 px-8 py-3 bg-[#061010] text-white rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow-xl hover:translate-y-[-2px] transition-all">Comenzar Audit</button>
+              <h4 className="text-2xl font-black uppercase italic leading-none mb-4">Optimizar Recaudación</h4>
+              <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed opacity-60 mb-8">Revisa las alertas automáticas para prevenir moras críticas en el cierre de mes.</p>
+              <button className="w-full py-5 bg-[#061010] text-accent rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-black transition-all">Comenzar Audit</button>
             </div>
           </div>
         </div>
+   </div>
       </div>
     </div>
   );

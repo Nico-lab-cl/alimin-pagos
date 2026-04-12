@@ -42,43 +42,43 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const handleSignOut = () => signOut({ callbackUrl: "/login" });
 
   return (
-    <div className="min-h-screen bg-[#061010] text-white flex flex-col font-['Outfit']">
+    <div className="min-h-screen bg-[#061010] text-white flex flex-col font-outfit">
       {/* Premium Background Effects */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-accent/5 rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-900/5 rounded-full blur-[150px]" />
+      <div className="fixed inset-0 pointer-events-none overflow-hidden emerald-mesh opacity-40">
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-500/5 rounded-full blur-[150px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[150px]" />
       </div>
 
       {/* Header / Navbar */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 border-b ${scrolled ? 'bg-[#061010]/90 backdrop-blur-xl py-4 border-white/5 shadow-2xl' : 'bg-transparent py-8 border-transparent'}`}>
-        <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${scrolled ? 'bg-[#061010]/95 backdrop-blur-xl py-5 border-b border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)]' : 'bg-transparent py-10'}`}>
+        <div className="max-w-7xl mx-auto px-8 md:px-12 flex items-center justify-between">
           {/* Logo Area */}
-          <Link href="/user" className="group flex items-center gap-4 transition-transform hover:scale-105 active:scale-95">
+          <Link href="/user" className="group flex items-center gap-5 transition-all hover:scale-105 active:scale-95">
             <div className="relative">
-              <div className="absolute inset-0 bg-accent/40 rounded-xl blur-lg group-hover:blur-xl transition-all" />
-              <div className="relative w-11 h-11 rounded-xl bg-accent flex items-center justify-center shadow-[0_0_20px_rgba(212,168,75,0.4)]">
-                <Zap className="w-6 h-6 text-[#061010] fill-current" />
+              <div className="absolute inset-0 bg-accent/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
+              <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-[0_10px_30px_rgba(212,168,75,0.4)] transition-transform duration-500 group-hover:rotate-3">
+                <Zap className="w-8 h-8 text-[#061010] fill-current" />
               </div>
             </div>
             <div>
-              <h1 className="text-xl font-black tracking-tighter uppercase leading-none text-white italic">Alimin</h1>
-              <p className="text-[9px] font-black text-accent tracking-[0.2em] uppercase mt-1 opacity-70">Portal Clientes</p>
+              <h1 className="text-3xl font-black tracking-tighter uppercase leading-none text-white italic text-glow">Alimin</h1>
+              <p className="text-[10px] font-black text-accent tracking-[0.4em] uppercase mt-1.5 opacity-60">Portal de Inversión</p>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-10">
+          <div className="hidden lg:flex items-center gap-12">
             {menuItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`relative text-[11px] font-black uppercase tracking-[0.2em] transition-all hover:text-white ${isActive ? 'text-white' : 'text-white/40'}`}
+                  className={`relative text-[11px] font-black uppercase tracking-[0.3em] transition-all hover:text-accent ${isActive ? 'text-accent' : 'text-white/30'}`}
                 >
                   {item.label}
                   {isActive && (
-                    <span className="absolute -bottom-2 left-0 right-0 h-0.5 bg-accent rounded-full animate-fade-in" />
+                    <span className="absolute -bottom-3 left-0 right-0 h-0.5 bg-accent rounded-full animate-fade-in shadow-[0_0_10px_rgba(212,168,75,0.5)]" />
                   )}
                 </Link>
               );
@@ -86,26 +86,27 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           {/* User Header Section */}
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex flex-col items-end mr-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Bienvenido</span>
-              <span className="text-xs font-black text-white italic truncate max-w-[150px] uppercase tracking-tighter">{session?.user?.name || "Propietario"}</span>
+          <div className="flex items-center gap-6">
+            <div className="hidden lg:flex flex-col items-end">
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20 mb-1.5">Titular Activo</span>
+              <span className="text-sm font-black text-white italic truncate max-w-[180px] uppercase tracking-tighter leading-none">{session?.user?.name || "Propietario"}</span>
             </div>
-            <button className="relative p-3 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all hidden sm:flex">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-accent rounded-full" />
+            <button className="relative p-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all hidden sm:flex hover:border-accent/40 group">
+              <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <span className="absolute top-3.5 right-3.5 w-2 h-2 bg-accent rounded-full shadow-[0_0_10px_rgba(212,168,75,0.8)]" />
             </button>
             <button 
               onClick={() => setIsOpen(!isOpen)}
-              className="md:hidden p-3 rounded-xl bg-white/5 text-accent border border-white/10"
+              className="lg:hidden p-4 rounded-2xl bg-white/5 text-accent border border-white/10 active:scale-90 transition-transform"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-7 h-7" />
             </button>
             <button 
               onClick={handleSignOut}
-              className="hidden md:flex p-3 rounded-xl bg-red-400/5 border border-red-400/10 text-red-400/60 hover:text-white hover:bg-red-400 transition-all font-black text-[10px] uppercase tracking-widest"
+              className="hidden lg:flex px-6 py-4 rounded-2xl bg-red-500/5 border border-red-500/10 text-red-400/60 hover:text-white hover:bg-red-500 hover:border-red-500 transition-all font-black text-[10px] uppercase tracking-[0.2em]"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4 mr-3" />
+              Log Out
             </button>
           </div>
         </div>

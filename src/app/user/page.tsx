@@ -180,11 +180,11 @@ export default function UserDashboard() {
 
                   <Link
                     href={`/user/pay/${lot.reservationId}`}
-                    className="w-full sm:w-auto min-w-[200px] py-4 rounded-2xl bg-white text-black font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all hover:bg-accent hover:shadow-[0_15px_30px_rgba(212,168,75,0.4)] hover:-translate-y-1 active:scale-95 group/btn"
+                    className="w-full sm:w-auto min-w-[220px] py-5 rounded-2xl btn-metallic-gold text-[10px] flex items-center justify-center gap-4 active:scale-95 group/btn"
                   >
-                    <CreditCard className="w-4 h-4 transition-transform group-hover/btn:-rotate-12" />
+                    <CreditCard className="w-5 h-5 transition-transform group-hover/btn:-rotate-12" />
                     Ejecutar Pago
-                    <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
+                    <ArrowRight className="w-5 h-5 transition-transform group-hover/btn:translate-x-1" />
                   </Link>
                 </div>
               </div>

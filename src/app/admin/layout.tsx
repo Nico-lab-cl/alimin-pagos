@@ -48,34 +48,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleSignOut = () => signOut({ callbackUrl: "/login" });
 
   return (
-    <div className="min-h-screen bg-[#061010] text-white flex overflow-hidden font-['Outfit']">
+    <div className="min-h-screen bg-[#061010] text-white flex overflow-hidden font-outfit">
       {/* Premium Background Effects */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-accent/10 rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-900/10 rounded-full blur-[150px]" />
+      <div className="fixed inset-0 pointer-events-none overflow-hidden emerald-mesh opacity-50">
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-500/5 rounded-full blur-[150px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[150px]" />
       </div>
 
       {/* Sidebar - Desktop */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50
-        w-72 glass-panel border-r border-white/5
-        transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]
+        w-80 glass-panel border-r border-white/5
+        transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]
         ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>
-        <div className="h-full flex flex-col p-8">
+        <div className="h-full flex flex-col p-10">
           {/* Logo Section */}
-          <div className="flex items-center gap-4 mb-14">
-            <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center shadow-[0_0_30px_rgba(212,168,75,0.4)] transition-transform hover:scale-110">
-              <Zap className="w-7 h-7 text-[#061010] fill-current" />
+          <div className="flex items-center gap-5 mb-16 group cursor-pointer">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-[0_10px_40px_rgba(212,168,75,0.3)] transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
+              <Zap className="w-8 h-8 text-[#061010] fill-current" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tighter uppercase leading-none text-gradient">Alimin</h1>
-              <p className="text-[10px] font-black text-accent tracking-[0.3em] uppercase mt-1 opacity-70">Console</p>
+              <h1 className="text-3xl font-black tracking-tighter uppercase leading-none italic text-glow">Alimin</h1>
+              <p className="text-[10px] font-black text-accent tracking-[0.4em] uppercase mt-1.5 opacity-60">Consola Central</p>
             </div>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-3">
+          <nav className="flex-1 space-y-4">
             {menuItems.map((item) => {
               const isActive = pathname === item.href;
               return (
@@ -83,15 +83,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   key={item.href}
                   href={item.href}
                   className={`
-                    group flex items-center justify-between px-5 py-4 rounded-2xl transition-all duration-500
+                    group flex items-center justify-between px-6 py-5 rounded-[1.5rem] transition-all duration-500
                     ${isActive 
-                      ? "bg-accent text-[#061010] shadow-[0_10px_30px_rgba(212,168,75,0.3)] font-black" 
-                      : "text-white/40 hover:text-white hover:bg-white/5"}
+                      ? "btn-metallic-gold shadow-[0_15px_35px_rgba(212,168,75,0.3)]" 
+                      : "text-white/30 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/5"}
                   `}
                 >
-                  <div className="flex items-center gap-4">
-                    <item.icon className="w-5 h-5 transition-transform group-hover:scale-110" />
-                    <span className="text-xs uppercase tracking-[0.15em]">{item.label}</span>
+                  <div className="flex items-center gap-5">
+                    <item.icon className={`w-5 h-5 transition-all duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:text-accent'}`} />
+                    <span className="text-[11px] font-black lowercase tracking-[0.1em] uppercase">{item.label}</span>
                   </div>
                   {isActive && <ChevronRight className="w-4 h-4 opacity-50" />}
                 </Link>
@@ -100,27 +100,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </nav>
 
           {/* User Section & Logout */}
-          <div className="mt-auto pt-8 border-t border-white/5 space-y-5">
-            <div className="flex items-center gap-4 px-2">
-              <div className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group overflow-hidden relative">
-                <div className="absolute inset-0 bg-accent transition-transform duration-500 translate-y-full group-hover:translate-y-0 opacity-20" />
+          <div className="mt-auto pt-10 border-t border-white/5 space-y-6">
+            <div className="flex items-center gap-5 px-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group overflow-hidden relative shadow-inner">
+                <div className="absolute inset-0 bg-accent transition-transform duration-700 translate-y-full group-hover:translate-y-0 opacity-20" />
                 <span className="text-sm font-black text-accent relative z-10">AD</span>
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-black truncate uppercase tracking-widest leading-none mb-1">{session?.user?.name || "Administrador"}</p>
-                <div className="flex items-center gap-1.5 text-[9px] text-emerald-400 font-bold uppercase tracking-tighter">
-                  <div className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>En Línea</span>
+                <p className="text-xs font-black truncate uppercase tracking-[0.15em] leading-none mb-1.5">{session?.user?.name || "Administrador"}</p>
+                <div className="flex items-center gap-2 text-[9px] text-emerald-400 font-black uppercase tracking-widest">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-glow" />
+                  <span>Terminal Activo</span>
                 </div>
               </div>
             </div>
             
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-white/30 hover:text-red-400 hover:bg-red-400/5 border border-transparent hover:border-red-400/10 transition-all duration-500"
+              className="w-full flex items-center gap-4 px-6 py-5 rounded-2xl text-white/20 hover:text-red-400 hover:bg-red-400/5 border border-transparent hover:border-red-400/10 transition-all duration-500"
             >
               <LogOut className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Cerrar Sesión</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em]">Cerrar Sesión</span>
             </button>
           </div>
         </div>

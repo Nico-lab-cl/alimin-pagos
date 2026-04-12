@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Loader2, Eye, EyeOff, Building2 } from "lucide-react";
+import { Loader2, Eye, EyeOff, Building2, ShieldCheck, ArrowRight, Zap } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,9 +26,8 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        setError("Correo o contraseña incorrectos");
+        setError("Las credenciales proporcionadas no son válidas");
       } else {
-        // Fetch fresh session to get user role
         const session = await getSession();
         const role = (session?.user as any)?.role;
         
@@ -40,230 +39,136 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch {
-      setError("Error de conexión. Intenta de nuevo.");
+      setError("Error de comunicación con el servidor central");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-      style={{
-        background: "linear-gradient(135deg, #0f1f1f 0%, #1a3a3a 40%, #2d5a5a 70%, #1a3a3a 100%)",
-      }}
-    >
-      {/* Animated decorative elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div
-          className="absolute -top-32 -right-32 w-[500px] h-[500px] rounded-full"
-          style={{
-            background: "radial-gradient(circle, rgba(212,168,75,0.12) 0%, transparent 70%)",
-            animation: "pulse-soft 6s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute top-1/2 -left-48 w-[400px] h-[400px] rounded-full"
-          style={{
-            background: "radial-gradient(circle, rgba(45,90,90,0.3) 0%, transparent 70%)",
-            animation: "pulse-soft 8s ease-in-out infinite 2s",
-          }}
-        />
-        <div
-          className="absolute -bottom-24 right-1/4 w-[300px] h-[300px] rounded-full"
-          style={{
-            background: "radial-gradient(circle, rgba(212,168,75,0.06) 0%, transparent 70%)",
-            animation: "pulse-soft 7s ease-in-out infinite 1s",
-          }}
-        />
-        {/* Grid pattern overlay */}
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)
-            `,
-            backgroundSize: "60px 60px",
-          }}
-        />
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden emerald-mesh">
+      {/* Decorative Background Elements */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-[10%] -left-[10%] w-[60%] h-[60%] rounded-full bg-emerald-500/5 blur-[120px] animate-pulse" />
+        <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] rounded-full bg-accent/5 blur-[100px] animate-float" />
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
       </div>
 
-      <div className="w-full max-w-[420px] animate-fade-in relative z-10">
-        {/* Logo & Header */}
-        <div className="text-center mb-10">
-          <div
-            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-5"
-            style={{
-              background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%)",
-              boxShadow: "0 12px 40px rgba(212, 168, 75, 0.35), 0 0 0 1px rgba(212,168,75,0.1)",
-            }}
-          >
-            <Building2 className="w-10 h-10 text-white" />
+      <div className="w-full max-w-[480px] animate-slide-up relative z-10">
+        {/* Logo & Branding */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] glass-card mb-8 border-accent/20 group hover:border-accent/50 transition-all duration-700">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
+              <Building2 className="w-9 h-9 text-[#061010]" />
+            </div>
           </div>
-          <h1
-            className="text-3xl font-bold tracking-tight"
-            style={{ color: "rgba(255,255,255,0.95)" }}
-          >
-            Portal de Pagos
+          <h1 className="text-4xl font-black text-white italic uppercase tracking-tighter mb-2 leading-none">
+            Portal de <span className="text-accent underline decoration-accent/20 underline-offset-8">Pagos</span>
           </h1>
-          <p className="text-sm mt-2 font-medium" style={{ color: "var(--accent-light)" }}>
-            Inmobiliaria Alimin SPA
-          </p>
+          <div className="flex items-center justify-center gap-2 opacity-40">
+            <Zap className="w-3 h-3 text-accent" />
+            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Inmobiliaria Alimin SPA</p>
+          </div>
         </div>
 
-        {/* Login Card */}
-        <div
-          className="rounded-3xl p-8"
-          style={{
-            background: "rgba(255,255,255,0.06)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-            boxShadow: "0 24px 80px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.08)",
-          }}
-        >
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-xs font-semibold mb-2 uppercase tracking-wider"
-                style={{ color: "rgba(255,255,255,0.5)" }}
-              >
-                Correo electrónico
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@correo.com"
-                required
-                className="w-full px-4 py-3.5 rounded-xl text-sm transition-all duration-200"
-                style={{
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  background: "rgba(255,255,255,0.06)",
-                  color: "white",
-                  outline: "none",
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = "var(--accent)";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(212,168,75,0.15)";
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(255,255,255,0.1)";
-                  e.target.style.boxShadow = "none";
-                }}
-              />
-            </div>
+        {/* Robust Login Card */}
+        <div className="glass-card rounded-[3rem] p-10 md:p-12 border-white/10 relative overflow-hidden">
+          {/* Subtle Internal Glow */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 blur-3xl" />
+          
+          <form onSubmit={handleSubmit} className="space-y-8 relative z-10">
+            <div className="space-y-6">
+              {/* Email Field */}
+              <div className="space-y-2">
+                <label htmlFor="email" className="label-premium">
+                  Email Corporativo / Cliente
+                </label>
+                <div className="relative group">
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="ejemplo@aliminspa.cl"
+                    required
+                    className="w-full input-premium pl-4 pr-4 py-5 text-sm font-medium tracking-tight"
+                  />
+                </div>
+              </div>
 
-            {/* Password */}
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-xs font-semibold mb-2 uppercase tracking-wider"
-                style={{ color: "rgba(255,255,255,0.5)" }}
-              >
-                Contraseña
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  minLength={6}
-                  className="w-full px-4 py-3.5 pr-12 rounded-xl text-sm transition-all duration-200"
-                  style={{
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    background: "rgba(255,255,255,0.06)",
-                    color: "white",
-                    outline: "none",
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "var(--accent)";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(212,168,75,0.15)";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "rgba(255,255,255,0.1)";
-                    e.target.style.boxShadow = "none";
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors cursor-pointer"
-                  style={{ color: "rgba(255,255,255,0.4)" }}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
+              {/* Password Field */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label htmlFor="password" className="label-premium">Clave de Acceso</label>
+                  <button type="button" className="text-[9px] font-black uppercase text-accent/40 hover:text-accent tracking-widest transition-colors mb-2">¿Olvidaste tu clave?</button>
+                </div>
+                <div className="relative group">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    required
+                    minLength={6}
+                    className="w-full input-premium pl-4 pr-12 py-5 text-sm font-medium tracking-tight"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Error */}
+            {/* Error Message */}
             {error && (
-              <div
-                className="p-3.5 rounded-xl text-sm font-medium text-center animate-fade-in"
-                style={{
-                  background: "rgba(220, 38, 38, 0.15)",
-                  color: "#ff6b6b",
-                  border: "1px solid rgba(220, 38, 38, 0.25)",
-                }}
-              >
+              <div className="p-5 rounded-2xl bg-error/10 border border-error/20 text-[11px] font-bold text-error text-center animate-fade-in uppercase tracking-wider">
                 {error}
               </div>
             )}
 
-            {/* Submit */}
+            {/* Submit Button - Brushed Gold */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 rounded-xl text-white font-bold text-sm tracking-wide transition-all duration-300 disabled:opacity-60 cursor-pointer"
-              style={{
-                background: loading
-                  ? "rgba(212,168,75,0.4)"
-                  : "linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%)",
-                boxShadow: loading
-                  ? "none"
-                  : "0 8px 24px rgba(212,168,75,0.35), inset 0 1px 0 rgba(255,255,255,0.15)",
-              }}
-              onMouseEnter={(e) => {
-                if (!loading) {
-                  (e.target as HTMLElement).style.transform = "translateY(-2px)";
-                  (e.target as HTMLElement).style.boxShadow = "0 12px 32px rgba(212,168,75,0.45), inset 0 1px 0 rgba(255,255,255,0.15)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                (e.target as HTMLElement).style.transform = "translateY(0)";
-                (e.target as HTMLElement).style.boxShadow = "0 8px 24px rgba(212,168,75,0.35), inset 0 1px 0 rgba(255,255,255,0.15)";
-              }}
+              className="w-full py-6 rounded-2xl btn-metallic-gold text-xs flex items-center justify-center gap-3 active:scale-[0.98]"
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Iniciando sesión...
-                </span>
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Verificando Credenciales...
+                </>
               ) : (
-                "Iniciar Sesión"
+                <>
+                  Acceder al Sistema
+                  <ArrowRight className="w-5 h-5" />
+                </>
               )}
             </button>
           </form>
+
+          {/* Security Indicator */}
+          <div className="mt-10 pt-8 border-t border-white/5 flex items-center justify-center gap-3 opacity-30">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <p className="text-[9px] font-black uppercase tracking-[0.2em]">Encriptación SSL de Grado Bancario</p>
+          </div>
         </div>
 
-        {/* Footer */}
-        <p
-          className="text-center text-xs mt-8 font-medium"
-          style={{ color: "rgba(255,255,255,0.25)" }}
-        >
-          © 2026 Inmobiliaria Alimin SPA — Todos los derechos reservados
-        </p>
+        {/* Improved Footer */}
+        <div className="mt-12 text-center space-y-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">
+            © 2026 Alimin SPA <span className="mx-2 opacity-50">•</span> Gestión Inmobiliaria
+          </p>
+          <div className="flex justify-center gap-6 opacity-20 hover:opacity-100 transition-opacity">
+            <a href="#" className="text-[9px] font-bold uppercase tracking-widest hover:text-accent transition-colors">Términos</a>
+            <a href="#" className="text-[9px] font-bold uppercase tracking-widest hover:text-accent transition-colors">Privacidad</a>
+            <a href="#" className="text-[9px] font-bold uppercase tracking-widest hover:text-accent transition-colors">Soporte</a>
+          </div>
+        </div>
       </div>
     </div>
   );
