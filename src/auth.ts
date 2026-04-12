@@ -5,10 +5,12 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  debug: process.env.NODE_ENV === "development" || true, // Force debug for now to see issues in Easypanel
   providers: [
     Credentials({
       async authorize(credentials) {
         try {
+          console.log("[Auth] Starting authorization process...");
           const parsedCredentials = z
             .object({
               email: z.string().email(),
@@ -20,23 +22,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const { email: rawEmail, password } = parsedCredentials.data;
             const email = rawEmail.toLowerCase();
 
-            console.log(`[Auth] Attempting login for: ${email}`);
+            console.log(`[Auth] Checking database for user: ${email}`);
 
-            const user = await prisma.user.findUnique({
-              where: { email },
-            });
+            let user;
+            try {
+              user = await prisma.user.findUnique({
+                where: { email },
+              });
+            } catch (dbError: any) {
+              console.error("[Auth] Database error during lookup:", dbError.message);
+              throw new Error("DATABASE_CONNECTION_ERROR");
+            }
 
             if (!user) {
-              console.log(`[Auth] User not found: ${email}`);
+              console.log(`[Auth] User record not found: ${email}`);
               return null;
             }
 
+            console.log(`[Auth] User found. Verifying password for: ${email}`);
             const passwordsMatch = await bcrypt.compare(
               password,
               user.password
             );
+
             if (passwordsMatch) {
-              console.log(`[Auth] Login successful for: ${email}`);
+              console.log(`[Auth] Password verified. Login successful: ${email}`);
               return {
                 id: user.id,
                 email: user.email,
@@ -49,12 +59,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
             console.log(`[Auth] Password mismatch for: ${email}`);
           } else {
-            console.log("[Auth] Invalid credentials format");
+            console.log("[Auth] Invalid login form data structure");
           }
 
           return null;
-        } catch (error) {
-          console.error("[Auth] Error in authorize:", error);
+        } catch (error: any) {
+          console.error("[Auth] Fatal error in authorize callback:", error.message || error);
+          // Return null instead of throwing to avoid generic 500 where possible, 
+          // but logging the error is key for the user to see in Easypanel
           return null;
         }
       },
