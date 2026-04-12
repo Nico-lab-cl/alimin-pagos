@@ -1,0 +1,102 @@
+import { prisma } from "./prisma";
+
+/**
+ * Calculates the due date for a specific installment number.
+ * Uses project-level config for the due day of month.
+ */
+export function getInstallmentDueDate(
+  installmentStartDate: Date | string,
+  installmentNumber: number,
+  dueDayOfMonth: number = 5
+): Date {
+  const base = new Date(installmentStartDate);
+  const due = new Date(base.getFullYear(), base.getMonth(), dueDayOfMonth, 12, 0, 0, 0);
+
+  // installment_start_date represents the MONTH of cuota 1
+  // Formula: base + (N-1)
+  due.setMonth(due.getMonth() + (installmentNumber - 1));
+
+  return due;
+}
+
+/**
+ * Calculates the total penalty (mora) for a late payment.
+ * Uses project-level config for daily penalty and grace period.
+ */
+export function calculateTotalInterest(
+  dueDate: Date,
+  paymentDate: Date = new Date(),
+  moraFrozen: boolean = false,
+  gracePeriodDays: number = 5,
+  dailyPenaltyAmount: number = 10000,
+  debtStartDate?: Date | string | null,
+  penaltyStartDate?: Date | string | null
+): number {
+  if (moraFrozen) return 0;
+
+  const pDate = new Date(paymentDate);
+  pDate.setHours(0, 0, 0, 0);
+
+  let gDate: Date;
+
+  if (debtStartDate) {
+    // Manual debt start date overrides grace period calculation
+    gDate = new Date(debtStartDate);
+  } else {
+    // Grace period ends X days after due date
+    const gracePeriodEnd = new Date(dueDate);
+    gracePeriodEnd.setDate(dueDate.getDate() + gracePeriodDays);
+    gracePeriodEnd.setHours(23, 59, 59, 999);
+    gDate = gracePeriodEnd;
+
+    if (paymentDate <= gracePeriodEnd) {
+      return 0;
+    }
+  }
+  gDate.setHours(0, 0, 0, 0);
+
+  // Apply penalty start date cutoff if configured
+  if (penaltyStartDate) {
+    const cutoff = new Date(penaltyStartDate);
+    cutoff.setHours(0, 0, 0, 0);
+
+    if (pDate < cutoff) return 0;
+    if (gDate < cutoff) {
+      gDate.setTime(cutoff.getTime());
+      gDate.setDate(gDate.getDate() - 1);
+    }
+  }
+
+  const diffTime = pDate.getTime() - gDate.getTime();
+  let daysLate = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (daysLate > 0) {
+    daysLate += 1; // First day of penalty is also counted
+  }
+
+  if (daysLate <= 0) return 0;
+
+  return dailyPenaltyAmount * daysLate;
+}
+
+/**
+ * Gets the project configuration for financial calculations.
+ */
+export async function getProjectConfig(projectId: string) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      grace_period_days: true,
+      daily_penalty_amount: true,
+      due_day_of_month: true,
+      penalty_start_date: true,
+      bank_name: true,
+      bank_type: true,
+      bank_account: true,
+      bank_holder: true,
+      bank_rut: true,
+      bank_email: true,
+    },
+  });
+  return project;
+}
