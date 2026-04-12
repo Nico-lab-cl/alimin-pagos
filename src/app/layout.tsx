@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "Portal de Pagos — Alimin SPA",
   description: "Portal de pagos para proyectos inmobiliarios Alimin SPA. Gestiona tus cuotas, comprobantes y documentos.",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.png",
   },
 };
 

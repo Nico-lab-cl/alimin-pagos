@@ -58,8 +58,8 @@ export default function LoginPage() {
         {/* Logo & Branding */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] glass-card mb-8 border-accent/20 group hover:border-accent/50 transition-all duration-700">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
-              <Building2 className="w-9 h-9 text-[#061010]" />
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent/20 to-accent-dark/20 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform p-2">
+              <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
             </div>
           </div>
           <h1 className="text-4xl font-black text-white italic uppercase tracking-tighter mb-2 leading-none">

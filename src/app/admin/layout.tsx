@@ -65,8 +65,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="h-full flex flex-col p-10">
           {/* Logo Section */}
           <div className="flex items-center gap-5 mb-16 group cursor-pointer">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-[0_10px_40px_rgba(212,168,75,0.3)] transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
-              <Zap className="w-8 h-8 text-[#061010] fill-current" />
+            <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-[0_10px_40px_rgba(212,168,75,0.2)] transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 p-2">
+              <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <h1 className="text-3xl font-black tracking-tighter uppercase leading-none italic text-glow">Alimin</h1>

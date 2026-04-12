@@ -56,8 +56,8 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           <Link href="/user" className="group flex items-center gap-5 transition-all hover:scale-105 active:scale-95">
             <div className="relative">
               <div className="absolute inset-0 bg-accent/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
-              <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-[0_10px_30px_rgba(212,168,75,0.4)] transition-transform duration-500 group-hover:rotate-3">
-                <Zap className="w-8 h-8 text-[#061010] fill-current" />
+              <div className="relative w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-[0_10px_30px_rgba(212,168,75,0.2)] transition-transform duration-500 group-hover:rotate-3 p-2">
+                <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
               </div>
             </div>
             <div>
