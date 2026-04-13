@@ -469,3 +469,62 @@ export async function getAdminLots(projectSlug: string) {
     return { error: "Error al cargar lotes", lots: [] };
   }
 }
+
+/**
+ * Updates a client's profile data, updating both Reservation and underlying User login email.
+ */
+export async function updateClientProfile(reservationId: string, data: { name: string, email: string, rut: string, phone: string }) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { user: true }
+    });
+
+    if (!reservation) {
+      return { error: "Reserva no encontrada" };
+    }
+
+    // Check if new email conflicts with another user
+    if (data.email !== reservation.email && data.email !== reservation.user.email) {
+      const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
+      if (existingUser) {
+        return { error: "Ese correo electrónico ya está registrado por otro usuario en la plataforma." };
+      }
+    }
+
+    // Attempt the transaction to guarantee integrity
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: reservation.user_id },
+        data: {
+          email: data.email,
+          name: data.name
+        }
+      }),
+      prisma.reservation.update({
+        where: { id: reservationId },
+        data: {
+          name: data.name,
+          email: data.email,
+          rut: data.rut,
+          phone: data.phone
+        }
+      })
+    ]);
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating client profile:", error);
+    return { error: "Error interno del servidor actualizando perfil" };
+  }
+}
