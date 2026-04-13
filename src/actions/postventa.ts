@@ -36,9 +36,9 @@ export async function getFullPostventaData({
     return { error: "No tienes acceso a este proyecto", data: [], stats: null };
   }
 
-  const cacheKey = `postventa_${projectSlug}`;
-  const cached = memoryCache.get(cacheKey);
-  if (cached) return cached;
+  // const cacheKey = `postventa_${projectSlug}`;
+  // const cached = memoryCache.get(cacheKey);
+  // if (cached) return cached;
 
   try {
     const project = await prisma.project.findUnique({
@@ -229,9 +229,9 @@ export async function getFullPostventaData({
         pie: res.pie || lot.pie || 0,
         extra_paid_amount: res.extra_paid_amount,
         pending_amount: res.pending_amount,
-        reservation_price: res.reservation_price ?? lot.reservation_amount_clp ?? 0,
-        last_installment_value: res.last_installment_value ?? lot.last_installment_amount ?? (lot.valor_cuota || 0),
-        daily_penalty: res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
+        reservation_price: res.reservation_price || lot.reservation_amount_clp || 0,
+        last_installment_value: res.last_installment_value || lot.last_installment_amount || (lot.valor_cuota || 0),
+        daily_penalty: res.daily_penalty || project.daily_penalty_amount || 10000,
         lot,
         buyer: res.user,
       };
