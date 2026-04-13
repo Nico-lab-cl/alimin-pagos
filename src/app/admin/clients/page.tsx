@@ -524,7 +524,7 @@ export default function ClientsPage() {
                             setIsSavingFin(true);
                             setEditFinMsg({ text: "", type: "" });
                             try {
-                              const res = await updateClientFinancials(selectedClient.id, selectedClient.lot_id, finForm);
+                              const res = await updateClientFinancials(selectedClient.id, selectedClient.lotId, finForm);
                               if (res.error) {
                                 setEditFinMsg({ text: res.error, type: "error" });
                               } else {

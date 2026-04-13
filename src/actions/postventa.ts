@@ -533,7 +533,7 @@ export async function updateClientProfile(reservationId: string, data: { name: s
 /**
  * Updates a client's financial data (admin only).
  */
-export async function updateClientFinancials(reservationId: string, lotId: string, data: {
+export async function updateClientFinancials(reservationId: string, lotId: number, data: {
   cuotas: number;
   valor_cuota: number;
   price_total_clp: number;
