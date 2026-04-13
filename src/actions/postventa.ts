@@ -598,11 +598,17 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
           pie: data.pie,
           last_installment_value: data.last_installment_value,
           daily_penalty: data.daily_penalty,
-          due_day: data.next_payment_date ? new Date(data.next_payment_date + "T12:00:00").getDate() : data.due_day,
+          due_day: (data.next_payment_date && data.next_payment_date.trim() !== "") 
+            ? new Date(data.next_payment_date + "T12:00:00").getDate() 
+            : data.due_day,
           grace_days: data.grace_days,
           mora_frozen: data.mora_frozen,
-          debt_start_date: data.debt_start_date ? new Date(data.debt_start_date + "T12:00:00") : null,
-          next_payment_date: data.next_payment_date ? new Date(data.next_payment_date + "T12:00:00") : (nextDateObj || null),
+          debt_start_date: (data.debt_start_date && data.debt_start_date.trim() !== "") 
+            ? new Date(data.debt_start_date + "T12:00:00") 
+            : null,
+          next_payment_date: (data.next_payment_date && data.next_payment_date.trim() !== "") 
+            ? new Date(data.next_payment_date + "T12:00:00") 
+            : (nextDateObj || null),
           installments_paid: data.installments_paid,
           ...(startDateObj && { installment_start_date: startDateObj }),
         }
