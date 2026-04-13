@@ -36,7 +36,7 @@ export async function getFullPostventaData({
     return { error: "No tienes acceso a este proyecto", data: [], stats: null };
   }
 
-  // const cacheKey = `postventa_${projectSlug}`;
+  const cacheKey = `postventa_${projectSlug}`;
   // const cached = memoryCache.get(cacheKey);
   // if (cached) return cached;
 
