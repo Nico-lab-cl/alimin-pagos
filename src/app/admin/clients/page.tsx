@@ -38,6 +38,7 @@ export default function ClientsPage() {
     grace_days: 5,
     mora_frozen: false,
     debt_start_date: "",
+    next_payment_date: "",
     installment_start_date: ""
   });
 
@@ -198,6 +199,7 @@ export default function ClientsPage() {
                         grace_days: c.grace_days || 5,
                         mora_frozen: c.mora_frozen || false,
                         debt_start_date: c.debt_start_date ? new Date(c.debt_start_date).toISOString().split('T')[0] : "",
+                        next_payment_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : "",
                         installment_start_date: c.installment_start_date ? new Date(c.installment_start_date).toISOString().split('T')[0] : ""
                       });
                     }}
@@ -522,8 +524,8 @@ export default function ClientsPage() {
                           <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-4">Vencimientos & Mora</p>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Día de Vencimiento</label>
-                              <input type="number" min="1" max="28" value={finForm.due_day} onChange={e=>setFinForm({...finForm, due_day: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                              <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest font-black italic">Fecha Próximo Vencimiento</label>
+                              <input type="date" value={finForm.next_payment_date} onChange={e=>setFinForm({...finForm, next_payment_date: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
                             </div>
                             <div className="space-y-2">
                               <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Días de Gracia</label>
