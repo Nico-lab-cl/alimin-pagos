@@ -226,9 +226,12 @@ export async function getFullPostventaData({
         installment_ranges: res.installment_ranges,
         debt_start_date: res.debt_start_date,
         next_payment_date: res.next_payment_date,
-        pie: res.pie,
+        pie: res.pie || lot.pie || 0,
         extra_paid_amount: res.extra_paid_amount,
         pending_amount: res.pending_amount,
+        reservation_price: res.reservation_price ?? lot.reservation_amount_clp ?? 0,
+        last_installment_value: res.last_installment_value ?? lot.last_installment_amount ?? (lot.valor_cuota || 0),
+        daily_penalty: res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
         lot,
         buyer: res.user,
       };

@@ -184,7 +184,7 @@ export default function ClientsPage() {
                       setFinForm({
                         price_total_clp: c.totalToPay || 0,
                         reservation_price: c.reservation_price || 0,
-                        pie: c.pieAmount || 0,
+                        pie: c.pie || 0,
                         cuotas: c.totalCuotas || 0,
                         valor_cuota: c.valor_cuota || 0,
                         last_installment_value: c.last_installment_value || c.valor_cuota || 0,
