@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   getInstallmentDueDate,
   calculateTotalInterest,
+  getProjectConfig,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
