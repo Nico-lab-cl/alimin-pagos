@@ -135,6 +135,9 @@ model Reservation {
   reservation_price      Int? @default(0)
   daily_penalty          Int?
 
+  due_day                Int? @default(5)
+  grace_days             Int? @default(5)
+
   mora_frozen Boolean @default(false)
   advisor     String? @db.VarChar(100)
   observation String?

@@ -118,7 +118,7 @@ export async function getFullPostventaData({
           nextDueDate = getInstallmentDueDate(
             res.installment_start_date,
             paidCuotas + 1,
-            project.due_day_of_month
+            res.due_day ?? project.due_day_of_month ?? 5
           );
         }
 
@@ -126,8 +126,8 @@ export async function getFullPostventaData({
           nextDueDate,
           currentDate,
           res.mora_frozen,
-          project.grace_period_days,
-          project.daily_penalty_amount,
+          res.grace_days ?? project.grace_period_days ?? 5,
+          res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
           res.debt_start_date,
           project.penalty_start_date
         );
@@ -232,6 +232,8 @@ export async function getFullPostventaData({
         reservation_price: res.reservation_price || lot.reservation_amount_clp || 0,
         last_installment_value: res.last_installment_value || lot.last_installment_amount || (lot.valor_cuota || 0),
         daily_penalty: res.daily_penalty || project.daily_penalty_amount || 10000,
+        due_day: res.due_day || project.due_day_of_month || 5,
+        grace_days: res.grace_days || project.grace_period_days || 5,
         lot,
         buyer: res.user,
       };
@@ -546,6 +548,10 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
   installments_paid: number;
   installment_start_date: string;
   daily_penalty: number;
+  due_day: number;
+  grace_days: number;
+  mora_frozen: boolean;
+  debt_start_date?: string | null;
 }) {
   const session = await auth();
   const adminUser = session?.user as any;
@@ -569,7 +575,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
         startDateObj = new Date(data.installment_start_date);
         // compute next date based on installments_paid
         const projectConfig = await getProjectConfig(reservation.project_id);
-        const dueDay = projectConfig?.due_day_of_month || 5;
+        const dueDay = data.due_day || projectConfig?.due_day_of_month || 5;
         // The NEXT payment is (installments_paid + 1)
         nextDateObj = getInstallmentDueDate(startDateObj, data.installments_paid + 1, dueDay);
     }
@@ -591,6 +597,10 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
           pie: data.pie,
           last_installment_value: data.last_installment_value,
           daily_penalty: data.daily_penalty,
+          due_day: data.due_day,
+          grace_days: data.grace_days,
+          mora_frozen: data.mora_frozen,
+          debt_start_date: data.debt_start_date ? new Date(data.debt_start_date) : null,
           installments_paid: data.installments_paid,
           ...(startDateObj && { installment_start_date: startDateObj }),
           ...(nextDateObj && { next_payment_date: nextDateObj }),
