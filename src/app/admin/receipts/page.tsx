@@ -222,7 +222,6 @@ export default function ReceiptsPage() {
                 </div>
               </div>
             </div>
-            </div>
           ))}
         </div>
       )}
