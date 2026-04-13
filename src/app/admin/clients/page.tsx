@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getAdminProjects, getFullPostventaData } from "@/actions/postventa";
 import { formatCLP, formatDate } from "@/lib/utils";
-import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users } from "lucide-react";
+import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText } from "lucide-react";
 
 export default function ClientsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -13,6 +13,7 @@ export default function ClientsPage() {
   const [search, setSearch] = useState("");
   const [selectedStage, setSelectedStage] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedClient, setSelectedClient] = useState<any>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -145,7 +146,8 @@ export default function ClientsPage() {
                 {paginatedClients.map((c: any) => (
                   <tr 
                     key={c.id} 
-                    className="group hover:bg-white/[0.02] transition-colors cursor-default"
+                    onClick={() => setSelectedClient(c)}
+                    className="group hover:bg-white/[0.02] transition-colors cursor-pointer"
                   >
                     <td className="px-8 py-7">
                       <div className="flex items-center gap-5">
@@ -256,6 +258,134 @@ export default function ClientsPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal Cliente */}
+      {selectedClient && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in" onClick={() => setSelectedClient(null)}>
+          <div className="bg-[#050C0C] border border-white/10 rounded-[2.5rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            {/* Header del Modal */}
+            <div className="sticky top-0 z-10 bg-[#050C0C]/90 backdrop-blur px-8 py-6 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                  <User className="w-6 h-6 text-accent" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-white italic tracking-tighter uppercase leading-none">{selectedClient.clientName}</h2>
+                  <p className="text-xs font-black text-white/40 uppercase tracking-[0.2em] mt-1">{selectedClient.rut || "SIN RUT"}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedClient(null)}
+                className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-red-500/10 hover:text-red-400 focus:outline-none transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Cuerpo del Modal */}
+            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8 outline-none">
+              
+              {/* Columna Izquierda: Contacto & Estado */}
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><Mail className="w-3 h-3"/> Contacto</h3>
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-4">
+                    <div>
+                      <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Correo Electrónico</p>
+                      <p className="text-sm font-bold text-white/80">{selectedClient.clientEmail}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Teléfono</p>
+                      <p className="text-sm font-bold text-white/80">{selectedClient.clientPhone || "No registrado"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><MapPin className="w-3 h-3"/> Propiedad Asignada</h3>
+                  <div className="bg-gradient-to-br from-accent/10 to-transparent border border-accent/20 rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <span className="inline-block px-3 py-1 rounded-full bg-accent/20 text-accent text-[10px] font-black uppercase tracking-widest mb-2">
+                          LOTE {selectedClient.lotNumber}
+                        </span>
+                        <p className="text-xl font-black text-white">{formatCLP(selectedClient.totalToPay)}</p>
+                        <p className="text-[10px] uppercase font-black text-white/40 mt-1">Valor Venta</p>
+                      </div>
+                      <Hash className="w-10 h-10 text-accent/20" />
+                    </div>
+                    {selectedClient.lotStage && (
+                      <div className="flex items-center gap-4 text-xs font-bold text-white/60">
+                        <span className="uppercase tracking-widest opacity-80">Etapa {selectedClient.lotStage}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Columna Derecha: Finanzas */}
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><DollarSign className="w-3 h-3"/> Finanzas & Saldos</h3>
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-6">
+                    <div className="flex justify-between items-end border-b border-white/5 pb-4">
+                      <div>
+                        <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Saldo Pendiente</p>
+                        <p className="text-2xl font-black text-white">{formatCLP(selectedClient.pendingBalance)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Total Pagado</p>
+                        <p className="text-sm font-bold text-emerald-400">{formatCLP(selectedClient.totalPaid)}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-[10px] uppercase font-black tracking-widest">
+                        <span className="text-white/40">Progreso Cuotas</span>
+                        <span className="text-accent">{selectedClient.paidCuotas} / {selectedClient.totalCuotas}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-white/5 overflow-hidden border border-white/5">
+                        <div className="h-full bg-accent" style={{ width: `${(selectedClient.totalCuotas > 0) ? (selectedClient.paidCuotas / selectedClient.totalCuotas) * 100 : 0}%` }} />
+                      </div>
+                      <p className="text-right text-[10px] text-white/30 uppercase font-black pt-1">
+                        Cuota Base: {formatCLP(selectedClient.valor_cuota)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><Activity className="w-3 h-3"/> Estado Operativo</h3>
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6">
+                    <div className="flex items-center gap-4 mb-5">
+                      <div className={`w-3 h-3 rounded-full animate-pulse ${selectedClient.status === "LATE" ? "bg-red-500" : selectedClient.status === "GRACE" ? "bg-orange-500" : selectedClient.status === "UPCOMING" ? "bg-indigo-500" : "bg-emerald-500"}`} />
+                      <p className={`text-sm font-black uppercase tracking-widest ${selectedClient.status === "LATE" ? "text-red-400" : selectedClient.status === "GRACE" ? "text-orange-400" : selectedClient.status === "UPCOMING" ? "text-indigo-400" : "text-emerald-400"}`}>
+                        {selectedClient.status === "LATE" ? "En Mora" : selectedClient.status === "GRACE" ? "Periodo de Gracia" : selectedClient.status === "UPCOMING" ? "Aviso Próximo" : "Al Día"}
+                      </p>
+                    </div>
+                    {selectedClient.status === "LATE" && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mt-2">
+                        <p className="text-xs text-red-300 font-bold mb-1">Atraso Contable: {selectedClient.lateDays} Días</p>
+                        <p className="text-[10px] uppercase text-red-400/80 font-black tracking-widest">Multa Vigente: {formatCLP(selectedClient.penaltyAmount)}</p>
+                      </div>
+                    )}
+                    {selectedClient.nextDueDate && (
+                      <div className="mt-5 pt-5 border-t border-white/5 flex justify-between items-center">
+                        <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">Próximo Cierre</p>
+                        <p className="text-xs font-bold text-white/80 flex items-center gap-2">
+                          <Calendar className="w-3 h-3 text-accent" />
+                          {formatDate(selectedClient.nextDueDate)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
         </div>
       )}
     </div>
