@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile } from "@/actions/postventa";
 import { formatCLP, formatDate } from "@/lib/utils";
-import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText } from "lucide-react";
+import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3 } from "lucide-react";
 
 export default function ClientsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -14,6 +14,13 @@ export default function ClientsPage() {
   const [selectedStage, setSelectedStage] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedClient, setSelectedClient] = useState<any>(null);
+  
+  // Edit State
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editMsg, setEditMsg] = useState({ text: "", type: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", rut: "", phone: "" });
+
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -146,7 +153,17 @@ export default function ClientsPage() {
                 {paginatedClients.map((c: any) => (
                   <tr 
                     key={c.id} 
-                    onClick={() => setSelectedClient(c)}
+                    onClick={() => {
+                      setSelectedClient(c);
+                      setIsEditing(false);
+                      setEditMsg({ text: "", type: "" });
+                      setEditForm({
+                        name: c.clientName || "",
+                        email: c.clientEmail || "",
+                        rut: c.rut || "",
+                        phone: c.clientPhone || ""
+                      });
+                    }}
                     className="group hover:bg-white/[0.02] transition-colors cursor-pointer"
                   >
                     <td className="px-8 py-7">
@@ -276,12 +293,19 @@ export default function ClientsPage() {
                   <p className="text-xs font-black text-white/40 uppercase tracking-[0.2em] mt-1">{selectedClient.rut || "SIN RUT"}</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setSelectedClient(null)}
-                className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-red-500/10 hover:text-red-400 focus:outline-none transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                {(!selectedClient.rut || !selectedClient.clientPhone || selectedClient.clientEmail?.includes("@libertadyalegria")) && !isEditing && (
+                  <div className="hidden sm:flex bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[10px] uppercase font-black tracking-widest px-4 py-2 rounded-xl items-center gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Faltan Datos Clave
+                  </div>
+                )}
+                <button 
+                  onClick={() => setSelectedClient(null)}
+                  className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-red-500/10 hover:text-red-400 focus:outline-none transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Cuerpo del Modal */}
@@ -290,17 +314,91 @@ export default function ClientsPage() {
               {/* Columna Izquierda: Contacto & Estado */}
               <div className="space-y-8">
                 <div className="space-y-4">
-                  <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><Mail className="w-3 h-3"/> Contacto</h3>
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-4">
-                    <div>
-                      <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Correo Electrónico</p>
-                      <p className="text-sm font-bold text-white/80">{selectedClient.clientEmail}</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Teléfono</p>
-                      <p className="text-sm font-bold text-white/80">{selectedClient.clientPhone || "No registrado"}</p>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><Mail className="w-3 h-3"/> Contacto</h3>
+                    {!isEditing && (
+                      <button onClick={() => setIsEditing(true)} className="text-[10px] uppercase font-black tracking-widest text-accent hover:text-white transition-colors flex items-center gap-1.5 bg-accent/10 px-3 py-1.5 rounded-lg">
+                        <Edit3 className="w-3 h-3" /> Editar
+                      </button>
+                    )}
                   </div>
+                  
+                  {isEditing ? (
+                    <div className="bg-white/[0.02] border border-accent/30 rounded-2xl p-6 space-y-4 shadow-[0_0_20px_rgba(212,168,75,0.05)]">
+                      <div className="space-y-3">
+                        <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Nombre Completo</label>
+                        <input type="text" value={editForm.name} onChange={e=>setEditForm({...editForm, name: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-accent outline-none font-bold" />
+                      </div>
+                      <div className="space-y-3">
+                        <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">RUT Registrado</label>
+                        <input type="text" value={editForm.rut} onChange={e=>setEditForm({...editForm, rut: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-accent outline-none font-bold" />
+                      </div>
+                      <div className="space-y-3">
+                        <label className="block flex items-center justify-between text-[9px] text-white/40 uppercase font-black tracking-widest">
+                          Correo / Usuario 
+                          {editForm.email.includes("@libertadyalegria") && <span className="text-red-400">Temporal</span>}
+                        </label>
+                        <input type="email" value={editForm.email} onChange={e=>setEditForm({...editForm, email: e.target.value})} className={`w-full bg-black/40 border rounded-xl px-4 py-3 text-sm text-white focus:border-accent outline-none font-bold ${editForm.email.includes("@libertadyalegria") ? "border-red-500/40" : "border-white/10"}`} />
+                      </div>
+                      <div className="space-y-3">
+                        <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Teléfono de Contacto</label>
+                        <input type="text" value={editForm.phone} onChange={e=>setEditForm({...editForm, phone: e.target.value})} className={`w-full bg-black/40 border rounded-xl px-4 py-3 text-sm text-white focus:border-accent outline-none font-bold ${!editForm.phone ? "border-orange-500/40" : "border-white/10"}`} />
+                      </div>
+
+                      {editMsg.text && (
+                        <div className={`text-[10px] font-black uppercase tracking-widest p-3 rounded-xl border ${editMsg.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+                          {editMsg.text}
+                        </div>
+                      )}
+
+                      <div className="flex gap-3 pt-2">
+                        <button onClick={() => {setIsEditing(false); setEditMsg({text:"",type:""});}} className="flex-1 px-4 py-3 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/60 hover:bg-white/5 transition-colors">Cancelar</button>
+                        <button 
+                          onClick={async () => {
+                            setIsSaving(true);
+                            setEditMsg({ text: "", type: "" });
+                            try {
+                              const res = await updateClientProfile(selectedClient.id, editForm);
+                              if (res.error) {
+                                setEditMsg({ text: res.error, type: "error" });
+                              } else {
+                                setEditMsg({ text: "Datos actualizados. Cerrando...", type: "success" });
+                                setTimeout(() => {
+                                  setSelectedClient(null); // Close modal on success to refresh cleanly
+                                  setIsEditing(false);
+                                }, 1500);
+                              }
+                            } catch(e) {
+                              setEditMsg({ text: "Error de servidor.", type: "error" });
+                            }
+                            setIsSaving(false);
+                          }}
+                          disabled={isSaving}
+                          className="flex-1 px-4 py-3 rounded-xl bg-accent text-black text-[10px] font-black uppercase tracking-widest hover:brightness-110 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                        >
+                          {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                          Guardar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-4">
+                      <div>
+                        <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1 flex items-center justify-between">
+                          Correo Electrónico
+                          {selectedClient.clientEmail?.includes("@libertadyalegria") && <span className="text-red-400">CORREO TEMPORAL CREADO POR SISTEMA</span>}
+                        </p>
+                        <p className={`text-sm font-bold ${selectedClient.clientEmail?.includes("@libertadyalegria") ? "text-red-300" : "text-white/80"}`}>{selectedClient.clientEmail}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1 flex items-center justify-between">
+                          Teléfono
+                          {!selectedClient.clientPhone && <span className="text-orange-400">FALTA TELÉFONO</span>}
+                        </p>
+                        <p className={`text-sm font-bold ${!selectedClient.clientPhone ? "text-orange-300 italic" : "text-white/80"}`}>{selectedClient.clientPhone || "No registrado"}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
