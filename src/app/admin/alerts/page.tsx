@@ -26,6 +26,9 @@ export default function AlertsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterStatus>("ALL");
   const [search, setSearch] = useState("");
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     getAdminProjects().then((result) => {
@@ -62,6 +65,12 @@ export default function AlertsPage() {
     { key: "UPCOMING", label: "Próximos Vencimientos", icon: Bell, count: data?.stats?.upcoming || 0, color: "#818cf8" },
     { key: "OK", label: "Situación Normal", icon: CheckCircle, count: data?.stats?.ok || 0, color: "var(--success)" },
   ];
+
+  const totalPages = Math.ceil(clients.length / itemsPerPage);
+  const paginatedClients = clients.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="space-y-12 animate-fade-in px-4">
@@ -134,7 +143,7 @@ export default function AlertsPage() {
         </div>
       ) : (
         <div className="grid gap-6">
-          {clients.map((client: any, idx: number) => (
+          {paginatedClients.map((client: any, idx: number) => (
             <div
               key={client.id}
               className="group relative rounded-[2rem] p-8 flex flex-col [@media(min-width:1000px)]:flex-row [@media(min-width:1000px)]:items-center gap-8 glass-card animate-slide-up"
@@ -215,6 +224,32 @@ export default function AlertsPage() {
               <p className="text-sm font-black uppercase tracking-[0.3em] opacity-20">Sin alertas activas bajo este criterio</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-20">
+            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, clients.length)} de {clients.length} Alertas
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center rotate-180 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <div className="px-4 text-xs font-black text-white/50">{currentPage} / {totalPages}</div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
     </div>

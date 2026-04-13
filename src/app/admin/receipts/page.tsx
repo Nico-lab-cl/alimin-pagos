@@ -17,7 +17,8 @@ import {
   Calendar, 
   ArrowRight, 
   Eye,
-  CheckSquare
+  CheckSquare,
+  ChevronRight
 } from "lucide-react";
 
 export default function ReceiptsPage() {
@@ -26,6 +27,9 @@ export default function ReceiptsPage() {
   const [receipts, setReceipts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     getAdminProjects().then((result) => {
@@ -80,6 +84,12 @@ export default function ReceiptsPage() {
     setProcessing(null);
   };
 
+  const totalPages = Math.ceil(receipts.length / itemsPerPage);
+  const paginatedReceipts = receipts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <div className="space-y-12 animate-fade-in px-4">
       {/* Header Section */}
@@ -125,7 +135,7 @@ export default function ReceiptsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-8">
-          {receipts.map((receipt: any, idx: number) => (
+          {paginatedReceipts.map((receipt: any, idx: number) => (
             <div
               key={receipt.id}
               className="group relative rounded-[3rem] overflow-hidden glass-card animate-slide-up"
@@ -212,7 +222,34 @@ export default function ReceiptsPage() {
                 </div>
               </div>
             </div>
+            </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-20">
+            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, receipts.length)} de {receipts.length} Comprobantes
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center rotate-180 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <div className="px-4 text-xs font-black text-white/50">{currentPage} / {totalPages}</div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -12,6 +12,8 @@ export default function AdminLotsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   useEffect(() => {
     getAdminProjects().then((result) => {
@@ -35,6 +37,12 @@ export default function AdminLotsPage() {
   const filteredLots = lots.filter(l => 
     l.number.toLowerCase().includes(search.toLowerCase()) ||
     l.stage?.toString().includes(search)
+  );
+
+  const totalPages = Math.ceil(filteredLots.length / itemsPerPage);
+  const paginatedLots = filteredLots.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   return (
@@ -100,7 +108,7 @@ export default function AdminLotsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredLots.map((lot, i) => (
+          {paginatedLots.map((lot, i) => (
             <div
               key={lot.id}
               className="group relative rounded-[2.5rem] p-8 glass-card animate-slide-up"
@@ -157,6 +165,32 @@ export default function AdminLotsPage() {
               <p className="text-sm font-black uppercase tracking-[0.3em] opacity-20">Inventario vacío en esta selección</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-20">
+            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredLots.length)} de {filteredLots.length} Lotes
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center rotate-180 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <div className="px-4 text-xs font-black text-white/50">{currentPage} / {totalPages}</div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
     </div>

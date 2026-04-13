@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData, updateClientProfile } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials } from "@/actions/postventa";
 import { formatCLP, formatDate } from "@/lib/utils";
 import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3 } from "lucide-react";
 
@@ -20,6 +20,22 @@ export default function ClientsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [editMsg, setEditMsg] = useState({ text: "", type: "" });
   const [editForm, setEditForm] = useState({ name: "", email: "", rut: "", phone: "" });
+  
+  // Financial Edit State
+  const [isEditingFin, setIsEditingFin] = useState(false);
+  const [isSavingFin, setIsSavingFin] = useState(false);
+  const [editFinMsg, setEditFinMsg] = useState({ text: "", type: "" });
+  const [finForm, setFinForm] = useState({
+    price_total_clp: 0,
+    reservation_price: 0,
+    pie: 0,
+    cuotas: 0,
+    valor_cuota: 0,
+    last_installment_value: 0,
+    installments_paid: 0,
+    daily_penalty: 0,
+    installment_start_date: ""
+  });
 
   const itemsPerPage = 10;
 
@@ -156,12 +172,25 @@ export default function ClientsPage() {
                     onClick={() => {
                       setSelectedClient(c);
                       setIsEditing(false);
+                      setIsEditingFin(false);
                       setEditMsg({ text: "", type: "" });
+                      setEditFinMsg({ text: "", type: "" });
                       setEditForm({
                         name: c.clientName || "",
                         email: c.clientEmail || "",
                         rut: c.rut || "",
                         phone: c.clientPhone || ""
+                      });
+                      setFinForm({
+                        price_total_clp: c.totalToPay || 0,
+                        reservation_price: c.reservation_price || 0,
+                        pie: c.pieAmount || 0,
+                        cuotas: c.totalCuotas || 0,
+                        valor_cuota: c.valor_cuota || 0,
+                        last_installment_value: c.last_installment_value || c.valor_cuota || 0,
+                        installments_paid: c.paidCuotas || 0,
+                        daily_penalty: c.daily_penalty || 10000,
+                        installment_start_date: c.installment_start_date ? new Date(c.installment_start_date).toISOString().split('T')[0] : ""
                       });
                     }}
                     className="group hover:bg-white/[0.02] transition-colors cursor-pointer"
@@ -426,32 +455,130 @@ export default function ClientsPage() {
               {/* Columna Derecha: Finanzas */}
               <div className="space-y-8">
                 <div className="space-y-4">
-                  <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><DollarSign className="w-3 h-3"/> Finanzas & Saldos</h3>
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-6">
-                    <div className="flex justify-between items-end border-b border-white/5 pb-4">
-                      <div>
-                        <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Saldo Pendiente</p>
-                        <p className="text-2xl font-black text-white">{formatCLP(selectedClient.pendingBalance)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Total Pagado</p>
-                        <p className="text-sm font-bold text-emerald-400">{formatCLP(selectedClient.totalPaid)}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-[10px] uppercase font-black tracking-widest">
-                        <span className="text-white/40">Progreso Cuotas</span>
-                        <span className="text-accent">{selectedClient.paidCuotas} / {selectedClient.totalCuotas}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-white/5 overflow-hidden border border-white/5">
-                        <div className="h-full bg-accent" style={{ width: `${(selectedClient.totalCuotas > 0) ? (selectedClient.paidCuotas / selectedClient.totalCuotas) * 100 : 0}%` }} />
-                      </div>
-                      <p className="text-right text-[10px] text-white/30 uppercase font-black pt-1">
-                        Cuota Base: {formatCLP(selectedClient.valor_cuota)}
-                      </p>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><DollarSign className="w-3 h-3"/> Finanzas & Saldos</h3>
+                    {!isEditingFin && (
+                      <button onClick={() => setIsEditingFin(true)} className="text-[10px] uppercase font-black tracking-widest text-accent hover:text-white transition-colors flex items-center gap-1.5 bg-accent/10 px-3 py-1.5 rounded-lg">
+                        <Edit3 className="w-3 h-3" /> Configuración Financiera
+                      </button>
+                    )}
                   </div>
+                  
+                  {isEditingFin ? (
+                    <div className="bg-white/[0.02] border border-accent/30 rounded-2xl p-6 space-y-4 shadow-[0_0_20px_rgba(212,168,75,0.05)]">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Valor Terreno Total</label>
+                          <input type="number" value={finForm.price_total_clp} onChange={e=>setFinForm({...finForm, price_total_clp: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Valor Reserva Inicial</label>
+                          <input type="number" value={finForm.reservation_price} onChange={e=>setFinForm({...finForm, reservation_price: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Valor Pie Pagado</label>
+                          <input type="number" value={finForm.pie} onChange={e=>setFinForm({...finForm, pie: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Total Cuotas a Pagar</label>
+                          <input type="number" value={finForm.cuotas} onChange={e=>setFinForm({...finForm, cuotas: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Valor Cuota Normal</label>
+                          <input type="number" value={finForm.valor_cuota} onChange={e=>setFinForm({...finForm, valor_cuota: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Valor Última Cuota</label>
+                          <input type="number" value={finForm.last_installment_value} onChange={e=>setFinForm({...finForm, last_installment_value: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                        </div>
+                      </div>
+
+                      <div className="border-t border-white/10 pt-4 mt-2">
+                        <p className="text-[10px] font-black uppercase text-white/40 tracking-widest mb-3">Progreso de Calendario</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Fecha Inicio de Cuota 1</label>
+                            <input type="date" value={finForm.installment_start_date} onChange={e=>setFinForm({...finForm, installment_start_date: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Cuota Actual Pagada</label>
+                            <input type="number" value={finForm.installments_paid} onChange={e=>setFinForm({...finForm, installments_paid: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Interés Multa x Día ($)</label>
+                            <input type="number" value={finForm.daily_penalty} onChange={e=>setFinForm({...finForm, daily_penalty: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {editFinMsg.text && (
+                        <div className={`mt-2 text-[10px] font-black uppercase tracking-widest p-3 rounded-xl border ${editFinMsg.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+                          {editFinMsg.text}
+                        </div>
+                      )}
+
+                      <div className="flex gap-3 pt-4">
+                        <button onClick={() => {setIsEditingFin(false); setEditFinMsg({text:"",type:""});}} className="flex-1 px-4 py-3 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/60 hover:bg-white/5 transition-colors">Descartar Cambios</button>
+                        <button 
+                          onClick={async () => {
+                            setIsSavingFin(true);
+                            setEditFinMsg({ text: "", type: "" });
+                            try {
+                              const res = await updateClientFinancials(selectedClient.id, selectedClient.lot_id, finForm);
+                              if (res.error) {
+                                setEditFinMsg({ text: res.error, type: "error" });
+                              } else {
+                                setEditFinMsg({ text: "Estructura Pactada Actualizada Exitosamente.", type: "success" });
+                                setTimeout(() => {
+                                  setSelectedClient(null); 
+                                  setIsEditingFin(false);
+                                }, 1500);
+                              }
+                            } catch(e) {
+                              setEditFinMsg({ text: "Error procesando recálculo en servidor.", type: "error" });
+                            }
+                            setIsSavingFin(false);
+                          }}
+                          disabled={isSavingFin}
+                          className="flex-1 px-4 py-3 rounded-xl bg-accent text-black text-[10px] font-black uppercase tracking-widest hover:brightness-110 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                        >
+                          {isSavingFin ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                          Recalibrar Finanzas
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-6">
+                      <div className="flex justify-between items-end border-b border-white/5 pb-4">
+                        <div>
+                          <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Saldo Pendiente</p>
+                          <p className="text-2xl font-black text-white">{formatCLP(selectedClient.pendingBalance)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Total Pagado</p>
+                          <p className="text-sm font-bold text-emerald-400">{formatCLP(selectedClient.totalPaid)}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-[10px] uppercase font-black tracking-widest">
+                          <span className="text-white/40">Progreso Cuotas</span>
+                          <span className="text-accent">{selectedClient.paidCuotas} / {selectedClient.totalCuotas}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-white/5 overflow-hidden border border-white/5">
+                          <div className="h-full bg-accent" style={{ width: `${(selectedClient.totalCuotas > 0) ? (selectedClient.paidCuotas / selectedClient.totalCuotas) * 100 : 0}%` }} />
+                        </div>
+                        <div className="flex justify-between w-full pt-1">
+                           <p className="text-[10px] text-white/30 uppercase font-black">
+                            Pie: {formatCLP(selectedClient.pieAmount)}
+                          </p>
+                          <p className="text-[10px] text-white/30 uppercase font-black">
+                            Cuota Base: {formatCLP(selectedClient.valor_cuota)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">

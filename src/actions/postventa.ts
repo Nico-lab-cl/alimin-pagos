@@ -528,3 +528,79 @@ export async function updateClientProfile(reservationId: string, data: { name: s
     return { error: "Error interno del servidor actualizando perfil" };
   }
 }
+
+/**
+ * Updates a client's financial data (admin only).
+ */
+export async function updateClientFinancials(reservationId: string, lotId: string, data: {
+  cuotas: number;
+  valor_cuota: number;
+  price_total_clp: number;
+  reservation_price: number;
+  pie: number;
+  last_installment_value: number;
+  installments_paid: number;
+  installment_start_date: string;
+  daily_penalty: number;
+}) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { lot: true }
+    });
+
+    if (!reservation) return { error: "Reserva no encontrada" };
+
+    // Set dates
+    let startDateObj: Date | null = null;
+    let nextDateObj: Date | null = null;
+    
+    if (data.installment_start_date) {
+        startDateObj = new Date(data.installment_start_date);
+        // compute next date based on installments_paid
+        const projectConfig = await getProjectConfig(reservation.project_id);
+        const dueDay = projectConfig?.due_day_of_month || 5;
+        // The NEXT payment is (installments_paid + 1)
+        nextDateObj = getInstallmentDueDate(startDateObj, data.installments_paid + 1, dueDay);
+    }
+
+    await prisma.$transaction([
+      prisma.lot.update({
+        where: { id: lotId },
+        data: {
+          price_total_clp: data.price_total_clp,
+          cuotas: data.cuotas,
+          valor_cuota: data.valor_cuota,
+          pie: data.pie
+        }
+      }),
+      prisma.reservation.update({
+        where: { id: reservationId },
+        data: {
+          reservation_price: data.reservation_price,
+          pie: data.pie,
+          last_installment_value: data.last_installment_value,
+          daily_penalty: data.daily_penalty,
+          installments_paid: data.installments_paid,
+          ...(startDateObj && { installment_start_date: startDateObj }),
+          ...(nextDateObj && { next_payment_date: nextDateObj }),
+        }
+      })
+    ]);
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating client financials:", error);
+    return { error: "Error interno actualizando finanzas" };
+  }
+}

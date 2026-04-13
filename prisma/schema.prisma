@@ -130,7 +130,9 @@ model Reservation {
   installment_ranges     Json?
   debt_start_date        DateTime? @db.Timestamptz
   next_payment_date      DateTime? @db.Timestamptz
+  last_installment_value Int?
 
+  reservation_price      Int? @default(0)
   daily_penalty          Int?
 
   mora_frozen Boolean @default(false)
