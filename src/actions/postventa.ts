@@ -207,14 +207,8 @@ export async function getFullPostventaData({
         isGracePeriod,
         isUpcoming,
         isLate: penaltyAmount > 0,
-        isMoraFrozen: res.mora_frozen,
+        mora_frozen: res.mora_frozen, // explicitly naming it here for the UI
         status,
-        valor_cuota: lot.valor_cuota || 0,
-        manual_documents: manualDocsMeta,
-        advisor: res.advisor,
-        observation: res.observation,
-        notes: res.notes,
-        mora_frozen: res.mora_frozen,
         address_street: res.address_street,
         address_number: res.address_number,
         address_commune: res.address_commune,
@@ -596,20 +590,20 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
         data: {
           reservation_price: data.reservation_price,
           pie: data.pie,
-          last_installment_value: data.last_installment_value,
-          daily_penalty: data.daily_penalty,
+          last_installment_value: Number(data.last_installment_value),
+          daily_penalty: Number(data.daily_penalty),
           due_day: (data.next_payment_date && data.next_payment_date.trim() !== "") 
             ? new Date(data.next_payment_date + "T12:00:00").getDate() 
-            : data.due_day,
-          grace_days: data.grace_days,
-          mora_frozen: data.mora_frozen,
+            : Number(data.due_day),
+          grace_days: Number(data.grace_days),
+          mora_frozen: Boolean(data.mora_frozen),
           debt_start_date: (data.debt_start_date && data.debt_start_date.trim() !== "") 
             ? new Date(data.debt_start_date + "T12:00:00") 
             : null,
           next_payment_date: (data.next_payment_date && data.next_payment_date.trim() !== "") 
             ? new Date(data.next_payment_date + "T12:00:00") 
             : (nextDateObj || null),
-          installments_paid: data.installments_paid,
+          installments_paid: Number(data.installments_paid),
           ...(startDateObj && { installment_start_date: startDateObj }),
         }
       })
