@@ -11,6 +11,9 @@ export default function ClientsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedStage, setSelectedStage] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     getAdminProjects().then((result) => {
@@ -31,13 +34,32 @@ export default function ClientsPage() {
     }
   }, [selectedProject]);
 
-  const clients = (data?.data || []).filter(
-    (c: any) =>
-      !search ||
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedStage, selectedProject]);
+
+  const rawClients = data?.data || [];
+  const uniqueStages: string[] = Array.from(new Set(rawClients.map((c: any) => c.lotStage).filter(Boolean)));
+  
+  const stageCounts = uniqueStages.reduce((acc: any, stage: string) => {
+    acc[stage] = rawClients.filter((c: any) => c.lotStage === stage).length;
+    return acc;
+  }, {});
+
+  const filteredClients = rawClients.filter((c: any) => {
+    const matchesSearch = !search ||
       c.clientName?.toLowerCase().includes(search.toLowerCase()) ||
       c.clientEmail?.toLowerCase().includes(search.toLowerCase()) ||
-      c.lotNumber?.toString().includes(search)
-  );
+      c.lotNumber?.toString().toUpperCase().includes(search.toUpperCase());
+    
+    // lotStage is stored in DB. Could be undefined occasionally for Lomas.
+    const matchesStage = selectedStage === "ALL" || (c.lotStage && c.lotStage.toString().toUpperCase() === selectedStage.toUpperCase());
+    
+    return matchesSearch && matchesStage;
+  });
+
+  const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+  const paginatedClients = filteredClients.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="space-y-12 animate-fade-in px-4">
@@ -80,6 +102,27 @@ export default function ClientsPage() {
         </div>
       </div>
 
+      {/* Tabs and Counts */}
+      {!loading && rawClients.length > 0 && uniqueStages.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 animate-fade-in">
+          <button
+            onClick={() => setSelectedStage("ALL")}
+            className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border ${selectedStage === "ALL" ? "bg-accent/10 border-accent/40 text-accent shadow-[0_0_15px_rgba(212,168,75,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}
+          >
+            Todos ({rawClients.length})
+          </button>
+          {uniqueStages.map((stage) => (
+            <button
+              key={stage}
+              onClick={() => setSelectedStage(stage)}
+              className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border ${selectedStage === stage.toString().toUpperCase() || selectedStage === stage ? "bg-accent/10 border-accent/40 text-accent shadow-[0_0_15px_rgba(212,168,75,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}
+            >
+              Etapa {stage} ({stageCounts[stage]})
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex flex-col items-center justify-center py-40 gap-4">
           <Loader2 className="w-10 h-10 animate-spin text-accent" />
@@ -99,7 +142,7 @@ export default function ClientsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {clients.map((c: any) => (
+                {paginatedClients.map((c: any) => (
                   <tr 
                     key={c.id} 
                     className="group hover:bg-white/[0.02] transition-colors cursor-default"
@@ -170,10 +213,47 @@ export default function ClientsPage() {
               </tbody>
             </table>
           </div>
-          {clients.length === 0 && (
+          
+          {paginatedClients.length === 0 && (
             <div className="text-center py-40 flex flex-col items-center justify-center">
               <Target className="w-16 h-16 mb-6 opacity-5" />
               <p className="text-sm font-black uppercase tracking-[0.3em] opacity-20">Búsqueda sin resultados en este proyecto</p>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="border-t border-white/5 bg-white/[0.02] p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">
+                Mostrando página <span className="text-accent">{currentPage}</span> de <span className="text-white/60">{totalPages}</span>
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  Anterior
+                </button>
+                <div className="hidden sm:flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black transition-all ${currentPage === page ? "bg-accent/20 text-accent border border-accent/40 shadow-[0_0_10px_rgba(212,168,75,0.2)]" : "text-white/40 hover:text-white/80 hover:bg-white/5"}`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
           )}
         </div>
