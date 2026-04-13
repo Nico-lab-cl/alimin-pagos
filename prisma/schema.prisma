@@ -49,7 +49,7 @@ model Lot {
   id                     Int       @id @default(autoincrement())
   project_id             String    @db.Uuid
   number                 String    @db.VarChar(20)
-  stage                  Int?
+  stage                  String?   @db.VarChar(100)
   area_m2                Float?    @db.Real
   price_total_clp        Int?
   reservation_amount_clp Int?      @default(0)
@@ -130,6 +130,8 @@ model Reservation {
   installment_ranges     Json?
   debt_start_date        DateTime? @db.Timestamptz
   next_payment_date      DateTime? @db.Timestamptz
+
+  daily_penalty          Int?
 
   mora_frozen Boolean @default(false)
   advisor     String? @db.VarChar(100)
