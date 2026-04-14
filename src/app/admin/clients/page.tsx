@@ -198,6 +198,7 @@ export default function ClientsPage() {
                         daily_penalty: c.daily_penalty || 10000,
                         due_day: c.due_day || 5,
                         grace_days: c.grace_days || 5,
+                        mora_frozen: c.mora_frozen || false,
                         mora_status: c.mora_status || (c.mora_frozen ? "CONGELADO" : "ACTIVO"),
                         debt_start_date: c.debt_start_date ? new Date(c.debt_start_date).toISOString().split('T')[0] : "",
                         next_payment_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : "",
