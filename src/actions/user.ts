@@ -134,7 +134,7 @@ export async function getUserLots() {
         nextDueDate,
         penaltyAmount,
         lateDays,
-        isLate: penaltyAmount \u003e 0 \u0026\u0026 res.mora_status === "ACTIVO",
+        isLate: penaltyAmount > 0 && res.mora_status === "ACTIVO",
         isMoraFrozen: res.mora_status === "CONGELADO" || res.mora_frozen,
         isUpToDate: res.mora_status === "AL_DIA",
         documents,
