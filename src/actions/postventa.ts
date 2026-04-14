@@ -572,9 +572,9 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
         startDateObj = new Date(data.installment_start_date);
         // compute next date based on installments_paid
         const projectConfig = await getProjectConfig(reservation.project_id);
-        const dueDay = data.due_day || projectConfig?.due_day_of_month || 5;
+        const dueDay = Number(data.due_day) || (projectConfig?.due_day_of_month ?? 5);
         // The NEXT payment is (installments_paid + 1)
-        nextDateObj = getInstallmentDueDate(startDateObj, data.installments_paid + 1, dueDay);
+        nextDateObj = getInstallmentDueDate(startDateObj, (Number(data.installments_paid) ?? 0) + 1, dueDay);
     }
 
     await prisma.$transaction([
