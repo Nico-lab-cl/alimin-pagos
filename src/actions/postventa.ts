@@ -607,7 +607,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
             : (Number(data.due_day) || 5),
           grace_days: Number(data.grace_days) || 0,
           mora_frozen: data.mora_status === "CONGELADO",
-          mora_status: data.mora_status || "ACTIVO",
+          mora_status: data.mora_status,
           debt_start_date: (data.debt_start_date && data.debt_start_date.trim() !== "") 
             ? new Date(data.debt_start_date + "T12:00:00") 
             : null,

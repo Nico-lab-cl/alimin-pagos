@@ -594,6 +594,11 @@ export default function ClientsPage() {
                                 setEditFinMsg({ text: res.error, type: "error" });
                               } else {
                                 setEditFinMsg({ text: "Estructura Pactada Actualizada Exitosamente.", type: "success" });
+                                
+                                // FORCE REFETCH
+                                const freshData = await getFullPostventaData({ projectSlug: selectedProject });
+                                setData(freshData);
+                                
                                 setTimeout(() => {
                                   setSelectedClient(null); 
                                   setIsEditingFin(false);
