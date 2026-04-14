@@ -37,6 +37,7 @@ export default function ClientsPage() {
     due_day: 5,
     grace_days: 5,
     mora_frozen: false,
+    mora_status: "ACTIVO",
     debt_start_date: "",
     next_payment_date: "",
     installment_start_date: ""
