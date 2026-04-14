@@ -101,7 +101,7 @@ export async function getFullPostventaData({
       const totalPaid =
         actualPie + calculatedCuotasTotal + (res.extra_paid_amount || 0);
       const totalToPay = lot.price_total_clp || 0;
-      const pendingBalance = Math.max(
+      let pendingBalance = Math.max(
         0,
         totalToPay - totalPaid + (res.pending_amount || 0)
       );
