@@ -88,7 +88,7 @@ export async function getUserLots() {
         penaltyAmount = calculateTotalInterest(
           nextDueDate,
           currentDate,
-          res.mora_frozen,
+          res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || res.mora_frozen,
           res.grace_days ?? project.grace_period_days ?? 5,
           res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
           res.debt_start_date,
@@ -134,7 +134,9 @@ export async function getUserLots() {
         nextDueDate,
         penaltyAmount,
         lateDays,
-        isMoraFrozen: res.mora_frozen,
+        isLate: penaltyAmount \u003e 0 \u0026\u0026 res.mora_status === "ACTIVO",
+        isMoraFrozen: res.mora_status === "CONGELADO" || res.mora_frozen,
+        isUpToDate: res.mora_status === "AL_DIA",
         documents,
         // Bank data for payment
         bank: {

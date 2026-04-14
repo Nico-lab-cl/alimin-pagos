@@ -139,6 +139,7 @@ model Reservation {
   grace_days             Int? @default(5)
 
   mora_frozen Boolean @default(false)
+  mora_status String? @default("ACTIVO") @db.VarChar(20)
   advisor     String? @db.VarChar(100)
   observation String?
   notes       String?

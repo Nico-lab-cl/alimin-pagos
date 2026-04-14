@@ -158,8 +158,14 @@ export async function getFullPostventaData({
       }
 
       let status = "OK";
-      if (res.mora_frozen) {
+      
+      // Override logic for AL_DIA and CONGELADO
+      if (res.mora_status === "AL_DIA") {
+        status = "OK";
+        penaltyAmount = 0;
+      } else if (res.mora_status === "CONGELADO" || res.mora_frozen) {
         status = "FROZEN";
+        penaltyAmount = 0;
       } else if (penaltyAmount > 0) {
         status = "LATE";
       } else if (isGracePeriod) {
@@ -208,8 +214,8 @@ export async function getFullPostventaData({
         penaltyAmount,
         isGracePeriod,
         isUpcoming,
-        isLate: penaltyAmount > 0,
-        mora_frozen: res.mora_frozen, // explicitly naming it here for the UI
+        mora_frozen: res.mora_frozen,
+        mora_status: res.mora_status || (res.mora_frozen ? "CONGELADO" : "ACTIVO"),
         status,
         address_street: res.address_street,
         address_number: res.address_number,
@@ -237,9 +243,9 @@ export async function getFullPostventaData({
 
     const stats = {
       total: processedData.length,
-      late: processedData.filter((d) => d.isLate && !d.mora_frozen).length,
-      grace: processedData.filter((d) => d.isGracePeriod && !d.mora_frozen).length,
-      upcoming: processedData.filter((d) => d.isUpcoming && !d.mora_frozen).length,
+      late: processedData.filter((d) => d.isLate && d.mora_status === "ACTIVO").length,
+      grace: processedData.filter((d) => d.isGracePeriod && d.mora_status === "ACTIVO").length,
+      upcoming: processedData.filter((d) => d.isUpcoming && d.mora_status === "ACTIVO").length,
       ok: processedData.filter((d) => d.status === "OK").length,
     };
 
@@ -547,6 +553,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
   due_day?: number;
   grace_days?: number;
   mora_frozen?: boolean;
+  mora_status?: string;
   debt_start_date?: string | null;
   next_payment_date?: string | null;
 }) {
@@ -598,7 +605,8 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
             ? new Date(data.next_payment_date + "T12:00:00").getDate() 
             : (Number(data.due_day) || 5),
           grace_days: Number(data.grace_days) || 0,
-          mora_frozen: Boolean(data.mora_frozen),
+          mora_frozen: data.mora_status === "CONGELADO",
+          mora_status: data.mora_status || "ACTIVO",
           debt_start_date: (data.debt_start_date && data.debt_start_date.trim() !== "") 
             ? new Date(data.debt_start_date + "T12:00:00") 
             : null,

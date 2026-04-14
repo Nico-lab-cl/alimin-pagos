@@ -197,7 +197,7 @@ export default function ClientsPage() {
                         daily_penalty: c.daily_penalty || 10000,
                         due_day: c.due_day || 5,
                         grace_days: c.grace_days || 5,
-                        mora_frozen: c.mora_frozen || false,
+                        mora_status: c.mora_status || (c.mora_frozen ? "CONGELADO" : "ACTIVO"),
                         debt_start_date: c.debt_start_date ? new Date(c.debt_start_date).toISOString().split('T')[0] : "",
                         next_payment_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : "",
                         installment_start_date: c.installment_start_date ? new Date(c.installment_start_date).toISOString().split('T')[0] : ""
@@ -540,18 +540,31 @@ export default function ClientsPage() {
                               <input type="number" min="0" value={finForm.grace_days} onChange={e=>setFinForm({...finForm, grace_days: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
                             </div>
                           </div>
-                          <div className="mt-4 flex items-center justify-between bg-white/[0.02] p-4 rounded-xl border border-white/5">
-                            <div>
-                              <p className="text-[10px] font-black text-white uppercase tracking-widest">Cálculo de Multas</p>
-                              <p className="text-[8px] text-white/40 uppercase font-black mt-1">Si activas esto, el sistema cobrará intereses</p>
+                          
+                          {/* Financial Status Dropdown */}
+                          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 mb-6 mt-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-accent mb-1">CÁLCULO DE MULTAS</p>
+                                <p className="text-[9px] text-white/40 uppercase font-bold">Estado financiero manual</p>
+                              </div>
+                              <select 
+                                value={finForm.mora_status}
+                                onChange={(e) => setFinForm({...finForm, mora_status: e.target.value})}
+                                className={`
+                                  px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none border cursor-pointer transition-all
+                                  ${finForm.mora_status === "ACTIVO" ? "bg-red-500/20 text-red-400 border-red-500/40" 
+                                    : finForm.mora_status === "AL_DIA" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                                    : "bg-blue-500/20 text-blue-400 border-blue-500/40"}
+                                `}
+                              >
+                                <option value="ACTIVO" className="bg-[#0c1a1a] text-red-400">ACTIVO (CON MORA)</option>
+                                <option value="AL_DIA" className="bg-[#0c1a1a] text-emerald-400">AL DÍA (SIN MORA)</option>
+                                <option value="CONGELADO" className="bg-[#0c1a1a] text-blue-400">CONGELADO (PAUSADO)</option>
+                              </select>
                             </div>
-                            <button 
-                              onClick={() => setFinForm({...finForm, mora_frozen: !finForm.mora_frozen})}
-                              className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${!finForm.mora_frozen ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "bg-red-500/20 text-red-400 border border-red-500/40"}`}
-                            >
-                              {!finForm.mora_frozen ? "Activo" : "Congelado"}
-                            </button>
                           </div>
+
                           {!finForm.mora_frozen && (
                             <div className="mt-4 space-y-2">
                               <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest font-black italic">Fecha Inicio de Deuda (Opcional - Fuerza Mora)</label>
