@@ -214,6 +214,7 @@ export async function getFullPostventaData({
         penaltyAmount,
         isGracePeriod,
         isUpcoming,
+        isLate: penaltyAmount > 0,
         mora_frozen: res.mora_frozen,
         mora_status: res.mora_status || (res.mora_frozen ? "CONGELADO" : "ACTIVO"),
         status,
