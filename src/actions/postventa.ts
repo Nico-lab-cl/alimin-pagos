@@ -237,9 +237,9 @@ export async function getFullPostventaData({
 
     const stats = {
       total: processedData.length,
-      late: processedData.filter((d) => d.isLate && !d.isMoraFrozen).length,
-      grace: processedData.filter((d) => d.isGracePeriod && !d.isMoraFrozen).length,
-      upcoming: processedData.filter((d) => d.isUpcoming && !d.isMoraFrozen).length,
+      late: processedData.filter((d) => d.isLate && !d.mora_frozen).length,
+      grace: processedData.filter((d) => d.isGracePeriod && !d.mora_frozen).length,
+      upcoming: processedData.filter((d) => d.isUpcoming && !d.mora_frozen).length,
       ok: processedData.filter((d) => d.status === "OK").length,
     };
 
