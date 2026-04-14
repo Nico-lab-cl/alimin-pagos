@@ -82,6 +82,9 @@ export default function ClientsPage() {
       c.clientEmail?.toLowerCase().includes(search.toLowerCase()) ||
       c.lotNumber?.toString().toUpperCase().includes(search.toUpperCase());
     
+    // Filter out ARCHIVED clients
+    if (c.internalStatus === "ARCHIVED") return false;
+    
     // lotStage is stored in DB. Could be undefined occasionally for Lomas.
     const matchesStage = selectedStage === "ALL" || (c.lotStage && c.lotStage.toString().toUpperCase() === selectedStage.toUpperCase());
     
@@ -241,7 +244,7 @@ export default function ClientsPage() {
                           <div 
                             className="h-full bg-accent group-hover:brightness-125 transition-all duration-1000" 
                             style={{ 
-                              width: `${(c.paidCuotas / c.totalCuotas) * 100}%`,
+                              width: c.totalCuotas > 0 ? `${(c.paidCuotas / c.totalCuotas) * 100}%` : '100%',
                               boxShadow: "0 0 15px rgba(212,168,75,0.4)"
                             }} 
                           />
@@ -262,11 +265,13 @@ export default function ClientsPage() {
                         <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ 
                           background: c.status === "LATE" ? "#f87171" 
                             : c.status === "FROZEN" ? "#60a5fa"
+                            : c.status === "COMPLETED" ? "#10b981"
                             : c.status === "GRACE" ? "var(--warning)" 
                             : "var(--success)" 
                         }} />
                         {c.status === "LATE" ? "MORA" 
                           : c.status === "FROZEN" ? "CONGELADO"
+                          : c.status === "COMPLETED" ? "PAGO CONTADO"
                           : c.status === "GRACE" ? "GRACIA" 
                           : c.status === "UPCOMING" ? "AVISO" 
                           : "AL DÍA"}

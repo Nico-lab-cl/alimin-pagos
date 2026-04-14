@@ -159,8 +159,12 @@ export async function getFullPostventaData({
 
       let status = "OK";
       
-      // Override logic for AL_DIA and CONGELADO
-      if (res.mora_status === "AL_DIA") {
+      // Override logic for COMPLETED, AL_DIA and CONGELADO
+      if (res.status === "COMPLETED") {
+        status = "COMPLETED";
+        penaltyAmount = 0;
+        pendingBalance = 0; // Ensure balance is 0 for paid in full
+      } else if (res.mora_status === "AL_DIA") {
         status = "OK";
         penaltyAmount = 0;
       } else if (res.mora_status === "CONGELADO" || res.mora_frozen) {
@@ -225,6 +229,7 @@ export async function getFullPostventaData({
         marital_status: res.marital_status,
         profession: res.profession,
         nationality: res.nationality,
+        internalStatus: res.status,
         installment_start_date: res.installment_start_date,
         installment_ranges: res.installment_ranges,
         debt_start_date: res.debt_start_date,
