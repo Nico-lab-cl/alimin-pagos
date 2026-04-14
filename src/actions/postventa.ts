@@ -157,14 +157,16 @@ export async function getFullPostventaData({
         isUpcoming = true;
       }
 
-      const status =
-        penaltyAmount > 0 && !res.mora_frozen
-          ? "LATE"
-          : isGracePeriod && !res.mora_frozen
-          ? "GRACE"
-          : isUpcoming && !res.mora_frozen
-          ? "UPCOMING"
-          : "OK";
+      let status = "OK";
+      if (res.mora_frozen) {
+        status = "FROZEN";
+      } else if (penaltyAmount > 0) {
+        status = "LATE";
+      } else if (isGracePeriod) {
+        status = "GRACE";
+      } else if (isUpcoming) {
+        status = "UPCOMING";
+      }
 
       // Manual docs meta (strip base64)
       let manualDocsMeta: any[] = [];
@@ -533,18 +535,18 @@ export async function updateClientProfile(reservationId: string, data: { name: s
  * Updates a client's financial data (admin only).
  */
 export async function updateClientFinancials(reservationId: string, lotId: number, data: {
-  cuotas: number;
-  valor_cuota: number;
-  price_total_clp: number;
-  reservation_price: number;
-  pie: number;
-  last_installment_value: number;
-  installments_paid: number;
-  installment_start_date: string;
-  daily_penalty: number;
-  due_day: number;
-  grace_days: number;
-  mora_frozen: boolean;
+  cuotas?: number;
+  valor_cuota?: number;
+  price_total_clp?: number;
+  reservation_price?: number;
+  pie?: number;
+  last_installment_value?: number;
+  installments_paid?: number;
+  installment_start_date?: string;
+  daily_penalty?: number;
+  due_day?: number;
+  grace_days?: number;
+  mora_frozen?: boolean;
   debt_start_date?: string | null;
   next_payment_date?: string | null;
 }) {
@@ -577,25 +579,25 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
 
     await prisma.$transaction([
       prisma.lot.update({
-        where: { id: lotId },
+        where: { id: Number(lotId) || lotId },
         data: {
-          price_total_clp: data.price_total_clp,
-          cuotas: data.cuotas,
-          valor_cuota: data.valor_cuota,
-          pie: data.pie
+          price_total_clp: Number(data.price_total_clp) || 0,
+          cuotas: Number(data.cuotas) || 0,
+          valor_cuota: Number(data.valor_cuota) || 0,
+          pie: Number(data.pie) || 0
         }
       }),
       prisma.reservation.update({
         where: { id: reservationId },
         data: {
-          reservation_price: data.reservation_price,
-          pie: data.pie,
-          last_installment_value: Number(data.last_installment_value),
-          daily_penalty: Number(data.daily_penalty),
+          reservation_price: Number(data.reservation_price) || 0,
+          pie: Number(data.pie) || 0,
+          last_installment_value: Number(data.last_installment_value) || 0,
+          daily_penalty: Number(data.daily_penalty) || 0,
           due_day: (data.next_payment_date && data.next_payment_date.trim() !== "") 
             ? new Date(data.next_payment_date + "T12:00:00").getDate() 
-            : Number(data.due_day),
-          grace_days: Number(data.grace_days),
+            : (Number(data.due_day) || 5),
+          grace_days: Number(data.grace_days) || 0,
           mora_frozen: Boolean(data.mora_frozen),
           debt_start_date: (data.debt_start_date && data.debt_start_date.trim() !== "") 
             ? new Date(data.debt_start_date + "T12:00:00") 
@@ -603,7 +605,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
           next_payment_date: (data.next_payment_date && data.next_payment_date.trim() !== "") 
             ? new Date(data.next_payment_date + "T12:00:00") 
             : (nextDateObj || null),
-          installments_paid: Number(data.installments_paid),
+          installments_paid: Number(data.installments_paid) || 0,
           ...(startDateObj && { installment_start_date: startDateObj }),
         }
       })

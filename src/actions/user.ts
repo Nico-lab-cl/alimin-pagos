@@ -81,7 +81,7 @@ export async function getUserLots() {
           nextDueDate = getInstallmentDueDate(
             res.installment_start_date,
             paidCuotas + 1,
-            project.due_day_of_month
+            res.due_day ?? project.due_day_of_month ?? 5
           );
         }
 
@@ -89,8 +89,8 @@ export async function getUserLots() {
           nextDueDate,
           currentDate,
           res.mora_frozen,
-          project.grace_period_days,
-          project.daily_penalty_amount,
+          res.grace_days ?? project.grace_period_days ?? 5,
+          res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
           res.debt_start_date,
           project.penalty_start_date
         );

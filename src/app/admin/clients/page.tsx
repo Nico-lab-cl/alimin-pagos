@@ -251,15 +251,23 @@ export default function ClientsPage() {
                         className={`
                           inline-flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[10px] font-black tracking-widest border
                           ${c.status === "LATE" ? "bg-red-500/10 text-red-400 border-red-500/20"
+                            : c.status === "FROZEN" ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
                             : c.status === "GRACE" ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
                             : c.status === "UPCOMING" ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/20"
                             : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"}
                         `}
                       >
                         <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ 
-                          background: c.status === "LATE" ? "#f87171" : c.status === "GRACE" ? "var(--warning)" : "var(--success)" 
+                          background: c.status === "LATE" ? "#f87171" 
+                            : c.status === "FROZEN" ? "#60a5fa"
+                            : c.status === "GRACE" ? "var(--warning)" 
+                            : "var(--success)" 
                         }} />
-                        {c.status === "LATE" ? "MORA" : c.status === "GRACE" ? "GRACIA" : c.status === "UPCOMING" ? "AVISO" : "AL DÍA"}
+                        {c.status === "LATE" ? "MORA" 
+                          : c.status === "FROZEN" ? "CONGELADO"
+                          : c.status === "GRACE" ? "GRACIA" 
+                          : c.status === "UPCOMING" ? "AVISO" 
+                          : "AL DÍA"}
                       </div>
                     </td>
                     <td className="px-8 py-7 text-right">
@@ -627,9 +635,9 @@ export default function ClientsPage() {
                   <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><Activity className="w-3 h-3"/> Estado Operativo</h3>
                   <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6">
                     <div className="flex items-center gap-4 mb-5">
-                      <div className={`w-3 h-3 rounded-full animate-pulse ${selectedClient.status === "LATE" ? "bg-red-500" : selectedClient.status === "GRACE" ? "bg-orange-500" : selectedClient.status === "UPCOMING" ? "bg-indigo-500" : "bg-emerald-500"}`} />
-                      <p className={`text-sm font-black uppercase tracking-widest ${selectedClient.status === "LATE" ? "text-red-400" : selectedClient.status === "GRACE" ? "text-orange-400" : selectedClient.status === "UPCOMING" ? "text-indigo-400" : "text-emerald-400"}`}>
-                        {selectedClient.status === "LATE" ? "En Mora" : selectedClient.status === "GRACE" ? "Periodo de Gracia" : selectedClient.status === "UPCOMING" ? "Aviso Próximo" : "Al Día"}
+                      <div className={`w-3 h-3 rounded-full animate-pulse ${selectedClient.status === "LATE" ? "bg-red-500" : selectedClient.status === "FROZEN" ? "bg-blue-500" : selectedClient.status === "GRACE" ? "bg-orange-500" : selectedClient.status === "UPCOMING" ? "bg-indigo-500" : "bg-emerald-500"}`} />
+                      <p className={`text-sm font-black uppercase tracking-widest ${selectedClient.status === "LATE" ? "text-red-400" : selectedClient.status === "FROZEN" ? "text-blue-400" : selectedClient.status === "GRACE" ? "text-orange-400" : selectedClient.status === "UPCOMING" ? "text-indigo-400" : "text-emerald-400"}`}>
+                        {selectedClient.status === "LATE" ? "En Mora" : selectedClient.status === "FROZEN" ? "Mora Congelada" : selectedClient.status === "GRACE" ? "Periodo de Gracia" : selectedClient.status === "UPCOMING" ? "Aviso Próximo" : "Al Día"}
                       </p>
                     </div>
                     {selectedClient.status === "LATE" && (

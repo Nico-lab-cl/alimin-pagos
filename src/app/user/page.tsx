@@ -164,10 +164,16 @@ export default function UserDashboard() {
                 {/* Status Dashboard & Action */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-8 pt-6 border-t border-white/5">
                   <div className="flex flex-wrap gap-4">
-                    {lot.penaltyAmount > 0 && (
+                    {lot.penaltyAmount > 0 && !lot.isMoraFrozen && (
                       <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-400/10 border border-red-400/20 text-red-400 text-[10px] font-black uppercase tracking-widest animate-pulse">
                         <AlertTriangle className="w-3.5 h-3.5" />
                         Atraso Crítico: {formatCLP(lot.penaltyAmount)}
+                      </div>
+                    )}
+                    {lot.isMoraFrozen && (
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-400/10 border border-blue-400/20 text-blue-400 text-[10px] font-black uppercase tracking-widest">
+                        <Clock className="w-3.5 h-3.5" />
+                        Mora Congelada por Administración
                       </div>
                     )}
                     {lot.nextDueDate && (
