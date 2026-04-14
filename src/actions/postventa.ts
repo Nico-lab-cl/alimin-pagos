@@ -49,7 +49,7 @@ export async function getFullPostventaData({
     const allReservations = await prisma.reservation.findMany({
       where: {
         project_id: project.id,
-        status: "active",
+        status: { in: ["active", "COMPLETED", "ARCHIVED"] },
       },
       orderBy: { created_at: "desc" },
       include: {
@@ -230,6 +230,7 @@ export async function getFullPostventaData({
         profession: res.profession,
         nationality: res.nationality,
         internalStatus: res.status,
+        isMultiLot: allReservations.filter(r => r.email === res.email || (res.rut && r.rut === res.rut)).length > 1,
         installment_start_date: res.installment_start_date,
         installment_ranges: res.installment_ranges,
         debt_start_date: res.debt_start_date,
@@ -474,10 +475,25 @@ export async function getAdminLots(projectSlug: string) {
 
     const lots = await prisma.lot.findMany({
       where: { project_id: project.id },
+      include: { 
+        reservations: {
+          where: { status: { in: ["active", "COMPLETED", "ARCHIVED"] } },
+          select: { name: true, last_name: true, status: true }
+        }
+      },
       orderBy: { number: "asc" },
     });
 
-    return { success: true, lots };
+    const processedLots = lots.map(l => {
+      const activeRes = l.reservations[0]; // Take the primary/most recent assignment
+      return {
+        ...l,
+        assignedClient: activeRes ? `${activeRes.name} ${activeRes.last_name || ""}`.trim() : null,
+        assignmentStatus: activeRes ? activeRes.status : null
+      };
+    });
+
+    return { success: true, lots: processedLots };
   } catch (error) {
     console.error("Error getting admin lots:", error);
     return { error: "Error al cargar lotes", lots: [] };

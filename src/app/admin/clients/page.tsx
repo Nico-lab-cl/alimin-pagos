@@ -82,9 +82,6 @@ export default function ClientsPage() {
       c.clientEmail?.toLowerCase().includes(search.toLowerCase()) ||
       c.lotNumber?.toString().toUpperCase().includes(search.toUpperCase());
     
-    // Filter out ARCHIVED clients
-    if (c.internalStatus === "ARCHIVED") return false;
-    
     // lotStage is stored in DB. Could be undefined occasionally for Lomas.
     const matchesStage = selectedStage === "ALL" || (c.lotStage && c.lotStage.toString().toUpperCase() === selectedStage.toUpperCase());
     
@@ -216,7 +213,15 @@ export default function ClientsPage() {
                           <User className="w-5 h-5" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-lg font-black text-white italic tracking-tighter group-hover:text-blue-400 transition-colors truncate uppercase leading-none mb-1">{c.clientName}</p>
+                          <div className="flex items-center gap-3 mb-1">
+                            <p className="text-lg font-black text-white italic tracking-tighter group-hover:text-blue-400 transition-colors truncate uppercase leading-none">{c.clientName}</p>
+                            {c.isMultiLot && (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-[8px] font-black text-amber-400 uppercase tracking-widest">Multi-Lote</span>
+                            )}
+                            {c.internalStatus === 'ARCHIVED' && (
+                              <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-black text-white/40 uppercase tracking-widest">Histórico</span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-3">
                             <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{c.rut || "SIN RUT"}</span>
                             <div className="w-1 h-1 rounded-full bg-white/5" />

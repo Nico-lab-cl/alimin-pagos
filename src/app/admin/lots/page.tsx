@@ -143,6 +143,16 @@ export default function AdminLotsPage() {
                   </div>
                 </div>
 
+                {lot.assignedClient && (
+                  <div className="mb-8 p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <p className="text-[9px] font-black uppercase tracking-widest opacity-20 mb-2">Cliente Asignado</p>
+                    <p className="text-sm font-black text-white uppercase tracking-tighter truncate">{lot.assignedClient}</p>
+                    {lot.assignmentStatus === 'ARCHIVED' && (
+                      <span className="text-[8px] font-black text-white/20 uppercase mt-1 block tracking-[0.2em]">Registro Histórico</span>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-20 mb-1">Valuación</p>
