@@ -225,7 +225,10 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                             {formatCLP(cuota.amount)}
                           </p>
                           {cuota.hasPenalty && (
-                            <p className="text-[8px] font-bold uppercase text-red-400 tracking-widest mt-1">Incluye Mora</p>
+                            <div className="mt-1 flex flex-col items-end">
+                              <p className="text-[8px] font-bold uppercase text-red-400 tracking-widest bg-red-500/10 px-2 py-0.5 rounded-full">Incluye Mora ({cuota.lateDays} {cuota.lateDays === 1 ? 'Día' : 'Días'})</p>
+                              <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest mt-1">Interés Aplicado: {formatCLP(cuota.penaltyAmount)}</p>
+                            </div>
                           )}
                         </div>
                       </button>
@@ -276,11 +279,25 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           <div className="rounded-[2.5rem] bg-white/[0.02] border border-white/5 p-10 space-y-8 relative overflow-hidden group">
             <Building className="absolute -bottom-10 -right-10 w-48 h-48 opacity-5 text-white group-hover:scale-110 transition-transform duration-1000" />
             
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center border border-accent/20">
-                <Building2 className="w-5 h-5 text-accent" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center border border-accent/20">
+                  <Building2 className="w-5 h-5 text-accent" />
+                </div>
+                <h3 className="text-xl font-black italic tracking-tighter uppercase text-white/80">Datos de Transferencia</h3>
               </div>
-              <h3 className="text-xl font-black italic tracking-tighter uppercase text-white/80">Datos de Transferencia</h3>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const dataToCopy = `Institución: ${lot.bank?.name}\nTipo Cuenta: ${lot.bank?.type}\nNº Cuenta: ${lot.bank?.account}\nRUT Receptor: ${lot.bank?.rut}\nEmail Destino: ${lot.bank?.email}`;
+                  navigator.clipboard.writeText(dataToCopy);
+                  toast.success("Todos los datos bancarios copiados");
+                }}
+                className="px-4 py-2.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[9px] uppercase font-black tracking-widest hover:bg-accent hover:text-black transition-all flex items-center gap-2 w-fit"
+              >
+                <Copy className="w-3.5 h-3.5" /> Copiar Todo
+              </button>
             </div>
 
             <div className="grid gap-4">
@@ -296,10 +313,19 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 mb-1">{item.label}</p>
                     <p className="text-sm font-black text-white italic group-hover/row:text-accent transition-colors">{item.value}</p>
                   </div>
-                  {item.copy && (
+                  {item.copy ? (
                     <button 
-                      onClick={() => handleCopy(item.value, item.label)}
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); handleCopy(item.value, item.label); }}
                       className="p-3 rounded-xl bg-white/5 text-white/30 hover:bg-accent hover:text-black transition-all"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button 
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); handleCopy(item.value, item.label); }}
+                      className="p-3 rounded-xl bg-white/5 text-white/30 hover:bg-white/10 hover:text-white transition-all opacity-0 group-hover/row:opacity-100 focus:opacity-100"
                     >
                       <Copy className="w-4 h-4" />
                     </button>

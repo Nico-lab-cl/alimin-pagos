@@ -139,11 +139,15 @@ export async function getUserLots() {
           
           let finalAmount = installmentBaseAmount;
           let hasPenalty = false;
+          let installmentPenaltyAmount = 0;
+          let installmentLateDays = 0;
           
           // Embed penalty in the FIRST pending installment only if it's active
           if (i === 0 && penaltyAmount > 0 && res.mora_status === "ACTIVO") {
             finalAmount += penaltyAmount;
             hasPenalty = true;
+            installmentPenaltyAmount = penaltyAmount;
+            installmentLateDays = lateDays;
           }
           
           const monthNameRaw = formatMonth.format(currentDue);
@@ -153,7 +157,9 @@ export async function getUserLots() {
             baseAmount: installmentBaseAmount,
             amount: finalAmount,
             monthName: monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1),
-            hasPenalty
+            hasPenalty,
+            penaltyAmount: installmentPenaltyAmount,
+            lateDays: installmentLateDays
           });
         }
       }
