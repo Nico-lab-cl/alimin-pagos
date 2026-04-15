@@ -57,6 +57,9 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     if (lot) {
       if (paymentType === "PIE") {
         setAmount(lot.pieAmount || 0);
+      } else if (lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
+        const sum = lot.upcomingInstallments.slice(0, installmentsCount).reduce((acc: number, curr: any) => acc + curr.amount, 0);
+        setAmount(sum);
       } else {
         setAmount((lot.valor_cuota || 0) * installmentsCount);
       }
@@ -185,8 +188,55 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               </div>
             </div>
 
-            {/* Installments Slider (If applicable) */}
-            {paymentType === "INSTALLMENT" && (
+            {/* Installments List */}
+            {paymentType === "INSTALLMENT" && lot.upcomingInstallments && lot.upcomingInstallments.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-white/20">Selecciona las Cuotas a Pagar</label>
+                  <span className="text-xl font-black text-white italic tracking-tighter">{installmentsCount} {installmentsCount === 1 ? 'Cuota' : 'Cuotas'}</span>
+                </div>
+                <div className="grid gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {lot.upcomingInstallments.map((cuota: any, idx: number) => {
+                    const isSelected = idx < installmentsCount;
+                    return (
+                      <button
+                        key={cuota.number}
+                        type="button"
+                        onClick={() => setInstallmentsCount(idx + 1)}
+                        className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                          isSelected 
+                            ? "bg-accent/10 border-accent/40 text-white shadow-[0_0_15px_rgba(212,168,75,0.1)]" 
+                            : "bg-white/[0.02] border-white/5 text-white/50 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors ${isSelected ? "bg-accent border-accent text-[#061010]" : "border-white/20"}`}>
+                            {isSelected && <CheckCircle className="w-4 h-4" />}
+                          </div>
+                          <div className="text-left">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-none mb-1 text-white/40">
+                              Cuota {cuota.number}
+                            </p>
+                            <p className="text-sm font-black italic">{cuota.monthName}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-lg font-black tracking-tighter ${isSelected ? "text-accent" : "text-white/80"}`}>
+                            {formatCLP(cuota.amount)}
+                          </p>
+                          {cuota.hasPenalty && (
+                            <p className="text-[8px] font-bold uppercase text-red-400 tracking-widest mt-1">Incluye Mora</p>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Fallback Slider (If no upcomingInstallments for some reason) */}
+            {paymentType === "INSTALLMENT" && (!lot.upcomingInstallments || lot.upcomingInstallments.length === 0) && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] font-black uppercase tracking-widest text-white/20">Cantidad de Cuotas</label>

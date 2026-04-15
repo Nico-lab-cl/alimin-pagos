@@ -82,6 +82,7 @@ export async function getUserLots() {
       let nextDueDate: Date | null = null;
       let penaltyAmount = 0;
       let lateDays = 0;
+      let upcomingInstallments: any[] = [];
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
         if (res.next_payment_date) {
@@ -107,6 +108,53 @@ export async function getUserLots() {
         const activeDailyPenalty = project.daily_penalty_amount || 10000;
         if (penaltyAmount > 0 && activeDailyPenalty > 0) {
           lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+        }
+
+        // Calculate upcoming installments (up to 12)
+        const totalPendingRemaining = totalCuotas - paidCuotas;
+        const maxToShow = Math.min(12, totalPendingRemaining);
+        const formatMonth = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+        
+        for (let i = 0; i < maxToShow; i++) {
+          const installmentNumber = paidCuotas + 1 + i;
+          
+          let currentDue: Date;
+          if (i === 0 && res.next_payment_date) {
+            currentDue = new Date(res.next_payment_date);
+          } else {
+            currentDue = getInstallmentDueDate(
+              res.installment_start_date,
+              installmentNumber,
+              res.due_day ?? project.due_day_of_month ?? 5
+            );
+          }
+           
+          let installmentBaseAmount = lot.valor_cuota || 0;
+          if (ranges && ranges.length > 0) {
+            const range = (ranges as any[]).find((r: any) => installmentNumber >= Number(r.from) && installmentNumber <= Number(r.to));
+            if (range) {
+              installmentBaseAmount = Number(range.amount);
+            }
+          }
+          
+          let finalAmount = installmentBaseAmount;
+          let hasPenalty = false;
+          
+          // Embed penalty in the FIRST pending installment only if it's active
+          if (i === 0 && penaltyAmount > 0 && res.mora_status === "ACTIVO") {
+            finalAmount += penaltyAmount;
+            hasPenalty = true;
+          }
+          
+          const monthNameRaw = formatMonth.format(currentDue);
+          upcomingInstallments.push({
+            number: installmentNumber,
+            dueDate: currentDue.toISOString(),
+            baseAmount: installmentBaseAmount,
+            amount: finalAmount,
+            monthName: monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1),
+            hasPenalty
+          });
         }
       }
 
@@ -160,6 +208,7 @@ export async function getUserLots() {
         isLate: penaltyAmount > 0 && res.mora_status === "ACTIVO",
         isMoraFrozen: res.mora_status === "CONGELADO" || res.mora_frozen,
         isUpToDate: res.mora_status === "AL_DIA",
+        upcomingInstallments,
         documents,
         // Bank data for payment
         bank: {
