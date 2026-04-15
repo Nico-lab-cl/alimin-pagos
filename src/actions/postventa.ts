@@ -239,7 +239,10 @@ export async function getFullPostventaData({
         profession: res.profession,
         nationality: res.nationality,
         internalStatus: res.status,
-        isMultiLot: allReservations.filter(r => r.email === res.email || (res.rut && r.rut === res.rut)).length > 1,
+        isMultiLot: allReservations.filter(r => r.status === "active" && r.id !== res.id && r.lot_id !== res.lot_id && (
+          (res.rut && r.rut === res.rut) || 
+          (res.email && !res.email.includes("@libertadyalegria") && !res.email.includes("@arenaysol") && r.email === res.email)
+        )).length > 0,
         installment_start_date: res.installment_start_date,
         installment_ranges: res.installment_ranges,
         debt_start_date: res.debt_start_date,
