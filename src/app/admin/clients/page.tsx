@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials } from "@/actions/postventa";
+import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import { formatCLP, formatDate } from "@/lib/utils";
-import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3 } from "lucide-react";
+import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download } from "lucide-react";
 
 export default function ClientsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -43,6 +44,12 @@ export default function ClientsPage() {
     installment_start_date: ""
   });
 
+  // Document State
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docName, setDocName] = useState("");
+
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -67,6 +74,17 @@ export default function ClientsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [search, selectedStage, selectedProject]);
+
+  // Fetch docs when client is selected
+  useEffect(() => {
+    if (selectedClient) {
+      setLoadingDocs(true);
+      getReservationDocuments(selectedClient.id).then(res => {
+        if (res.documents) setDocs(res.documents);
+        setLoadingDocs(false);
+      });
+    }
+  }, [selectedClient]);
 
   const rawClients = data?.data || [];
   const uniqueStages: string[] = Array.from(new Set(rawClients.map((c: any) => c.lotStage).filter(Boolean)));
@@ -686,6 +704,129 @@ export default function ClientsPage() {
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Sección de Documentos - Full Width */}
+              <div className="col-span-1 md:col-span-2 space-y-4 pt-8 border-t border-white/5 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4 text-accent/60"/> Documentación del Cliente
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="text" 
+                      placeholder="Nombre del documento..." 
+                      value={docName}
+                      onChange={(e) => setDocName(e.target.value)}
+                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white outline-none focus:border-accent/40 w-full sm:w-60 transition-all shadow-inner"
+                    />
+                    <label className={`
+                      flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all whitespace-nowrap
+                      ${uploadingDoc ? "bg-white/5 text-white/20 border border-white/10" : "bg-accent text-[#061010] hover:scale-[1.02] shadow-[0_0_20px_rgba(212,168,75,0.2)] active:scale-95"}
+                    `}>
+                      {uploadingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Upload className="w-3.5 h-3.5"/>}
+                      {uploadingDoc ? "Subiendo..." : "Subir Archivo"}
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        disabled={uploadingDoc}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (!docName.trim()) {
+                            alert("Por favor, ingresa un nombre para identificar el documento.");
+                            return;
+                          }
+                          
+                          setUploadingDoc(true);
+                          try {
+                            const reader = new FileReader();
+                            reader.readAsDataURL(file);
+                            reader.onload = async () => {
+                              const base64 = reader.result as string;
+                              const res = await uploadDocument({
+                                reservationId: selectedClient.id,
+                                name: docName.trim(),
+                                fileType: file.type,
+                                base64Content: base64
+                              });
+                              if (res.success) {
+                                setDocName("");
+                                const freshDocs = await getReservationDocuments(selectedClient.id);
+                                if (freshDocs.documents) setDocs(freshDocs.documents);
+                              } else {
+                                alert(res.error || "Fallo en la carga");
+                              }
+                              setUploadingDoc(false);
+                            };
+                          } catch (err) {
+                            alert("Error al procesar el archivo localmente");
+                            setUploadingDoc(false);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                  {loadingDocs ? (
+                    <div className="col-span-full py-16 flex flex-col items-center justify-center gap-4 bg-white/[0.01] rounded-[2.5rem] border border-dashed border-white/5 border-white/5 transition-all">
+                      <Loader2 className="w-8 h-8 animate-spin text-accent/30"/>
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/10">Consultando Repositorio...</p>
+                    </div>
+                  ) : docs.length === 0 ? (
+                    <div className="col-span-full py-16 flex flex-col items-center justify-center gap-4 bg-white/[0.01] rounded-[2.5rem] border border-dashed border-white/5 group hover:border-white/10 transition-all duration-700">
+                      <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-all duration-700">
+                        <FileCheck2 className="w-8 h-8 text-white/5 group-hover:text-white/20 transition-all" />
+                      </div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/10 text-center px-8 leading-relaxed">Sin documentos disponibles para este cliente</p>
+                    </div>
+                  ) : (
+                    docs.map((doc, idx) => (
+                      <div 
+                        key={doc.id} 
+                        className="group flex items-center justify-between p-5 bg-white/[0.02] border border-white/5 rounded-[2rem] hover:bg-white/[0.05] hover:border-accent/30 transition-all duration-500 animate-slide-up"
+                        style={{ animationDelay: `${idx * 100}ms` }}
+                      >
+                        <div className="flex items-center gap-5">
+                          <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-accent/10 group-hover:border-accent/40 transition-all duration-500 shadow-inner">
+                            <FileText className="w-6 h-6 text-accent/40 group-hover:text-accent group-hover:scale-110 transition-all duration-500" />
+                          </div>
+                          <div className="flex flex-col overflow-hidden">
+                            <p className="text-[11px] font-black text-white/80 uppercase tracking-tight truncate max-w-[180px] group-hover:text-white transition-colors">{doc.name}</p>
+                            <p className="text-[9px] font-black text-white/10 uppercase tracking-[0.2em] mt-1 group-hover:text-white/20 transition-colors">
+                              Cargado el {new Date(doc.created_at).toLocaleDateString('es-CL')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <a 
+                            href={`/api/documents/${doc.id}`} 
+                            download
+                            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/20 hover:bg-accent hover:text-black hover:border-accent hover:shadow-[0_0_15px_rgba(212,168,75,0.3)] transition-all duration-300"
+                            title="Descargar Documento"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                          <button 
+                            onClick={async () => {
+                              if (!confirm("¿Seguro que deseas eliminar definitivamente este archivo?")) return;
+                              const res = await deleteDocument(doc.id);
+                              if (res.success) {
+                                setDocs(docs.filter(d => d.id !== doc.id));
+                              }
+                            }}
+                            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/20 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all duration-300"
+                            title="Eliminar Documento"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 

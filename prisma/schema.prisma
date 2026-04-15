@@ -10,70 +10,198 @@ datasource db {
   schemas  = ["pagos"]
 }
 
-// ═══════════════════════════════════════════
-// PROYECTO — Configuración global por proyecto
-// ═══════════════════════════════════════════
 model Project {
-  id          String @id @default(uuid()) @db.Uuid
-  slug        String @unique @db.VarChar(100)
-  name        String @db.VarChar(255)
-  description String?
-  status      String @default("ACTIVE") @db.VarChar(20)
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug                 String        @unique @db.VarChar(100)
+  name                 String        @db.VarChar(255)
+  description          String?
+  status               String?       @default("ACTIVE") @db.VarChar(20)
+  grace_period_days    Int?          @default(5)
+  daily_penalty_amount Int?          @default(10000)
+  due_day_of_month     Int?          @default(5)
+  penalty_start_date   DateTime?     @db.Timestamptz(6)
+  bank_name            String?       @default("Santander") @db.VarChar(100)
+  bank_type            String?       @default("Corriente") @db.VarChar(50)
+  bank_account         String?       @default("") @db.VarChar(50)
+  bank_holder          String?       @default("Alimin SPA") @db.VarChar(255)
+  bank_rut             String?       @default("77.508.711-0") @db.VarChar(20)
+  bank_email           String?       @default("inmobiliaria@aliminspa.cl") @db.VarChar(255)
+  created_at           DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?     @default(now()) @updatedAt @db.Timestamptz(6)
+  lots                 Lot[]
+  reservations         Reservation[]
 
-  grace_period_days    Int    @default(5)
-  daily_penalty_amount Int    @default(10000)
-  due_day_of_month     Int    @default(5)
-  penalty_start_date   DateTime? @db.Timestamptz
-
-  bank_name    String @default("Santander") @db.VarChar(100)
-  bank_type    String @default("Corriente") @db.VarChar(50)
-  bank_account String @default("") @db.VarChar(50)
-  bank_holder  String @default("Alimin SPA") @db.VarChar(255)
-  bank_rut     String @default("77.508.711-0") @db.VarChar(20)
-  bank_email   String @default("inmobiliaria@aliminspa.cl") @db.VarChar(255)
-
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz
-
-  lots         Lot[]
-  reservations Reservation[]
-
+  @@index([slug], map: "idx_projects_slug")
+  @@index([status], map: "idx_projects_status")
   @@map("projects")
   @@schema("pagos")
 }
 
-// ═══════════════════════════════════════════
-// LOTE — Cada terreno/parcela
-// ═══════════════════════════════════════════
 model Lot {
-  id                     Int       @id @default(autoincrement())
-  project_id             String    @db.Uuid
-  number                 String    @db.VarChar(20)
-  stage                  String?   @db.VarChar(100)
-  area_m2                Float?    @db.Real
-  price_total_clp        Int?
-  reservation_amount_clp Int?      @default(0)
-  pie                    Int?      @default(0)
-  cuotas                 Int?
-  valor_cuota            Int?
+  id                      Int              @id @default(autoincrement())
+  project_id              String           @db.Uuid
+  number                  String           @db.VarChar(20)
+  stage                   String?          @db.VarChar(100)
+  area_m2                 Float?           @db.Real
+  price_total_clp         Int?
+  reservation_amount_clp  Int?             @default(0)
+  pie                     Int?             @default(0)
+  cuotas                  Int?
+  valor_cuota             Int?
   last_installment_amount Int?
-  status                 String    @default("available") @db.VarChar(20)
-
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz
-
-  project      Project          @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  reservations Reservation[]
-  receipts     PaymentReceipt[]
+  status                  String?          @default("available") @db.VarChar(20)
+  created_at              DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?        @default(now()) @updatedAt @db.Timestamptz(6)
+  project                 Project          @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  receipts                PaymentReceipt[]
+  reservations            Reservation[]
 
   @@unique([project_id, number, stage])
+  @@index([project_id], map: "idx_lots_project")
+  @@index([stage], map: "idx_lots_stage")
+  @@index([status], map: "idx_lots_status")
   @@map("lots")
   @@schema("pagos")
 }
 
-// ═══════════════════════════════════════════
-// USUARIO — Login del comprador y admin
-// ═══════════════════════════════════════════
+model User {
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                String         @unique @db.VarChar(255)
+  email_verified       DateTime?      @db.Timestamptz(6)
+  password             String         @db.VarChar(255)
+  name                 String         @db.VarChar(255)
+  role                 UserRole?      @default(USER)
+  must_change_password Boolean?       @default(false)
+  allowed_projects     Json?
+  created_at           DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
+  auditLogs            AuditLog[]
+  notifications        Notification[]
+  reservations         Reservation[]
+
+  @@index([email], map: "idx_users_email")
+  @@index([role], map: "idx_users_role")
+  @@map("users")
+  @@schema("pagos")
+}
+
+model Reservation {
+  id                     String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id             String           @db.Uuid
+  lot_id                 Int
+  user_id                String           @db.Uuid
+  name                   String           @db.VarChar(255)
+  last_name              String?          @db.VarChar(255)
+  email                  String           @db.VarChar(255)
+  phone                  String           @db.VarChar(50)
+  rut                    String?          @db.VarChar(20)
+  status                 String?          @default("active") @db.VarChar(20)
+  pie_status             String?          @default("PENDING") @db.VarChar(20)
+  installments_paid      Int?             @default(0)
+  pie                    Int?             @default(0)
+  extra_paid_amount      Int?             @default(0)
+  pending_amount         Int?             @default(0)
+  installment_start_date DateTime?        @db.Timestamptz(6)
+  installment_ranges     Json?
+  debt_start_date        DateTime?        @db.Timestamptz(6)
+  next_payment_date      DateTime?        @db.Timestamptz(6)
+  mora_frozen            Boolean?         @default(false)
+  advisor                String?          @db.VarChar(100)
+  observation            String?
+  notes                  String?
+  manual_documents       Json?
+  uploaded_contracts     Json?
+  address_street         String?          @db.VarChar(255)
+  address_number         String?          @db.VarChar(20)
+  address_commune        String?          @db.VarChar(100)
+  address_region         String?          @db.VarChar(100)
+  marital_status         String?          @db.VarChar(50)
+  profession             String?          @db.VarChar(100)
+  nationality            String?          @default("Chilena") @db.VarChar(100)
+  created_at             DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?        @default(now()) @updatedAt @db.Timestamptz(6)
+  daily_penalty          Int?
+  reservation_price      Int?             @default(0)
+  last_installment_value Int?
+  due_day                Int?             @default(5)
+  grace_days             Int?             @default(5)
+  mora_status            String?          @default("ACTIVO") @db.VarChar(20)
+  receipts               PaymentReceipt[]
+  documents              ReservationDocument[]
+  lot                    Lot              @relation(fields: [lot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  project                Project          @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user                   User             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([lot_id], map: "idx_reservations_lot")
+  @@index([pie_status], map: "idx_reservations_pie_status")
+  @@index([project_id], map: "idx_reservations_project")
+  @@index([status], map: "idx_reservations_status")
+  @@index([user_id], map: "idx_reservations_user")
+  @@map("reservations")
+  @@schema("pagos")
+}
+
+model PaymentReceipt {
+  id                         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reservation_id             String      @db.Uuid
+  lot_id                     Int
+  amount_clp                 Int
+  status                     String?     @default("PENDING") @db.VarChar(20)
+  receipt_url                String
+  scope                      String      @db.VarChar(30)
+  installments_count         Int?        @default(1)
+  nominal_installment_number Int?
+  nominal_installment_range  String?     @db.VarChar(20)
+  rejection_reason           String?
+  created_at                 DateTime?   @default(now()) @db.Timestamptz(6)
+  processed_at               DateTime?   @db.Timestamptz(6)
+  lot                        Lot         @relation(fields: [lot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reservation                Reservation @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([lot_id], map: "idx_receipts_lot")
+  @@index([reservation_id], map: "idx_receipts_reservation")
+  @@index([scope], map: "idx_receipts_scope")
+  @@index([status], map: "idx_receipts_status")
+  @@map("payment_receipts")
+  @@schema("pagos")
+}
+
+model AuditLog {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  action     ActionType
+  entity     String     @db.VarChar(100)
+  entity_id  String?    @db.VarChar(100)
+  details    String?
+  user_id    String?    @db.Uuid
+  user_email String?    @db.VarChar(255)
+  ip_address String?    @db.VarChar(50)
+  user_agent String?
+  created_at DateTime?  @default(now()) @db.Timestamptz(6)
+  user       User?      @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_audit_created")
+  @@index([entity], map: "idx_audit_entity")
+  @@index([user_id], map: "idx_audit_user")
+  @@map("audit_logs")
+  @@schema("pagos")
+}
+
+model Notification {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String    @db.Uuid
+  type       String    @db.VarChar(50)
+  title      String    @db.VarChar(255)
+  message    String
+  read       Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([read], map: "idx_notifications_read")
+  @@index([user_id], map: "idx_notifications_user")
+  @@map("notifications")
+  @@schema("pagos")
+}
+
 enum UserRole {
   ADMIN
   USER
@@ -82,123 +210,6 @@ enum UserRole {
   @@schema("pagos")
 }
 
-model User {
-  id                 String    @id @default(uuid()) @db.Uuid
-  email              String    @unique @db.VarChar(255)
-  email_verified     DateTime? @db.Timestamptz
-  password           String    @db.VarChar(255)
-  name               String    @db.VarChar(255)
-  role               UserRole  @default(USER)
-  must_change_password Boolean @default(false)
-  allowed_projects   Json?
-
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz
-
-  reservations  Reservation[]
-  auditLogs     AuditLog[]
-  notifications Notification[]
-
-  @@map("users")
-  @@schema("pagos")
-}
-
-// ═══════════════════════════════════════════
-// RESERVATION — Vínculo comprador ↔ lote
-// ═══════════════════════════════════════════
-model Reservation {
-  id         String @id @default(uuid()) @db.Uuid
-  project_id String @db.Uuid
-  lot_id     Int
-  user_id    String @db.Uuid
-
-  name      String  @db.VarChar(255)
-  last_name String? @db.VarChar(255)
-  email     String  @db.VarChar(255)
-  phone     String  @db.VarChar(50)
-  rut       String? @db.VarChar(20)
-
-  status            String @default("active") @db.VarChar(20)
-  pie_status        String @default("PENDING") @db.VarChar(20)
-  installments_paid Int    @default(0)
-
-  pie               Int? @default(0)
-  extra_paid_amount Int? @default(0)
-  pending_amount    Int? @default(0)
-
-  installment_start_date DateTime? @db.Timestamptz
-  installment_ranges     Json?
-  debt_start_date        DateTime? @db.Timestamptz
-  next_payment_date      DateTime? @db.Timestamptz
-  last_installment_value Int?
-
-  reservation_price      Int? @default(0)
-  daily_penalty          Int?
-
-  due_day                Int? @default(5)
-  grace_days             Int? @default(5)
-
-  mora_frozen Boolean @default(false)
-  mora_status String? @default("ACTIVO") @db.VarChar(20)
-  advisor     String? @db.VarChar(100)
-  observation String?
-  notes       String?
-
-  manual_documents   Json?
-  uploaded_contracts Json?
-
-  address_street  String? @db.VarChar(255)
-  address_number  String? @db.VarChar(20)
-  address_commune String? @db.VarChar(100)
-  address_region  String? @db.VarChar(100)
-  marital_status  String? @db.VarChar(50)
-  profession      String? @db.VarChar(100)
-  nationality     String? @default("Chilena") @db.VarChar(100)
-
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz
-
-  project  Project          @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  lot      Lot              @relation(fields: [lot_id], references: [id], onDelete: Cascade)
-  user     User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  receipts PaymentReceipt[]
-
-  @@map("reservations")
-  @@schema("pagos")
-}
-
-// ═══════════════════════════════════════════
-// COMPROBANTE DE PAGO
-// ═══════════════════════════════════════════
-model PaymentReceipt {
-  id                         String    @id @default(uuid()) @db.Uuid
-  reservation_id             String    @db.Uuid
-  lot_id                     Int
-
-  amount_clp                 Int
-  status                     String    @default("PENDING") @db.VarChar(20)
-  receipt_url                String
-  scope                      String    @db.VarChar(30)
-
-  installments_count         Int?      @default(1)
-  nominal_installment_number Int?
-  nominal_installment_range  String?   @db.VarChar(20)
-
-  rejection_reason           String?
-
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  processed_at DateTime? @db.Timestamptz
-
-  reservation Reservation @relation(fields: [reservation_id], references: [id], onDelete: Cascade)
-  lot         Lot         @relation(fields: [lot_id], references: [id], onDelete: Cascade)
-
-  @@map("payment_receipts")
-  @@schema("pagos")
-}
-
-// ═══════════════════════════════════════════
-// AUDIT LOG
-// ═══════════════════════════════════════════
 enum ActionType {
   CREATE
   UPDATE
@@ -211,40 +222,16 @@ enum ActionType {
   @@schema("pagos")
 }
 
-model AuditLog {
-  id         String     @id @default(uuid()) @db.Uuid
-  action     ActionType
-  entity     String     @db.VarChar(100)
-  entity_id  String?    @db.VarChar(100)
-  details    String?
-  user_id    String?    @db.Uuid
-  user_email String?    @db.VarChar(255)
-  ip_address String?    @db.VarChar(50)
-  user_agent String?
+model ReservationDocument {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reservation_id String    @db.Uuid
+  name           String    @db.VarChar(255)
+  file_type      String?   @db.VarChar(100)
+  base64_content String
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
 
-  created_at DateTime @default(now()) @db.Timestamptz
+  reservation Reservation @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
-
-  @@map("audit_logs")
-  @@schema("pagos")
-}
-
-// ═══════════════════════════════════════════
-// NOTIFICACIONES
-// ═══════════════════════════════════════════
-model Notification {
-  id      String  @id @default(uuid()) @db.Uuid
-  user_id String  @db.Uuid
-  type    String  @db.VarChar(50)
-  title   String  @db.VarChar(255)
-  message String
-  read    Boolean @default(false)
-
-  created_at DateTime @default(now()) @db.Timestamptz
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@map("notifications")
+  @@map("reservation_documents")
   @@schema("pagos")
 }

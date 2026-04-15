@@ -32,6 +32,16 @@ export async function getUserLots() {
           where: { status: "APPROVED" },
           orderBy: { created_at: "desc" },
         },
+        documents: {
+          select: {
+            id: true,
+            name: true,
+            file_type: true,
+            category: true,
+            created_at: true,
+          },
+          orderBy: { created_at: "desc" },
+        },
       },
     });
 
@@ -102,6 +112,8 @@ export async function getUserLots() {
 
       // Documents
       let documents: any[] = [];
+      
+      // Legacy Docs
       if (res.manual_documents) {
         try {
           const parsed = Array.isArray(res.manual_documents)
@@ -114,6 +126,17 @@ export async function getUserLots() {
             url: `/api/documents/${res.id}?name=${encodeURIComponent(d.name)}`,
           }));
         } catch {}
+      }
+
+      // New Docs
+      if (res.documents && res.documents.length > 0) {
+        const newDocs = res.documents.map((d: any) => ({
+          name: d.name,
+          category: d.category,
+          uploadedAt: d.created_at,
+          url: `/api/documents/${d.id}`,
+        }));
+        documents = [...newDocs, ...documents];
       }
 
       return {
