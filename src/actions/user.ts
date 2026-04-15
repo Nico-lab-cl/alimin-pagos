@@ -37,7 +37,6 @@ export async function getUserLots() {
             id: true,
             name: true,
             file_type: true,
-            category: true,
             created_at: true,
           },
           orderBy: { created_at: "desc" },
@@ -98,15 +97,16 @@ export async function getUserLots() {
         penaltyAmount = calculateTotalInterest(
           nextDueDate,
           currentDate,
-          res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || res.mora_frozen,
+          res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
           res.grace_days ?? project.grace_period_days ?? 5,
           res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
           res.debt_start_date,
           project.penalty_start_date
         );
 
-        if (penaltyAmount > 0 && project.daily_penalty_amount > 0) {
-          lateDays = Math.round(penaltyAmount / project.daily_penalty_amount);
+        const activeDailyPenalty = project.daily_penalty_amount || 10000;
+        if (penaltyAmount > 0 && activeDailyPenalty > 0) {
+          lateDays = Math.round(penaltyAmount / activeDailyPenalty);
         }
       }
 

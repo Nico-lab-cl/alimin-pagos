@@ -33,7 +33,6 @@ export async function uploadDocument({
         name,
         file_type: fileType,
         base64_content: base64Content,
-        category: category || "General",
       },
     });
 
@@ -62,7 +61,6 @@ export async function getReservationDocuments(reservationId: string) {
         id: true,
         name: true,
         file_type: true,
-        category: true,
         created_at: true,
       },
       orderBy: { created_at: "desc" },
