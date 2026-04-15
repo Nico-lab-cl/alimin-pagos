@@ -150,6 +150,7 @@ export async function getUserLots() {
             installmentLateDays = lateDays;
           }
           
+          const dailyPenaltyRate = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
           const monthNameRaw = formatMonth.format(currentDue);
           upcomingInstallments.push({
             number: installmentNumber,
@@ -159,7 +160,8 @@ export async function getUserLots() {
             monthName: monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1),
             hasPenalty,
             penaltyAmount: installmentPenaltyAmount,
-            lateDays: installmentLateDays
+            lateDays: installmentLateDays,
+            dailyPenalty: hasPenalty ? dailyPenaltyRate : 0
           });
         }
       }
@@ -214,6 +216,7 @@ export async function getUserLots() {
         isLate: penaltyAmount > 0 && res.mora_status === "ACTIVO",
         isMoraFrozen: res.mora_status === "CONGELADO" || res.mora_frozen,
         isUpToDate: res.mora_status === "AL_DIA",
+        dailyPenalty: res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
         upcomingInstallments,
         documents,
         // Bank data for payment

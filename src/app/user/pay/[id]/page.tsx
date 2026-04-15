@@ -227,7 +227,8 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                           {cuota.hasPenalty && (
                             <div className="mt-1 flex flex-col items-end">
                               <p className="text-[8px] font-bold uppercase text-red-400 tracking-widest bg-red-500/10 px-2 py-0.5 rounded-full">Incluye Mora ({cuota.lateDays} {cuota.lateDays === 1 ? 'Día' : 'Días'})</p>
-                              <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest mt-1">Interés Aplicado: {formatCLP(cuota.penaltyAmount)}</p>
+                              <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest mt-1">Interés Diario: {formatCLP(cuota.dailyPenalty)}</p>
+                              <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest">Interés Total: {formatCLP(cuota.penaltyAmount)}</p>
                             </div>
                           )}
                         </div>
@@ -265,6 +266,27 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               <p className="text-5xl font-black text-white tracking-tighter italic text-glow">
                 {formatCLP(amount)}
               </p>
+              {/* Mora breakdown in summary */}
+              {paymentType === "INSTALLMENT" && lot.upcomingInstallments?.[0]?.hasPenalty && installmentsCount >= 1 && (
+                <div className="pt-3 border-t border-white/5 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">Cuotas Base ({installmentsCount}x)</span>
+                    <span className="text-sm font-black text-white/60">
+                      {formatCLP(
+                        lot.upcomingInstallments
+                          .slice(0, installmentsCount)
+                          .reduce((acc: number, c: any) => acc + c.baseAmount, 0)
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-red-400/60">Mora ({lot.upcomingInstallments[0].lateDays} Días × {formatCLP(lot.upcomingInstallments[0].dailyPenalty)}/día)</span>
+                    <span className="text-sm font-black text-red-400">
+                      + {formatCLP(lot.upcomingInstallments[0].penaltyAmount)}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="pt-4 border-t border-white/5 flex items-center gap-3">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 opacity-50" />
                 <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.15em]">Operación Protegida & Cifrada</p>
@@ -302,10 +324,10 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
 
             <div className="grid gap-4">
               {[
-                { label: "Institución", value: lot.bank?.name, copy: false },
-                { label: "Tipo Cuenta", value: lot.bank?.type, copy: false },
+                { label: "Institución", value: lot.bank?.name, copy: true },
+                { label: "Tipo Cuenta", value: lot.bank?.type, copy: true },
                 { label: "Nº Cuenta", value: lot.bank?.account, copy: true },
-                { label: "RUT Recreceptor", value: lot.bank?.rut, copy: true },
+                { label: "RUT Receptor", value: lot.bank?.rut, copy: true },
                 { label: "Email Destino", value: lot.bank?.email, copy: true },
               ].map((item, i) => item.value && (
                 <div key={i} className="flex items-center justify-between p-4 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 group/row">
