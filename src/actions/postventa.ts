@@ -110,6 +110,7 @@ export async function getFullPostventaData({
       let nextDueDate: Date | null = null;
       let lateDays = 0;
       let penaltyAmount = 0;
+      const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
         if (res.next_payment_date) {
@@ -122,19 +123,26 @@ export async function getFullPostventaData({
           );
         }
 
-        penaltyAmount = calculateTotalInterest(
-          nextDueDate,
-          currentDate,
-          res.mora_frozen || false,
-          res.grace_days ?? project.grace_period_days ?? 5,
-          res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
-          res.debt_start_date,
-          project.penalty_start_date
-        );
+        // Determine penalty: FIXED (manual) or AUTO (date-based)
+        if (res.penalty_mode === "FIXED" && res.manual_penalty != null && res.manual_penalty > 0) {
+          penaltyAmount = res.manual_penalty;
+          if (activeDailyPenalty > 0) {
+            lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+          }
+        } else {
+          penaltyAmount = calculateTotalInterest(
+            nextDueDate,
+            currentDate,
+            res.mora_frozen || false,
+            res.grace_days ?? project.grace_period_days ?? 5,
+            activeDailyPenalty,
+            res.debt_start_date,
+            project.penalty_start_date
+          );
 
-        const activeDailyPenalty = project.daily_penalty_amount || 10000;
-        if (penaltyAmount > 0 && activeDailyPenalty > 0) {
-          lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+          if (penaltyAmount > 0 && activeDailyPenalty > 0) {
+            lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+          }
         }
       }
 
@@ -244,6 +252,9 @@ export async function getFullPostventaData({
         daily_penalty: res.daily_penalty || project.daily_penalty_amount || 10000,
         due_day: res.due_day || project.due_day_of_month || 5,
         grace_days: res.grace_days || project.grace_period_days || 5,
+        penalty_mode: res.penalty_mode || "AUTO",
+        manual_penalty: res.manual_penalty || 0,
+        valor_cuota: lot.valor_cuota || 0,
         lot,
         buyer: res.user,
       };
@@ -360,15 +371,59 @@ export async function approveReceipt(receiptId: string) {
         data: { pie_status: "PAID" },
       });
     } else if (receipt.scope === "INSTALLMENT") {
-      await prisma.reservation.update({
+      // Get reservation with lot to calculate expected amount
+      const res = await prisma.reservation.findUnique({
         where: { id: receipt.reservation_id },
-        data: {
-          installments_paid: {
-            increment: receipt.installments_count || 1,
-          },
-          next_payment_date: null,
-        },
+        include: { lot: true, project: true }
       });
+
+      if (res) {
+        // Calculate what should have been paid (cuota base + penalty)
+        let expectedCuotaBase = res.lot.valor_cuota || 0;
+        const ranges = res.installment_ranges
+          ? (typeof res.installment_ranges === "string"
+              ? JSON.parse(res.installment_ranges)
+              : res.installment_ranges)
+          : [];
+        const nextInstNum = (res.installments_paid || 0) + 1;
+        const range = (ranges as any[]).find((r: any) => nextInstNum >= Number(r.from) && nextInstNum <= Number(r.to));
+        if (range) expectedCuotaBase = Number(range.amount);
+
+        const totalExpectedPerCuota = expectedCuotaBase * (receipt.installments_count || 1);
+        const currentPenalty = res.manual_penalty || 0;
+        const totalExpected = totalExpectedPerCuota + currentPenalty;
+        const paid = receipt.amount_clp;
+        const shortfall = totalExpected - paid;
+
+        await prisma.reservation.update({
+          where: { id: receipt.reservation_id },
+          data: {
+            installments_paid: {
+              increment: receipt.installments_count || 1,
+            },
+            next_payment_date: null,
+            // If there's a shortfall, carry it as new manual penalty
+            // If fully paid, clear manual penalty and reset to AUTO
+            manual_penalty: shortfall > 0 ? shortfall : null,
+            penalty_mode: shortfall > 0 ? "FIXED" : "AUTO",
+            // Reset debt_start_date so cycle restarts cleanly
+            debt_start_date: null,
+          },
+        });
+      } else {
+        // Fallback if reservation not found
+        await prisma.reservation.update({
+          where: { id: receipt.reservation_id },
+          data: {
+            installments_paid: {
+              increment: receipt.installments_count || 1,
+            },
+            next_payment_date: null,
+            manual_penalty: null,
+            penalty_mode: "AUTO",
+          },
+        });
+      }
     }
 
     memoryCache.deleteByPrefix("postventa_");
@@ -577,6 +632,8 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
   grace_days?: number;
   mora_frozen?: boolean;
   mora_status?: string;
+  penalty_mode?: string;
+  manual_penalty?: number | null;
   debt_start_date?: string | null;
   next_payment_date?: string | null;
 }) {
@@ -637,6 +694,8 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
             ? new Date(data.next_payment_date + "T12:00:00") 
             : (nextDateObj || null),
           installments_paid: Number(data.installments_paid) || 0,
+          penalty_mode: data.penalty_mode || "AUTO",
+          manual_penalty: data.penalty_mode === "FIXED" ? (Number(data.manual_penalty) || null) : null,
           ...(startDateObj && { installment_start_date: startDateObj }),
         }
       })

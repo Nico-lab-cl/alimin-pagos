@@ -39,6 +39,8 @@ export default function ClientsPage() {
     grace_days: 5,
     mora_frozen: false,
     mora_status: "ACTIVO",
+    penalty_mode: "AUTO",
+    manual_penalty: 0,
     debt_start_date: "",
     next_payment_date: "",
     installment_start_date: ""
@@ -218,6 +220,8 @@ export default function ClientsPage() {
                         grace_days: c.grace_days || 5,
                         mora_frozen: c.mora_frozen || false,
                         mora_status: c.mora_status || (c.mora_frozen ? "CONGELADO" : "ACTIVO"),
+                        penalty_mode: c.penalty_mode || "AUTO",
+                        manual_penalty: c.manual_penalty || 0,
                         debt_start_date: c.debt_start_date ? new Date(c.debt_start_date).toISOString().split('T')[0] : "",
                         next_payment_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : "",
                         installment_start_date: c.installment_start_date ? new Date(c.installment_start_date).toISOString().split('T')[0] : ""
@@ -594,6 +598,54 @@ export default function ClientsPage() {
                               </select>
                             </div>
                           </div>
+
+                          {/* Penalty Mode Toggle - Only show when ACTIVO */}
+                          {finForm.mora_status === "ACTIVO" && (
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-4 space-y-4">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-3">Modo de Cálculo de Penalización</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setFinForm({...finForm, penalty_mode: "AUTO", manual_penalty: 0})}
+                                  className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
+                                    finForm.penalty_mode === "AUTO" 
+                                      ? "bg-accent/10 border-accent/40 text-accent shadow-[0_0_10px_rgba(212,168,75,0.15)]" 
+                                      : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"
+                                  }`}
+                                >
+                                  Por Fecha (Auto)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setFinForm({...finForm, penalty_mode: "FIXED"})}
+                                  className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
+                                    finForm.penalty_mode === "FIXED" 
+                                      ? "bg-red-500/10 border-red-500/40 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.15)]" 
+                                      : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"
+                                  }`}
+                                >
+                                  Monto Fijo
+                                </button>
+                              </div>
+                              {finForm.penalty_mode === "FIXED" && (
+                                <div className="space-y-2 animate-fade-in">
+                                  <label className="block text-[8px] text-red-400/80 uppercase font-black tracking-widest">Monto Total de Multa Fija ($)</label>
+                                  <input 
+                                    type="number" 
+                                    min="0"
+                                    value={finForm.manual_penalty} 
+                                    onChange={e => setFinForm({...finForm, manual_penalty: Number(e.target.value)})} 
+                                    className="w-full bg-black/40 border border-red-500/30 rounded-xl px-3 py-3 text-lg text-red-400 focus:border-red-400 outline-none font-black" 
+                                    placeholder="Ej: 500000"
+                                  />
+                                  <p className="text-[8px] text-white/20 uppercase tracking-widest">Este monto se sumará a la cuota del cliente en su portal de pago</p>
+                                </div>
+                              )}
+                              {finForm.penalty_mode === "AUTO" && (
+                                <p className="text-[8px] text-white/20 uppercase tracking-widest">La multa se calcula automáticamente según los días de atraso × interés diario</p>
+                              )}
+                            </div>
+                          )}
 
                           {!finForm.mora_frozen && (
                             <div className="mt-4 space-y-2">

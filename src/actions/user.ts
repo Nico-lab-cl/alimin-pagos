@@ -83,6 +83,7 @@ export async function getUserLots() {
       let penaltyAmount = 0;
       let lateDays = 0;
       let upcomingInstallments: any[] = [];
+      const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
         if (res.next_payment_date) {
@@ -95,19 +96,26 @@ export async function getUserLots() {
           );
         }
 
-        penaltyAmount = calculateTotalInterest(
-          nextDueDate,
-          currentDate,
-          res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
-          res.grace_days ?? project.grace_period_days ?? 5,
-          res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
-          res.debt_start_date,
-          project.penalty_start_date
-        );
+        // Determine penalty: FIXED (manual) or AUTO (date-based)
+        if (res.penalty_mode === "FIXED" && res.manual_penalty != null && res.manual_penalty > 0) {
+          penaltyAmount = res.manual_penalty;
+          if (activeDailyPenalty > 0) {
+            lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+          }
+        } else {
+          penaltyAmount = calculateTotalInterest(
+            nextDueDate,
+            currentDate,
+            res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
+            res.grace_days ?? project.grace_period_days ?? 5,
+            activeDailyPenalty,
+            res.debt_start_date,
+            project.penalty_start_date
+          );
 
-        const activeDailyPenalty = project.daily_penalty_amount || 10000;
-        if (penaltyAmount > 0 && activeDailyPenalty > 0) {
-          lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+          if (penaltyAmount > 0 && activeDailyPenalty > 0) {
+            lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+          }
         }
 
         // Calculate upcoming installments (up to 12)
