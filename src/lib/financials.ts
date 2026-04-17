@@ -2,15 +2,17 @@ import { prisma } from "./prisma";
 
 /**
  * Calculates the due date for a specific installment number.
- * Uses project-level config for the due day of month.
+ * The payment day is always derived from the installment_start_date day.
+ * e.g., if start = May 5, payments are the 5th of each month.
  */
 export function getInstallmentDueDate(
   installmentStartDate: Date | string,
   installmentNumber: number,
-  dueDayOfMonth: number = 5
+  _dueDayOfMonth?: number // kept for backward compat, but ignored
 ): Date {
   const base = new Date(installmentStartDate);
-  const due = new Date(base.getFullYear(), base.getMonth(), dueDayOfMonth, 12, 0, 0, 0);
+  const payDay = base.getDate(); // Always use the day from the start date
+  const due = new Date(base.getFullYear(), base.getMonth(), payDay, 12, 0, 0, 0);
 
   // installment_start_date represents the MONTH of cuota 1
   // Formula: base + (N-1)
