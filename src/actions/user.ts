@@ -86,14 +86,17 @@ export async function getUserLots() {
       const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
-        if (res.next_payment_date) {
+        // Always calculate dynamically based on installments paid
+        const calculatedDueDate = getInstallmentDueDate(
+          res.installment_start_date,
+          paidCuotas + 1,
+          res.due_day ?? project.due_day_of_month ?? 5
+        );
+        // Only use stored next_payment_date if it's AFTER the calculated date (admin override)
+        if (res.next_payment_date && new Date(res.next_payment_date) > calculatedDueDate) {
           nextDueDate = new Date(res.next_payment_date);
         } else {
-          nextDueDate = getInstallmentDueDate(
-            res.installment_start_date,
-            paidCuotas + 1,
-            res.due_day ?? project.due_day_of_month ?? 5
-          );
+          nextDueDate = calculatedDueDate;
         }
 
         // Determine penalty: FIXED (manual) or AUTO (date-based)
@@ -127,8 +130,8 @@ export async function getUserLots() {
           const installmentNumber = paidCuotas + 1 + i;
           
           let currentDue: Date;
-          if (i === 0 && res.next_payment_date) {
-            currentDue = new Date(res.next_payment_date);
+          if (i === 0) {
+            currentDue = nextDueDate!;
           } else {
             currentDue = getInstallmentDueDate(
               res.installment_start_date,
