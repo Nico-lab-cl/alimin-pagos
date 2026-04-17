@@ -88,7 +88,26 @@ export default function ClientsPage() {
       setDocs([]);
       getReservationDocuments(selectedClient.id)
         .then(res => {
-          if (res.documents) setDocs(res.documents);
+          if (res.documents) {
+            // Unify with legacy docs if any
+            const tableDocs = res.documents.map((d: any) => ({
+              id: d.id,
+              name: d.name,
+              date: d.created_at,
+              url: `/api/documents/${d.id}`,
+              type: 'table'
+            }));
+            
+            const legacyDocs = (selectedClient.manual_documents || []).map((d: any, i: number) => ({
+              id: `legacy-${i}`,
+              name: d.name,
+              date: d.uploadedAt,
+              url: d.url,
+              type: 'legacy'
+            }));
+
+            setDocs([...tableDocs, ...legacyDocs]);
+          }
         })
         .catch(err => {
           console.error("Error fetching documents:", err);
@@ -928,33 +947,40 @@ export default function ClientsPage() {
                           </div>
                           <div className="flex flex-col overflow-hidden">
                             <p className="text-[11px] font-black text-white/80 uppercase tracking-tight truncate max-w-[180px] group-hover:text-white transition-colors">{doc.name}</p>
-                            <p className="text-[9px] font-black text-white/10 uppercase tracking-[0.2em] mt-1 group-hover:text-white/20 transition-colors">
-                              Cargado el {new Date(doc.created_at).toLocaleDateString('es-CL')}
-                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-[9px] font-black text-white/10 uppercase tracking-[0.2em] group-hover:text-white/20 transition-colors">
+                                Cargado el {new Date(doc.date).toLocaleDateString('es-CL')}
+                              </p>
+                              {doc.type === 'legacy' && (
+                                <span className="text-[7px] bg-white/5 px-2 py-0.5 rounded-full text-white/20 font-black uppercase tracking-widest border border-white/5">Auto</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <a 
-                            href={`/api/documents/${doc.id}`} 
+                            href={doc.url} 
                             download
                             className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/20 hover:bg-accent hover:text-black hover:border-accent hover:shadow-[0_0_15px_rgba(212,168,75,0.3)] transition-all duration-300"
                             title="Descargar Documento"
                           >
                             <Download className="w-4 h-4" />
                           </a>
-                          <button 
-                            onClick={async () => {
-                              if (!confirm("¿Seguro que deseas eliminar definitivamente este archivo?")) return;
-                              const res = await deleteDocument(doc.id);
-                              if (res.success) {
-                                setDocs(docs.filter(d => d.id !== doc.id));
-                              }
-                            }}
-                            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/20 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all duration-300"
-                            title="Eliminar Documento"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {doc.type === 'table' && (
+                            <button 
+                              onClick={async () => {
+                                if (!confirm("¿Seguro que deseas eliminar definitivamente este archivo?")) return;
+                                const res = await deleteDocument(doc.id);
+                                if (res.success) {
+                                  setDocs(docs.filter(d => d.id !== doc.id));
+                                }
+                              }}
+                              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/20 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all duration-300"
+                              title="Eliminar Documento"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))

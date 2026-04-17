@@ -20,9 +20,11 @@ export async function uploadDocument({
   base64Content: string;
   category?: string;
 }) {
+  console.log(`[ACTION] uploadDocument called for reservation: ${reservationId}, name: ${name}`);
   const session = await auth();
   const user = session?.user as any;
   if (!session?.user || user?.role !== "ADMIN") {
+    console.error("[ACTION] uploadDocument Unauthorized");
     return { error: "No autorizado" };
   }
 
@@ -36,19 +38,21 @@ export async function uploadDocument({
       },
     });
 
+    console.log(`[ACTION] uploadDocument SUCCESS: ${document.id}`);
+
+    // Force revalidation for both views
     revalidatePath("/admin/clients");
     revalidatePath("/user/documents");
     
     return { success: true, documentId: document.id };
   } catch (error) {
-    console.error("Error uploading document:", error);
+    console.error("[ACTION] Error uploading document:", error);
     return { error: "Error al subir el documento" };
   }
 }
 
 /**
  * Lists metadata for all documents of a reservation.
- * Content is NOT included to keep it fast.
  */
 export async function getReservationDocuments(reservationId: string) {
   const session = await auth();
@@ -68,7 +72,7 @@ export async function getReservationDocuments(reservationId: string) {
 
     return { success: true, documents };
   } catch (error) {
-    console.error("Error listing documents:", error);
+    console.error("[ACTION] Error listing documents:", error);
     return { error: "Error al listar documentos", documents: [] };
   }
 }
@@ -77,23 +81,27 @@ export async function getReservationDocuments(reservationId: string) {
  * Deletes a document.
  */
 export async function deleteDocument(documentId: string) {
+  console.log(`[ACTION] deleteDocument called for ID: ${documentId}`);
   const session = await auth();
   const user = session?.user as any;
   if (!session?.user || user?.role !== "ADMIN") {
+    console.error("[ACTION] deleteDocument Unauthorized");
     return { error: "No autorizado" };
   }
 
   try {
-    await prisma.reservationDocument.delete({
+    const doc = await prisma.reservationDocument.delete({
       where: { id: documentId },
     });
+
+    console.log(`[ACTION] deleteDocument SUCCESS for: ${doc.id}`);
 
     revalidatePath("/admin/clients");
     revalidatePath("/user/documents");
 
     return { success: true };
   } catch (error) {
-    console.error("Error deleting document:", error);
+    console.error("[ACTION] Error deleting document:", error);
     return { error: "Error al eliminar el documento" };
   }
 }
