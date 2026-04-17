@@ -621,11 +621,16 @@ export default function ClientsPage() {
                         <div className="pt-4 mt-4 border-t border-white/5">
                           <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-4">Vencimientos & Mora</p>
                           <div className="grid grid-cols-2 gap-4">
-                            <DatePicker 
-                              label="Fecha Próximo Vencimiento"
-                              date={finForm.next_payment_date}
-                              onChange={val => setFinForm({...finForm, next_payment_date: val})}
-                            />
+                            <div className="space-y-1">
+                              <DatePicker 
+                                label="Próximo Vencimiento (Opcional)"
+                                date={finForm.next_payment_date}
+                                onChange={val => setFinForm({...finForm, next_payment_date: val})}
+                              />
+                              <p className="text-[7px] font-bold text-white/10 uppercase tracking-widest px-1">
+                                Automático si está vacío
+                              </p>
+                            </div>
                             <div className="space-y-2">
                               <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Días de Gracia</label>
                               <input type="number" min="0" value={finForm.grace_days} onChange={e=>setFinForm({...finForm, grace_days: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
