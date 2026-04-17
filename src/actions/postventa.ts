@@ -739,3 +739,226 @@ export async function toggleMultiLot(reservationId: string, status: boolean) {
     return { error: "Error al cambiar estado multi-lote" };
   }
 }
+
+/**
+ * Gets the client's Point-of-View data for a reservation.
+ * Admin-only. Returns the same data structure the user portal displays.
+ */
+export async function getClientPOV(reservationId: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const res = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: {
+        project: true,
+        lot: true,
+        receipts: {
+          where: { status: "APPROVED" },
+          orderBy: { created_at: "desc" },
+        },
+        documents: {
+          select: {
+            id: true,
+            name: true,
+            file_type: true,
+            created_at: true,
+          },
+          orderBy: { created_at: "desc" },
+        },
+      },
+    });
+
+    if (!res) return { error: "Reservación no encontrada" };
+
+    const lot = res.lot;
+    const project = res.project;
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+
+    const paidCuotas = res.installments_paid || 0;
+    const totalCuotas = lot.cuotas || 0;
+    const pieAmount = res.pie || lot.pie || 0;
+    const actualPie = res.pie_status === "PAID" ? pieAmount : 0;
+
+    // Calculate installments total using ranges
+    let calculatedCuotasTotal = 0;
+    const ranges = res.installment_ranges
+      ? (typeof res.installment_ranges === "string"
+          ? JSON.parse(res.installment_ranges)
+          : res.installment_ranges)
+      : [];
+    for (let i = 1; i <= paidCuotas; i++) {
+      const range = (ranges as any[]).find(
+        (r: any) => i >= Number(r.from) && i <= Number(r.to)
+      );
+      calculatedCuotasTotal += range
+        ? Number(range.amount)
+        : (lot.valor_cuota || 0);
+    }
+
+    const totalPaid = actualPie + calculatedCuotasTotal + (res.extra_paid_amount || 0);
+    const totalToPay = lot.price_total_clp || 0;
+    const pendingBalance = Math.max(0, totalToPay - totalPaid + (res.pending_amount || 0));
+
+    let nextDueDate: Date | null = null;
+    let penaltyAmount = 0;
+    let lateDays = 0;
+    let upcomingInstallments: any[] = [];
+    const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
+
+    if (paidCuotas < totalCuotas && res.installment_start_date) {
+      if (res.next_payment_date) {
+        nextDueDate = new Date(res.next_payment_date);
+      } else {
+        nextDueDate = getInstallmentDueDate(
+          res.installment_start_date,
+          paidCuotas + 1,
+          res.due_day ?? project.due_day_of_month ?? 5
+        );
+      }
+
+      // Penalty calculation
+      if (res.penalty_mode === "FIXED" && res.manual_penalty != null && res.manual_penalty > 0) {
+        penaltyAmount = res.manual_penalty;
+        if (activeDailyPenalty > 0) {
+          lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+        }
+      } else {
+        penaltyAmount = calculateTotalInterest(
+          nextDueDate,
+          currentDate,
+          res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
+          res.grace_days ?? project.grace_period_days ?? 5,
+          activeDailyPenalty,
+          res.debt_start_date,
+          project.penalty_start_date
+        );
+        if (penaltyAmount > 0 && activeDailyPenalty > 0) {
+          lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+        }
+      }
+
+      // Upcoming installments (up to 12)
+      const totalPendingRemaining = totalCuotas - paidCuotas;
+      const maxToShow = Math.min(12, totalPendingRemaining);
+      const formatMonth = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+      for (let i = 0; i < maxToShow; i++) {
+        const installmentNumber = paidCuotas + 1 + i;
+        let currentDue: Date;
+        if (i === 0 && res.next_payment_date) {
+          currentDue = new Date(res.next_payment_date);
+        } else {
+          currentDue = getInstallmentDueDate(
+            res.installment_start_date,
+            installmentNumber,
+            res.due_day ?? project.due_day_of_month ?? 5
+          );
+        }
+
+        let installmentBaseAmount = lot.valor_cuota || 0;
+        if (ranges && ranges.length > 0) {
+          const range = (ranges as any[]).find((r: any) => installmentNumber >= Number(r.from) && installmentNumber <= Number(r.to));
+          if (range) installmentBaseAmount = Number(range.amount);
+        }
+
+        let finalAmount = installmentBaseAmount;
+        let hasPenalty = false;
+        let installmentPenaltyAmount = 0;
+        let installmentLateDays = 0;
+
+        if (i === 0 && penaltyAmount > 0 && res.mora_status === "ACTIVO") {
+          finalAmount += penaltyAmount;
+          hasPenalty = true;
+          installmentPenaltyAmount = penaltyAmount;
+          installmentLateDays = lateDays;
+        }
+
+        const monthNameRaw = formatMonth.format(currentDue);
+        upcomingInstallments.push({
+          number: installmentNumber,
+          dueDate: currentDue.toISOString(),
+          baseAmount: installmentBaseAmount,
+          amount: finalAmount,
+          monthName: monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1),
+          hasPenalty,
+          penaltyAmount: installmentPenaltyAmount,
+          lateDays: installmentLateDays,
+          dailyPenalty: hasPenalty ? activeDailyPenalty : 0,
+        });
+      }
+    }
+
+    // Documents
+    let documents: any[] = [];
+    if (res.manual_documents) {
+      try {
+        const parsed = Array.isArray(res.manual_documents)
+          ? res.manual_documents
+          : JSON.parse(res.manual_documents as string);
+        documents = parsed.map((d: any) => ({
+          name: d.name,
+          category: d.category,
+          uploadedAt: d.uploadedAt,
+          url: `/api/documents/${res.id}?name=${encodeURIComponent(d.name)}`,
+        }));
+      } catch {}
+    }
+    if (res.documents && res.documents.length > 0) {
+      const newDocs = res.documents.map((d: any) => ({
+        name: d.name,
+        category: d.category,
+        uploadedAt: d.created_at,
+        url: `/api/documents/${d.id}`,
+      }));
+      documents = [...newDocs, ...documents];
+    }
+
+    return {
+      success: true,
+      data: {
+        reservationId: res.id,
+        projectName: project.name,
+        projectSlug: project.slug,
+        lotNumber: lot.number,
+        lotStage: lot.stage,
+        area_m2: lot.area_m2,
+        totalToPay,
+        totalPaid,
+        pendingBalance,
+        paidCuotas,
+        totalCuotas,
+        pieStatus: res.pie_status,
+        pieAmount,
+        valor_cuota: lot.valor_cuota || 0,
+        nextDueDate,
+        penaltyAmount,
+        lateDays,
+        isLate: penaltyAmount > 0 && res.mora_status === "ACTIVO",
+        isMoraFrozen: res.mora_status === "CONGELADO" || res.mora_frozen,
+        isUpToDate: res.mora_status === "AL_DIA",
+        dailyPenalty: activeDailyPenalty,
+        upcomingInstallments,
+        documents,
+        bank: {
+          name: project.bank_name,
+          type: project.bank_type,
+          account: project.bank_account,
+          holder: project.bank_holder,
+          rut: project.bank_rut,
+          email: project.bank_email,
+        },
+        clientName: res.last_name ? `${res.name} ${res.last_name}`.trim() : res.name,
+        clientEmail: res.email,
+      },
+    };
+  } catch (error) {
+    console.error("Error getting client POV:", error);
+    return { error: "Error al cargar vista del cliente" };
+  }
+}

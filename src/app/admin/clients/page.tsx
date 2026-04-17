@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import { formatCLP, formatDate } from "@/lib/utils";
-import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download } from "lucide-react";
+import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
+import ClientPOVModal from "@/components/admin/ClientPOVModal";
 
 export default function ClientsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -53,6 +54,7 @@ export default function ClientsPage() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docName, setDocName] = useState("");
   const [isTogglingMultiLot, setIsTogglingMultiLot] = useState(false);
+  const [showPOV, setShowPOV] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -418,6 +420,14 @@ export default function ClientsPage() {
                 >
                   {isTogglingMultiLot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
                   {selectedClient.isMultiLot ? "MULTI-LOTE: SI" : "MULTI-LOTE: NO"}
+                </button>
+
+                <button
+                  onClick={() => setShowPOV(true)}
+                  className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 bg-violet-500/10 border-violet-500/30 text-violet-400 hover:bg-violet-500/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)]"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  Vista Cliente
                 </button>
 
                 {(!selectedClient.rut || !selectedClient.clientPhone || selectedClient.clientEmail?.includes("@libertadyalegria")) && !isEditing && (
@@ -943,6 +953,15 @@ export default function ClientsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Client POV Modal */}
+      {showPOV && selectedClient && (
+        <ClientPOVModal
+          reservationId={selectedClient.id}
+          clientName={selectedClient.clientName}
+          onClose={() => setShowPOV(false)}
+        />
       )}
     </div>
   );
