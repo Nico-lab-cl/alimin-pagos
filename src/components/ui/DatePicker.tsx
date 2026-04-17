@@ -15,8 +15,18 @@ interface DatePickerProps {
 }
 
 export function DatePicker({ date, onChange, label, className }: DatePickerProps) {
-  const [currentMonth, setCurrentMonth] = React.useState(date ? new Date(date) : new Date());
-  const selectedDate = date ? new Date(date) : null;
+  // Helper to parse YYYY-MM-DD string as local date to avoid timezone shifts
+  const parseLocalDate = (dateStr: string | Date | null | undefined): Date => {
+    if (!dateStr) return new Date();
+    if (dateStr instanceof Date) return dateStr;
+    const [year, month, day] = dateStr.split("-").map(Number);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return new Date(dateStr);
+    return new Date(year, month - 1, day);
+  };
+
+  const initialDate = React.useMemo(() => parseLocalDate(date), [date]);
+  const [currentMonth, setCurrentMonth] = React.useState(initialDate);
+  const selectedDate = date ? parseLocalDate(date) : null;
   const [isOpen, setIsOpen] = React.useState(false);
 
   const days = React.useMemo(() => {
@@ -58,7 +68,7 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
               !date && "text-white/20"
             )}
           >
-            <span>{date ? format(new Date(date), "PPP", { locale: es }) : "Seleccionar fecha"}</span>
+            <span>{date ? format(parseLocalDate(date), "PPP", { locale: es }) : "Seleccionar fecha"}</span>
             <CalendarIcon className="w-4 h-4 text-accent/60" />
           </button>
         </Popover.Trigger>
