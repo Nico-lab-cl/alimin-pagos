@@ -49,7 +49,7 @@ export async function getFullPostventaData({
     const allReservations = await prisma.reservation.findMany({
       where: {
         project_id: project.id,
-        status: { in: ["active", "COMPLETED", "ARCHIVED"] },
+        status: { in: ["active", "COMPLETED"] },
       },
       orderBy: { created_at: "desc" },
       include: {
@@ -73,21 +73,7 @@ export async function getFullPostventaData({
     const fiveDaysFromNow = new Date(currentDate);
     fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
 
-    // Filter out maintenance/system records (e.g. "Sin Nombre" or "ALIMIN")
-    const filteredReservations = allReservations.filter(res => {
-      const nameMatch = res.name?.toLowerCase().includes("sin nombre") || 
-                        res.name?.toUpperCase() === "ALIMIN";
-      const emailMatch = res.email?.startsWith("@alimin.cl");
-      
-      // Exclude if it looks like a placeholder
-      if (nameMatch && emailMatch) return false;
-      if (res.name === "Sin Nombre" && res.status === "ARCHIVED") return false;
-      if (res.name === "ALIMIN" && res.status === "ARCHIVED") return false;
-      
-      return true;
-    });
-
-    const processedData = filteredReservations.map((res) => {
+    const processedData = allReservations.map((res) => {
       const lot = res.lot;
       const paidCuotas = res.installments_paid || 0;
       const totalCuotas = lot.cuotas || 0;
