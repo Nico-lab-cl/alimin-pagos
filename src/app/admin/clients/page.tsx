@@ -81,40 +81,41 @@ export default function ClientsPage() {
     setCurrentPage(1);
   }, [search, selectedStage, selectedProject]);
 
+  const refreshDocs = async (clientId: string, clientData: any) => {
+    setLoadingDocs(true);
+    try {
+      const res = await getReservationDocuments(clientId);
+      if (res.documents) {
+        const tableDocs = res.documents.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          date: d.created_at,
+          url: `/api/documents/${d.id}`,
+          type: 'table'
+        }));
+        
+        const legacyDocs = (clientData.manual_documents || []).map((d: any, i: number) => ({
+          id: `legacy-${i}`,
+          name: d.name,
+          date: d.uploadedAt,
+          url: d.url,
+          type: 'legacy'
+        }));
+
+        setDocs([...tableDocs, ...legacyDocs]);
+      }
+    } catch (err) {
+      console.error("Error fetching documents:", err);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
   // Fetch docs when client is selected
   useEffect(() => {
     if (selectedClient) {
-      setLoadingDocs(true);
       setDocs([]);
-      getReservationDocuments(selectedClient.id)
-        .then(res => {
-          if (res.documents) {
-            // Unify with legacy docs if any
-            const tableDocs = res.documents.map((d: any) => ({
-              id: d.id,
-              name: d.name,
-              date: d.created_at,
-              url: `/api/documents/${d.id}`,
-              type: 'table'
-            }));
-            
-            const legacyDocs = (selectedClient.manual_documents || []).map((d: any, i: number) => ({
-              id: `legacy-${i}`,
-              name: d.name,
-              date: d.uploadedAt,
-              url: d.url,
-              type: 'legacy'
-            }));
-
-            setDocs([...tableDocs, ...legacyDocs]);
-          }
-        })
-        .catch(err => {
-          console.error("Error fetching documents:", err);
-        })
-        .finally(() => {
-          setLoadingDocs(false);
-        });
+      refreshDocs(selectedClient.id, selectedClient);
     }
   }, [selectedClient?.id]);
 
@@ -903,8 +904,7 @@ export default function ClientsPage() {
                             });
                             if (res.success) {
                               setDocName("");
-                              const freshDocs = await getReservationDocuments(selectedClient.id);
-                              if (freshDocs.documents) setDocs(freshDocs.documents);
+                              await refreshDocs(selectedClient.id, selectedClient);
                             } else {
                               alert(res.error || "Fallo en la carga");
                             }
@@ -958,6 +958,13 @@ export default function ClientsPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => window.open(doc.url, "_blank")}
+                            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/20 hover:bg-white/10 hover:text-white transition-all duration-300"
+                            title="Previsualizar"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                           <a 
                             href={doc.url} 
                             download
