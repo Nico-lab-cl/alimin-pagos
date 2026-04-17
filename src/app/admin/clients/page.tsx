@@ -5,6 +5,7 @@ import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClie
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import { formatCLP, formatDate } from "@/lib/utils";
 import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download } from "lucide-react";
+import { DatePicker } from "@/components/ui/DatePicker";
 
 export default function ClientsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -585,10 +586,11 @@ export default function ClientsPage() {
                       <div className="border-t border-white/10 pt-4 mt-2">
                         <p className="text-[10px] font-black uppercase text-white/40 tracking-widest mb-3">Progreso de Calendario</p>
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Fecha Inicio de Cuota 1</label>
-                            <input type="date" value={finForm.installment_start_date} onChange={e=>setFinForm({...finForm, installment_start_date: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
-                          </div>
+                          <DatePicker 
+                            label="Fecha Inicio de Cuota 1"
+                            date={finForm.installment_start_date}
+                            onChange={val => setFinForm({...finForm, installment_start_date: val})}
+                          />
                           <div className="space-y-2">
                             <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Cuota Actual Pagada</label>
                             <input type="number" value={finForm.installments_paid} onChange={e=>setFinForm({...finForm, installments_paid: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
@@ -602,10 +604,11 @@ export default function ClientsPage() {
                         <div className="pt-4 mt-4 border-t border-white/5">
                           <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-4">Vencimientos & Mora</p>
                           <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest font-black italic">Fecha Próximo Vencimiento</label>
-                              <input type="date" value={finForm.next_payment_date} onChange={e=>setFinForm({...finForm, next_payment_date: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
-                            </div>
+                            <DatePicker 
+                              label="Fecha Próximo Vencimiento"
+                              date={finForm.next_payment_date}
+                              onChange={val => setFinForm({...finForm, next_payment_date: val})}
+                            />
                             <div className="space-y-2">
                               <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Días de Gracia</label>
                               <input type="number" min="0" value={finForm.grace_days} onChange={e=>setFinForm({...finForm, grace_days: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
@@ -685,10 +688,11 @@ export default function ClientsPage() {
                           )}
 
                           {!finForm.mora_frozen && (
-                            <div className="mt-4 space-y-2">
-                              <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest font-black italic">Fecha Inicio de Deuda (Opcional - Fuerza Mora)</label>
-                              <input type="date" value={finForm.debt_start_date} onChange={e=>setFinForm({...finForm, debt_start_date: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
-                            </div>
+                              <DatePicker 
+                                label="Fecha Inicio de Deuda (Opcional - Fuerza Mora)"
+                                date={finForm.debt_start_date}
+                                onChange={val => setFinForm({...finForm, debt_start_date: val})}
+                              />
                           )}
                         </div>
                       </div>
