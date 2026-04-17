@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import { formatCLP, formatDate } from "@/lib/utils";
 import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download } from "lucide-react";
@@ -51,6 +51,7 @@ export default function ClientsPage() {
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docName, setDocName] = useState("");
+  const [isTogglingMultiLot, setIsTogglingMultiLot] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -102,7 +103,10 @@ export default function ClientsPage() {
       c.clientEmail?.toLowerCase().includes(search.toLowerCase()) ||
       c.lotNumber?.toString().toUpperCase().includes(search.toUpperCase());
     
-    // lotStage is stored in DB. Could be undefined occasionally for Lomas.
+    if (selectedStage === "MULTILOTE") {
+      return matchesSearch && c.isMultiLot;
+    }
+
     const matchesStage = selectedStage === "ALL" || (c.lotStage && c.lotStage.toString().toUpperCase() === selectedStage.toUpperCase());
     
     return matchesSearch && matchesStage;
@@ -160,6 +164,13 @@ export default function ClientsPage() {
             className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border ${selectedStage === "ALL" ? "bg-accent/10 border-accent/40 text-accent shadow-[0_0_15px_rgba(212,168,75,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}
           >
             Todos ({rawClients.length})
+          </button>
+          
+          <button
+            onClick={() => setSelectedStage("MULTILOTE")}
+            className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border ${selectedStage === "MULTILOTE" ? "bg-amber-500/10 border-amber-500/40 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}
+          >
+            Multi-Lotes ({rawClients.filter((c: any) => c.isMultiLot).length})
           </button>
           {uniqueStages.map((stage) => (
             <button
@@ -375,6 +386,32 @@ export default function ClientsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={async () => {
+                    setIsTogglingMultiLot(true);
+                    try {
+                      const newStatus = !selectedClient.isMultiLot;
+                      const res = await toggleMultiLot(selectedClient.id, newStatus);
+                      if (!res.error) {
+                        // Optimistic UI update or refetch
+                        const freshData = await getFullPostventaData({ projectSlug: selectedProject });
+                        setData(freshData);
+                        setSelectedClient({ ...selectedClient, isMultiLot: newStatus });
+                      }
+                    } catch (e) {}
+                    setIsTogglingMultiLot(false);
+                  }}
+                  disabled={isTogglingMultiLot}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 ${
+                    selectedClient.isMultiLot 
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20" 
+                      : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {isTogglingMultiLot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
+                  {selectedClient.isMultiLot ? "Marcar: SI" : "Marcar: NO"}
+                </button>
+
                 {(!selectedClient.rut || !selectedClient.clientPhone || selectedClient.clientEmail?.includes("@libertadyalegria")) && !isEditing && (
                   <div className="hidden sm:flex bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[10px] uppercase font-black tracking-widest px-4 py-2 rounded-xl items-center gap-2">
                     <AlertTriangle className="w-3.5 h-3.5" /> Faltan Datos Clave

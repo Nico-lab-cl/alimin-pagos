@@ -239,10 +239,7 @@ export async function getFullPostventaData({
         profession: res.profession,
         nationality: res.nationality,
         internalStatus: res.status,
-        isMultiLot: allReservations.filter(r => r.status === "active" && r.id !== res.id && r.lot_id !== res.lot_id && (
-          (res.rut && r.rut === res.rut) || 
-          (res.email && res.email.includes("@") && !res.email.includes("@libertadyalegria") && !res.email.includes("@arenaysol") && r.email === res.email)
-        )).length > 0,
+        isMultiLot: res.is_multilote || false,
         installment_start_date: res.installment_start_date,
         installment_ranges: res.installment_ranges,
         debt_start_date: res.debt_start_date,
@@ -258,6 +255,7 @@ export async function getFullPostventaData({
         penalty_mode: res.penalty_mode || "AUTO",
         manual_penalty: res.manual_penalty || 0,
         valor_cuota: lot.valor_cuota || 0,
+        is_multilote: res.is_multilote || false,
         lot,
         buyer: res.user,
       };
@@ -712,5 +710,32 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
   } catch (error) {
     console.error("Error updating client financials:", error);
     return { error: "Error interno actualizando finanzas" };
+  }
+}
+
+/**
+ * Toggles the multi-lot status for a reservation.
+ */
+export async function toggleMultiLot(reservationId: string, status: boolean) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { is_multilote: status }
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error toggling multi-lot:", error);
+    return { error: "Error al cambiar estado multi-lote" };
   }
 }
