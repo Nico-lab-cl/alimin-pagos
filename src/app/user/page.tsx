@@ -179,7 +179,8 @@ export default function UserDashboard() {
                     {lot.nextDueDate && (
                       <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-widest text-white/50">
                         <Calendar className="w-3.5 h-3.5" />
-                        Próximo Pago: {formatDate(lot.nextDueDate)}
+                        Próximo Pago: {formatDate(lot.nextDueDate)} 
+                        {lot.nextInstallmentNumber && ` (CUOTA ${lot.nextInstallmentNumber} - ${lot.nextInstallmentMonth})`}
                       </div>
                     )}
                   </div>

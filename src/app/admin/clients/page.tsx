@@ -810,9 +810,16 @@ export default function ClientsPage() {
                       </div>
                     )}
                     {selectedClient.nextDueDate && (
-                      <div className="mt-5 pt-5 border-t border-white/5 flex justify-between items-center">
-                        <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">Próximo Cierre</p>
-                        <p className="text-xs font-bold text-white/80 flex items-center gap-2">
+                      <div className="mt-5 pt-5 border-t border-white/5 flex justify-between items-end">
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] text-accent font-black uppercase tracking-widest">
+                            {selectedClient.nextInstallmentNumber ? `Cuota ${selectedClient.nextInstallmentNumber}` : 'Próximo Pago'}
+                          </p>
+                          <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">
+                            {selectedClient.nextInstallmentMonth}
+                          </p>
+                        </div>
+                        <p className="text-xs font-bold text-white/80 flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
                           <Calendar className="w-3 h-3 text-accent" />
                           {formatDate(selectedClient.nextDueDate)}
                         </p>

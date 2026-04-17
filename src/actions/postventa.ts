@@ -206,6 +206,9 @@ export async function getFullPostventaData({
         } catch {}
       }
 
+      const formatMonth = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      const nextInstallmentMonth = nextDueDate ? formatMonth.format(nextDueDate).toUpperCase() : null;
+
       return {
         id: res.id,
         name: res.name,
@@ -224,7 +227,10 @@ export async function getFullPostventaData({
         pendingBalance,
         paidCuotas,
         totalCuotas,
+        nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
+        nextInstallmentMonth,
         pieStatus: res.pie_status,
+        pieAmount,
         nextDueDate,
         lateDays,
         penaltyAmount,
@@ -925,6 +931,9 @@ export async function getClientPOV(reservationId: string) {
       documents = [...newDocs, ...documents];
     }
 
+    const formatMonth = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const nextInstallmentMonth = nextDueDate ? formatMonth.format(nextDueDate).toUpperCase() : null;
+
     return {
       success: true,
       data: {
@@ -939,6 +948,8 @@ export async function getClientPOV(reservationId: string) {
         pendingBalance,
         paidCuotas,
         totalCuotas,
+        nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
+        nextInstallmentMonth,
         pieStatus: res.pie_status,
         pieAmount,
         valor_cuota: lot.valor_cuota || 0,

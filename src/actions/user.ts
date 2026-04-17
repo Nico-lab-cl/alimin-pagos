@@ -85,6 +85,8 @@ export async function getUserLots() {
       let upcomingInstallments: any[] = [];
       const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
+      const formatMonth = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
       if (paidCuotas < totalCuotas && res.installment_start_date) {
         // Always calculate dynamically based on installments paid
         const calculatedDueDate = getInstallmentDueDate(
@@ -124,7 +126,6 @@ export async function getUserLots() {
         // Calculate upcoming installments (up to 12)
         const totalPendingRemaining = totalCuotas - paidCuotas;
         const maxToShow = Math.min(12, totalPendingRemaining);
-        const formatMonth = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'UTC' });
         
         for (let i = 0; i < maxToShow; i++) {
           const installmentNumber = paidCuotas + 1 + i;
@@ -218,6 +219,8 @@ export async function getUserLots() {
         pendingBalance,
         paidCuotas,
         totalCuotas,
+        nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
+        nextInstallmentMonth: nextDueDate ? formatMonth.format(nextDueDate).toUpperCase() : null,
         pieStatus: res.pie_status,
         pieAmount,
         valor_cuota: lot.valor_cuota || 0,
