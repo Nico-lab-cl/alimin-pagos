@@ -587,12 +587,12 @@ export default function ClientsPage() {
                         <p className="text-[10px] font-black uppercase text-white/40 tracking-widest mb-3">Progreso de Calendario</p>
                         <div className="grid grid-cols-2 gap-4">
                           <DatePicker 
-                            label="Fecha de Inicio de Cuotas"
+                            label="Día de Pago / Próxima Cuota"
                             date={finForm.installment_start_date}
                             onChange={val => setFinForm({...finForm, installment_start_date: val})}
                           />
                           <div className="space-y-2">
-                            <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Cuota Actual Pagada</label>
+                            <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Total Cuotas ya Pagadas</label>
                             <input type="number" value={finForm.installments_paid} onChange={e=>setFinForm({...finForm, installments_paid: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
                           </div>
                           <div className="space-y-2">
