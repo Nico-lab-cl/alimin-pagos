@@ -73,7 +73,21 @@ export async function getFullPostventaData({
     const fiveDaysFromNow = new Date(currentDate);
     fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
 
-    const processedData = allReservations.map((res) => {
+    // Filter out maintenance/system records (e.g. "Sin Nombre" or "ALIMIN")
+    const filteredReservations = allReservations.filter(res => {
+      const nameMatch = res.name?.toLowerCase().includes("sin nombre") || 
+                        res.name?.toUpperCase() === "ALIMIN";
+      const emailMatch = res.email?.startsWith("@alimin.cl");
+      
+      // Exclude if it looks like a placeholder
+      if (nameMatch && emailMatch) return false;
+      if (res.name === "Sin Nombre" && res.status === "ARCHIVED") return false;
+      if (res.name === "ALIMIN" && res.status === "ARCHIVED") return false;
+      
+      return true;
+    });
+
+    const processedData = filteredReservations.map((res) => {
       const lot = res.lot;
       const paidCuotas = res.installments_paid || 0;
       const totalCuotas = lot.cuotas || 0;
