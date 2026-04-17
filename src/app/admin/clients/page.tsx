@@ -409,7 +409,7 @@ export default function ClientsPage() {
                   }`}
                 >
                   {isTogglingMultiLot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
-                  {selectedClient.isMultiLot ? "Marcar: SI" : "Marcar: NO"}
+                  {selectedClient.isMultiLot ? "MULTI-LOTE: SI" : "MULTI-LOTE: NO"}
                 </button>
 
                 {(!selectedClient.rut || !selectedClient.clientPhone || selectedClient.clientEmail?.includes("@libertadyalegria")) && !isEditing && (
