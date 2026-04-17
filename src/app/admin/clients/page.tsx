@@ -587,7 +587,7 @@ export default function ClientsPage() {
                         <p className="text-[10px] font-black uppercase text-white/40 tracking-widest mb-3">Progreso de Calendario</p>
                         <div className="grid grid-cols-2 gap-4">
                           <DatePicker 
-                            label="Fecha Inicio de Cuota 1"
+                            label="Fecha de Inicio de Cuotas"
                             date={finForm.installment_start_date}
                             onChange={val => setFinForm({...finForm, installment_start_date: val})}
                           />
