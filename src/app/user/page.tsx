@@ -167,7 +167,7 @@ export default function UserDashboard() {
                     {lot.penaltyAmount > 0 && !lot.isMoraFrozen && (
                       <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-400/10 border border-red-400/20 text-red-400 text-[10px] font-black uppercase tracking-widest animate-pulse">
                         <AlertTriangle className="w-3.5 h-3.5" />
-                        Atraso Crítico: {formatCLP(lot.penaltyAmount)}
+                        Interés Acumulado: {formatCLP(lot.penaltyAmount)} ({lot.lateDays} {lot.lateDays === 1 ? "día" : "días"} × {formatCLP(lot.dailyPenalty)}/día)
                       </div>
                     )}
                     {lot.isMoraFrozen && (
@@ -178,8 +178,8 @@ export default function UserDashboard() {
                     )}
                     {lot.nextDueDate && (
                       <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-widest text-white/50">
-                        <Clock className="w-3.5 h-3.5" />
-                        Vence: {formatDate(lot.nextDueDate)}
+                        <Calendar className="w-3.5 h-3.5" />
+                        Próximo Pago: {formatDate(lot.nextDueDate)}
                       </div>
                     )}
                   </div>
