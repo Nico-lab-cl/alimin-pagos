@@ -83,12 +83,19 @@ export default function ClientsPage() {
   useEffect(() => {
     if (selectedClient) {
       setLoadingDocs(true);
-      getReservationDocuments(selectedClient.id).then(res => {
-        if (res.documents) setDocs(res.documents);
-        setLoadingDocs(false);
-      });
+      setDocs([]);
+      getReservationDocuments(selectedClient.id)
+        .then(res => {
+          if (res.documents) setDocs(res.documents);
+        })
+        .catch(err => {
+          console.error("Error fetching documents:", err);
+        })
+        .finally(() => {
+          setLoadingDocs(false);
+        });
     }
-  }, [selectedClient]);
+  }, [selectedClient?.id]);
 
   const rawClients = data?.data || [];
   const uniqueStages: string[] = Array.from(new Set(rawClients.map((c: any) => c.lotStage).filter(Boolean)));
@@ -829,33 +836,43 @@ export default function ClientsPage() {
                           if (!file) return;
                           if (!docName.trim()) {
                             alert("Por favor, ingresa un nombre para identificar el documento.");
+                            e.target.value = "";
+                            return;
+                          }
+                          // Limit file size to 8MB (base64 adds ~33% overhead)
+                          if (file.size > 8 * 1024 * 1024) {
+                            alert("El archivo es demasiado grande. Máximo permitido: 8MB.");
+                            e.target.value = "";
                             return;
                           }
                           
                           setUploadingDoc(true);
                           try {
-                            const reader = new FileReader();
-                            reader.readAsDataURL(file);
-                            reader.onload = async () => {
-                              const base64 = reader.result as string;
-                              const res = await uploadDocument({
-                                reservationId: selectedClient.id,
-                                name: docName.trim(),
-                                fileType: file.type,
-                                base64Content: base64
-                              });
-                              if (res.success) {
-                                setDocName("");
-                                const freshDocs = await getReservationDocuments(selectedClient.id);
-                                if (freshDocs.documents) setDocs(freshDocs.documents);
-                              } else {
-                                alert(res.error || "Fallo en la carga");
-                              }
-                              setUploadingDoc(false);
-                            };
+                            const base64 = await new Promise<string>((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = () => resolve(reader.result as string);
+                              reader.onerror = () => reject(new Error("Error al leer el archivo"));
+                              reader.readAsDataURL(file);
+                            });
+                            const res = await uploadDocument({
+                              reservationId: selectedClient.id,
+                              name: docName.trim(),
+                              fileType: file.type,
+                              base64Content: base64
+                            });
+                            if (res.success) {
+                              setDocName("");
+                              const freshDocs = await getReservationDocuments(selectedClient.id);
+                              if (freshDocs.documents) setDocs(freshDocs.documents);
+                            } else {
+                              alert(res.error || "Fallo en la carga");
+                            }
                           } catch (err) {
-                            alert("Error al procesar el archivo localmente");
+                            console.error("Upload error:", err);
+                            alert("Error al procesar o subir el archivo. Verifica que no sea demasiado grande.");
+                          } finally {
                             setUploadingDoc(false);
+                            e.target.value = "";
                           }
                         }}
                       />
