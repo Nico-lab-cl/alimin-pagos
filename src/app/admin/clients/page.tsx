@@ -252,7 +252,7 @@ export default function ClientsPage() {
                               <span className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-[8px] font-black text-amber-400 uppercase tracking-widest">Multi-Lote</span>
                             )}
                             {c.internalStatus === 'ARCHIVED' && (
-                              <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-black text-white/40 uppercase tracking-widest">Histórico</span>
+                              <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-black text-white/40 uppercase tracking-widest">H-VERIFY</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
