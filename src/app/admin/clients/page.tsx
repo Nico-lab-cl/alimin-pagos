@@ -623,11 +623,16 @@ export default function ClientsPage() {
                       <div className="border-t border-white/10 pt-4 mt-2">
                         <p className="text-[10px] font-black uppercase text-white/40 tracking-widest mb-3">Progreso de Calendario</p>
                         <div className="grid grid-cols-2 gap-4">
-                          <DatePicker 
-                            label="Día de Pago / Próxima Cuota"
-                            date={finForm.installment_start_date}
-                            onChange={val => setFinForm({...finForm, installment_start_date: val})}
-                          />
+                          <div className="space-y-1">
+                            <DatePicker 
+                              label="Próximo Vencimiento (Cuota Actual)"
+                              date={finForm.installment_start_date}
+                              onChange={val => setFinForm({...finForm, installment_start_date: val})}
+                            />
+                            <p className="text-[7px] font-bold text-accent/40 uppercase tracking-widest px-1 leading-tight">
+                              Efectivo para la cuota #{finForm.installments_paid + 1}. El sistema recalibra la cronología automáticamente.
+                            </p>
+                          </div>
                           <div className="space-y-2">
                             <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Total Cuotas ya Pagadas</label>
                             <input type="number" value={finForm.installments_paid} onChange={e=>setFinForm({...finForm, installments_paid: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />

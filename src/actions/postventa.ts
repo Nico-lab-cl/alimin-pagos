@@ -119,8 +119,8 @@ export async function getFullPostventaData({
           paidCuotas + 1,
           res.due_day ?? project.due_day_of_month ?? 5
         );
-        // Only use stored next_payment_date if it's AFTER the calculated date (admin override)
-        if (res.next_payment_date && new Date(res.next_payment_date) > calculatedDueDate) {
+        // Use stored next_payment_date if it exists (admin override), otherwise use calculated
+        if (res.next_payment_date) {
           nextDueDate = new Date(res.next_payment_date);
         } else {
           nextDueDate = calculatedDueDate;
@@ -666,12 +666,16 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
     let nextDateObj: Date | null = null;
     
     if (data.installment_start_date) {
-        startDateObj = new Date(data.installment_start_date);
-        // compute next date based on installments_paid
-        const projectConfig = await getProjectConfig(reservation.project_id);
-        const dueDay = Number(data.due_day) || (projectConfig?.due_day_of_month ?? 5);
-        // The NEXT payment is (installments_paid + 1)
-        nextDateObj = getInstallmentDueDate(startDateObj, (Number(data.installments_paid) ?? 0) + 1, dueDay);
+        const enteredDate = new Date(data.installment_start_date + "T12:00:00");
+        const paidCount = Number(data.installments_paid) || 0;
+        
+        // We want: AnchorDate + PaidCount = EnteredDate
+        // Therefore: AnchorDate = EnteredDate - PaidCount
+        const calculatedAnchor = new Date(enteredDate);
+        calculatedAnchor.setMonth(calculatedAnchor.getMonth() - paidCount);
+        
+        startDateObj = calculatedAnchor;
+        nextDateObj = enteredDate;
     }
 
     await prisma.$transaction([

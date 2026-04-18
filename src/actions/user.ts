@@ -94,8 +94,8 @@ export async function getUserLots() {
           paidCuotas + 1,
           res.due_day ?? project.due_day_of_month ?? 5
         );
-        // Only use stored next_payment_date if it's AFTER the calculated date (admin override)
-        if (res.next_payment_date && new Date(res.next_payment_date) > calculatedDueDate) {
+        // Use stored next_payment_date if it exists (admin override), otherwise use calculated
+        if (res.next_payment_date) {
           nextDueDate = new Date(res.next_payment_date);
         } else {
           nextDueDate = calculatedDueDate;
