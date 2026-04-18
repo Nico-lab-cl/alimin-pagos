@@ -704,9 +704,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
           debt_start_date: (data.debt_start_date && data.debt_start_date.trim() !== "") 
             ? new Date(data.debt_start_date + "T12:00:00") 
             : null,
-          next_payment_date: (data.next_payment_date && data.next_payment_date.trim() !== "") 
-            ? new Date(data.next_payment_date + "T12:00:00") 
-            : (nextDateObj || null),
+          next_payment_date: nextDateObj || null,
           installments_paid: Number(data.installments_paid) || 0,
           penalty_mode: data.penalty_mode || "AUTO",
           manual_penalty: data.penalty_mode === "FIXED" ? (Number(data.manual_penalty) || null) : null,
@@ -831,8 +829,8 @@ export async function getClientPOV(reservationId: string) {
         paidCuotas + 1,
         res.due_day ?? project.due_day_of_month ?? 5
       );
-      // Only use stored next_payment_date if it's AFTER the calculated date (admin override)
-      if (res.next_payment_date && new Date(res.next_payment_date) > calculatedDueDate) {
+      // Use stored next_payment_date if it exists (admin override), otherwise use calculated
+      if (res.next_payment_date) {
         nextDueDate = new Date(res.next_payment_date);
       } else {
         nextDueDate = calculatedDueDate;
