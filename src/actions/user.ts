@@ -85,7 +85,7 @@ export async function getUserLots() {
       let upcomingInstallments: any[] = [];
       const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
-      const formatMonth = new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+      const formatMonth = new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Santiago' });
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
         // Always calculate dynamically based on installments paid
