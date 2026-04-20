@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import { formatCLP, formatDate } from "@/lib/utils";
 import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye } from "lucide-react";
@@ -54,6 +54,7 @@ export default function ClientsPage() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docName, setDocName] = useState("");
   const [isTogglingMultiLot, setIsTogglingMultiLot] = useState(false);
+  const [isTogglingAlContado, setIsTogglingAlContado] = useState(false);
   const [showPOV, setShowPOV] = useState(false);
 
   const itemsPerPage = 10;
@@ -440,6 +441,33 @@ export default function ClientsPage() {
                 >
                   {isTogglingMultiLot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
                   {selectedClient.isMultiLot ? "MULTI-LOTE: SI" : "MULTI-LOTE: NO"}
+                </button>
+
+                <button
+                  onClick={async () => {
+                    setIsTogglingAlContado(true);
+                    try {
+                      // Status is COMPLETED if true, active if false
+                      const isCurrentlyContado = selectedClient.status === "COMPLETED";
+                      const newStatus = !isCurrentlyContado;
+                      const res = await toggleAlContado(selectedClient.id, newStatus);
+                      if (!res.error) {
+                        const freshData = await getFullPostventaData({ projectSlug: selectedProject });
+                        setData(freshData);
+                        setSelectedClient({ ...selectedClient, status: newStatus ? "COMPLETED" : "active" });
+                      }
+                    } catch (e) {}
+                    setIsTogglingAlContado(false);
+                  }}
+                  disabled={isTogglingAlContado}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 ${
+                    selectedClient.status === "COMPLETED" 
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20" 
+                      : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {isTogglingAlContado ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                  {selectedClient.status === "COMPLETED" ? "AL CONTADO: SI" : "AL CONTADO: NO"}
                 </button>
 
                 <button

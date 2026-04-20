@@ -752,6 +752,33 @@ export async function toggleMultiLot(reservationId: string, status: boolean) {
 }
 
 /**
+ * Toggles the Al Contado status for a reservation (mark as COMPLETED or active).
+ */
+export async function toggleAlContado(reservationId: string, isAlContado: boolean) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { status: isAlContado ? "COMPLETED" : "active" }
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error toggling al contado:", error);
+    return { error: "Error al cambiar estado al contado" };
+  }
+}
+
+/**
  * Gets the client's Point-of-View data for a reservation.
  * Admin-only. Returns the same data structure the user portal displays.
  */
