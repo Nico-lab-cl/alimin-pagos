@@ -751,7 +751,7 @@ export default function ClientsPage() {
                             </div>
                           )}
 
-                          {!finForm.mora_frozen && (
+                          {!finForm.mora_frozen && finForm.penalty_mode !== "FIXED" && (
                               <DatePicker 
                                 label="Fecha Inicio de Deuda (Opcional - Fuerza Mora)"
                                 date={finForm.debt_start_date}
