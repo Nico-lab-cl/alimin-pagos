@@ -266,7 +266,7 @@ export default function ClientsPage() {
                         manual_penalty: c.manual_penalty || 0,
                         debt_start_date: c.debt_start_date ? new Date(c.debt_start_date).toISOString().split('T')[0] : "",
                         next_payment_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : "",
-                        installment_start_date: c.installment_start_date ? new Date(c.installment_start_date).toISOString().split('T')[0] : ""
+                        installment_start_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : ""
                       });
                     }}
                     className="group hover:bg-white/[0.02] transition-colors cursor-pointer"
