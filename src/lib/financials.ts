@@ -11,12 +11,16 @@ export function getInstallmentDueDate(
   _dueDayOfMonth?: number // kept for backward compat, but ignored
 ): Date {
   const base = new Date(installmentStartDate);
-  const payDay = base.getDate(); // Always use the day from the start date
-  const due = new Date(base.getFullYear(), base.getMonth(), payDay, 12, 0, 0, 0);
+  
+  // Use UTC methods to prevent local timezone shift (critical for midnight UTC dates)
+  const payDay = base.getUTCDate();
+  
+  // Construct the new date directly in UTC at 12:00:00 UTC to safely avoid boundary issues
+  const due = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), payDay, 12, 0, 0, 0));
 
   // installment_start_date represents the MONTH of cuota 1
   // Formula: base + (N-1)
-  due.setMonth(due.getMonth() + (installmentNumber - 1));
+  due.setUTCMonth(due.getUTCMonth() + (installmentNumber - 1));
 
   return due;
 }
