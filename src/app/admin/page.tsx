@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, getProjectLedgerStats } from "@/actions/postventa";
 import { formatCLP } from "@/lib/utils";
 import { 
   Loader2, 
@@ -23,7 +23,13 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [data, setData] = useState<any>(null);
+  const [ledgerStats, setLedgerStats] = useState<any>({ revenue: 0, penalty: 0 });
   const [loading, setLoading] = useState(true);
+  
+  // By default, show historical totals (no month/year filter)
+  // Let's implement month/year state. `month=0` means "Histórico Total"
+  const [filterMonth, setFilterMonth] = useState<number>(0);
+  const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
 
   useEffect(() => {
     getAdminProjects().then((result) => {
@@ -37,12 +43,16 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (selectedProject) {
       setLoading(true);
-      getFullPostventaData({ projectSlug: selectedProject }).then((result) => {
-        setData(result);
+      Promise.all([
+        getFullPostventaData({ projectSlug: selectedProject }),
+        getProjectLedgerStats(selectedProject, filterMonth === 0 ? undefined : filterMonth, filterYear)
+      ]).then(([fullData, ledger]) => {
+        setData(fullData);
+        if (!ledger.error) setLedgerStats(ledger);
         setLoading(false);
       });
     }
-  }, [selectedProject]);
+  }, [selectedProject, filterMonth, filterYear]);
 
   if (loading && !data) {
     return (
@@ -53,14 +63,12 @@ export default function AdminDashboard() {
     );
   }
 
-  // Calculate high-level metrics
-  const totalRecau = (data?.data || []).reduce((acc: number, curr: any) => acc + curr.totalPaid, 0);
-  const totalMora = (data?.data || []).reduce((acc: number, curr: any) => acc + curr.penaltyAmount, 0);
+  // Saldo por cobrar and Clientes remain global snapshot
   const totalPend = (data?.data || []).reduce((acc: number, curr: any) => acc + curr.pendingBalance, 0);
 
   const stats = [
-    { label: "Recaudación Total", value: formatCLP(totalRecau), icon: TrendingUp, color: "text-emerald-400", glow: "shadow-emerald-500/20" },
-    { label: "Mora Acumulada", value: formatCLP(totalMora), icon: AlertTriangle, color: "text-red-400", glow: "shadow-red-500/20" },
+    { label: "Recaudación Total", value: formatCLP(ledgerStats.revenue), icon: TrendingUp, color: "text-emerald-400", glow: "shadow-emerald-500/20" },
+    { label: "Mora Acumulada", value: formatCLP(ledgerStats.penalty), icon: AlertTriangle, color: "text-red-400", glow: "shadow-red-500/20" },
     { label: "Saldo por Cobrar", value: formatCLP(totalPend), icon: Wallet, color: "text-blue-400", glow: "shadow-blue-500/20" },
     { label: "Clientes Activos", value: data?.stats?.total || 0, icon: Users, color: "text-accent", glow: "shadow-accent/20" },
   ];
@@ -83,7 +91,30 @@ export default function AdminDashboard() {
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3 shadow-inner">
             <Calendar className="w-4 h-4 text-accent/60" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Periodo: <span className="text-white">Abril 2026</span></span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Periodo</span>
+            <select 
+              value={`${filterMonth}-${filterYear}`} 
+              onChange={(e) => {
+                const [m, y] = e.target.value.split("-").map(Number);
+                setFilterMonth(m);
+                setFilterYear(y);
+              }}
+              className="bg-transparent border-none text-white font-black text-[10px] outline-none ml-2 uppercase"
+            >
+              <option value={`0-${filterYear}`} className="bg-black">Histórico Total</option>
+              <option value={`1-${filterYear}`} className="bg-black">Ene {filterYear}</option>
+              <option value={`2-${filterYear}`} className="bg-black">Feb {filterYear}</option>
+              <option value={`3-${filterYear}`} className="bg-black">Mar {filterYear}</option>
+              <option value={`4-${filterYear}`} className="bg-black">Abr {filterYear}</option>
+              <option value={`5-${filterYear}`} className="bg-black">May {filterYear}</option>
+              <option value={`6-${filterYear}`} className="bg-black">Jun {filterYear}</option>
+              <option value={`7-${filterYear}`} className="bg-black">Jul {filterYear}</option>
+              <option value={`8-${filterYear}`} className="bg-black">Ago {filterYear}</option>
+              <option value={`9-${filterYear}`} className="bg-black">Sep {filterYear}</option>
+              <option value={`10-${filterYear}`} className="bg-black">Oct {filterYear}</option>
+              <option value={`11-${filterYear}`} className="bg-black">Nov {filterYear}</option>
+              <option value={`12-${filterYear}`} className="bg-black">Dic {filterYear}</option>
+            </select>
           </div>
           
           <select

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import { formatCLP, formatDate } from "@/lib/utils";
 import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye } from "lucide-react";
@@ -56,6 +56,16 @@ export default function ClientsPage() {
   const [isTogglingMultiLot, setIsTogglingMultiLot] = useState(false);
   const [isTogglingAlContado, setIsTogglingAlContado] = useState(false);
   const [showPOV, setShowPOV] = useState(false);
+
+  // Manual Payment State
+  const [showManualPayment, setShowManualPayment] = useState(false);
+  const [isRegisteringPayment, setIsRegisteringPayment] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: 0,
+    installmentsCount: 1,
+    paidAt: new Date().toISOString().split("T")[0],
+    isPie: false
+  });
 
   const itemsPerPage = 10;
 
@@ -119,6 +129,38 @@ export default function ClientsPage() {
       refreshDocs(selectedClient.id, selectedClient);
     }
   }, [selectedClient?.id]);
+
+  const handleManualPayment = async () => {
+    if (!selectedClient || isRegisteringPayment) return;
+    if (paymentForm.amount <= 0 || paymentForm.installmentsCount <= 0) return;
+    
+    setIsRegisteringPayment(true);
+    try {
+      const res = await registerManualPayment(selectedClient.id, {
+        amount: paymentForm.amount,
+        installmentsCount: paymentForm.installmentsCount,
+        paidAt: paymentForm.paidAt,
+        isPie: paymentForm.isPie
+      });
+      
+      if (res.error) {
+        alert(res.error);
+      } else {
+        setShowManualPayment(false);
+        setPaymentForm({ amount: 0, installmentsCount: 1, paidAt: new Date().toISOString().split("T")[0], isPie: false });
+        // Refresh data
+        const freshData = await getFullPostventaData({ projectSlug: selectedProject });
+        setData(freshData);
+        // Update selectedClient
+        const updatedClient = (freshData?.data || []).find((c: any) => c.id === selectedClient.id);
+        if (updatedClient) setSelectedClient(updatedClient);
+      }
+    } catch (e) {
+      alert("Error al procesar pago");
+    } finally {
+      setIsRegisteringPayment(false);
+    }
+  };
 
   const rawClients = data?.data || [];
   const uniqueStages: string[] = Array.from(new Set(rawClients.map((c: any) => c.lotStage).filter(Boolean)));
@@ -607,8 +649,58 @@ export default function ClientsPage() {
                 </div>
               </div>
 
-              {/* Columna Derecha: Finanzas */}
+              {/* Columna Derecha: Finanzas & Pagos */}
               <div className="space-y-8">
+                
+                {/* Nuevo Bloque: Registrar Pago Manual */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black text-accent uppercase tracking-[0.2em] flex items-center gap-2"><DollarSign className="w-3 h-3"/> Módulo de Caja (Manual)</h3>
+                    {!showManualPayment && (
+                      <button onClick={() => setShowManualPayment(true)} className="text-[10px] uppercase font-black tracking-widest text-emerald-400 hover:text-white transition-colors flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+                        <Upload className="w-3 h-3" /> Registrar Pago
+                      </button>
+                    )}
+                  </div>
+                  
+                  {showManualPayment && (
+                    <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-2xl p-6 space-y-4 shadow-[0_0_20px_rgba(16,185,129,0.05)]">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Monto Recaudado ($)</label>
+                          <input type="number" value={paymentForm.amount} onChange={e=>setPaymentForm({...paymentForm, amount: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-emerald-400 focus:border-emerald-500 outline-none font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Nº Cuotas Que Paga</label>
+                          <input type="number" min="1" value={paymentForm.installmentsCount} onChange={e=>setPaymentForm({...paymentForm, installmentsCount: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none font-bold" />
+                        </div>
+                        <div className="space-y-2 col-span-2 sm:col-span-1">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Fecha Exacta del Depósito/Pago</label>
+                          <input type="date" value={paymentForm.paidAt} onChange={e=>setPaymentForm({...paymentForm, paidAt: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none font-bold" />
+                        </div>
+                        <div className="space-y-2 col-span-2 sm:col-span-1 flex items-end">
+                          <label className="flex items-center gap-2 cursor-pointer p-2 w-full h-[38px] rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors">
+                            <input type="checkbox" checked={paymentForm.isPie} onChange={e=>setPaymentForm({...paymentForm, isPie: e.target.checked})} className="accent-emerald-500" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Es pago del PIE</span>
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-3 pt-2">
+                        <button onClick={() => setShowManualPayment(false)} className="flex-1 px-4 py-3 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/60 hover:bg-white/5 transition-colors">Cancelar</button>
+                        <button 
+                          onClick={handleManualPayment}
+                          disabled={isRegisteringPayment || paymentForm.amount <= 0 || paymentForm.installmentsCount <= 0}
+                          className="flex-1 px-4 py-3 rounded-xl bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest hover:brightness-110 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                        >
+                          {isRegisteringPayment ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                          Confirmar Ingreso En Libro Mayor
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><DollarSign className="w-3 h-3"/> Finanzas & Saldos</h3>
