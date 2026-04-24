@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUserLots } from "@/actions/user";
+import { getUserLots, getUserNotifications, markNotificationAsRead } from "@/actions/user";
 import { formatCLP, formatDate } from "@/lib/utils";
 import {
   MapPin,
@@ -23,14 +23,29 @@ import Link from "next/link";
 
 export default function UserDashboard() {
   const [data, setData] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getUserLots().then((result) => {
-      setData(result);
+    Promise.all([
+      getUserLots(),
+      getUserNotifications()
+    ]).then(([lotsResult, notificationsResult]) => {
+      setData(lotsResult);
+      if (notificationsResult.success) {
+        setNotifications(notificationsResult.notifications || []);
+      }
       setLoading(false);
     });
   }, []);
+
+  const handleMarkAsRead = async (id: string) => {
+    await markNotificationAsRead(id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const unreadNotifications = notifications.filter(n => !n.read);
+
 
   if (loading) {
     return (
@@ -65,6 +80,40 @@ export default function UserDashboard() {
           Mis <span className="text-white/20">Activos</span>
         </h2>
       </div>
+
+      {/* Notifications Section */}
+      {unreadNotifications.length > 0 && (
+        <div className="space-y-4 animate-slide-up">
+          {unreadNotifications.map((n) => (
+            <div 
+              key={n.id}
+              className="relative p-8 rounded-[2.5rem] bg-red-400/5 border border-red-400/20 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden group hover:bg-red-400/10 transition-all duration-500"
+            >
+              <div className="flex items-center gap-6 relative z-10">
+                <div className="w-14 h-14 rounded-2xl bg-red-400/20 flex items-center justify-center border border-red-400/30 shadow-2xl">
+                  <AlertTriangle className="w-7 h-7 text-red-400" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-black text-white uppercase italic tracking-tighter mb-1">{n.title}</h4>
+                  <p className="text-[11px] font-bold text-white/50 uppercase tracking-widest leading-relaxed max-w-xl">
+                    {n.message}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => handleMarkAsRead(n.id)}
+                className="relative z-10 px-8 py-4 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all active:scale-95 whitespace-nowrap"
+              >
+                Entendido
+              </button>
+              
+              {/* Background Glow */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-red-400/5 rounded-full blur-[80px] pointer-events-none group-hover:bg-red-400/10 transition-all" />
+            </div>
+          ))}
+        </div>
+      )}
+
 
       {/* Lot Cards Grid */}
       <div className="grid gap-12">

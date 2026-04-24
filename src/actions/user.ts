@@ -426,3 +426,48 @@ export async function resetPassword(token: string, newPassword: string) {
     return { error: "Error al restablecer la contraseña" };
   }
 }
+
+/**
+ * Gets all notifications for the current user.
+ */
+export async function getUserNotifications() {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado", notifications: [] };
+
+  const userId = (session.user as any).id;
+
+  try {
+    const notifications = await prisma.notification.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: "desc" },
+      take: 20,
+    });
+
+    return { success: true, notifications };
+  } catch (error) {
+    console.error("Error getting notifications:", error);
+    return { error: "Error al cargar notificaciones", notifications: [] };
+  }
+}
+
+/**
+ * Marks a notification as read.
+ */
+export async function markNotificationAsRead(notificationId: string) {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado" };
+
+  const userId = (session.user as any).id;
+
+  try {
+    await prisma.notification.update({
+      where: { id: notificationId, user_id: userId },
+      data: { read: true },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    return { error: "Error al marcar como leída" };
+  }
+}

@@ -553,7 +553,19 @@ export async function rejectReceipt(receiptId: string, reason: string) {
       },
     });
 
-    // Send Notification
+    // Create persistent notification in DB
+    if (receipt?.reservation?.user_id) {
+      await prisma.notification.create({
+        data: {
+          user_id: receipt.reservation.user_id,
+          type: "PAYMENT_REJECTED",
+          title: "Pago Observado",
+          message: `Tu comprobante de ${receipt.scope === 'PIE' ? 'Pie' : 'Cuota'} por $${receipt.amount_clp.toLocaleString('es-CL')} fue rechazado: ${reason}`,
+        }
+      });
+    }
+
+    // Send Push Notification
     if (receipt?.reservation?.user?.fcm_token) {
       const { sendPushNotification } = await import("@/lib/notifications");
       sendPushNotification({
