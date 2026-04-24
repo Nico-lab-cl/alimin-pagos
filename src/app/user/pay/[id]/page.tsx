@@ -206,8 +206,14 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                       <button
                         key={cuota.number}
                         type="button"
-                        onClick={() => setInstallmentsCount(idx + 1)}
-                        className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                        onClick={() => {
+                          if (idx + 1 === installmentsCount) {
+                            setInstallmentsCount(idx);
+                          } else {
+                            setInstallmentsCount(idx + 1);
+                          }
+                        }}
+                        className={`flex items-center justify-between p-6 rounded-2xl border transition-all cursor-pointer ${
                           isSelected 
                             ? "bg-accent/10 border-accent/40 text-white shadow-[0_0_15px_rgba(212,168,75,0.1)]" 
                             : "bg-white/[0.02] border-white/5 text-white/50 hover:bg-white/[0.05]"

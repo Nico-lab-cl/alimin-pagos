@@ -343,9 +343,17 @@ function PaymentView({ data }: { data: any }) {
                     key={cuota.number}
                     type="button"
                     onClick={() => {
-                      const newSelected = data.upcomingInstallments
-                        .slice(0, idx + 1)
-                        .map((c: any) => c.number);
+                      const isLastSelected = idx + 1 === selectedCuotas.length;
+                      let newSelected;
+                      if (isLastSelected) {
+                        newSelected = data.upcomingInstallments
+                          .slice(0, idx)
+                          .map((c: any) => c.number);
+                      } else {
+                        newSelected = data.upcomingInstallments
+                          .slice(0, idx + 1)
+                          .map((c: any) => c.number);
+                      }
                       setSelectedCuotas(newSelected);
                     }}
                     className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
