@@ -283,10 +283,11 @@ export async function uploadPaymentReceipt({
   if (!session?.user) return { error: "No autorizado" };
 
   const userId = (session.user as any).id;
+  const isAdmin = (session.user as any).role === "ADMIN";
 
   try {
     const reservation = await prisma.reservation.findFirst({
-      where: { id: reservationId, user_id: userId },
+      where: isAdmin ? { id: reservationId } : { id: reservationId, user_id: userId },
       include: { lot: true },
     });
 

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { getClientPOV } from "@/actions/postventa";
+import { uploadPaymentReceipt } from "@/actions/user";
 import { formatCLP } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   X,
   Loader2,
@@ -140,7 +142,7 @@ export default function ClientPOVModal({ reservationId, clientName, onClose }: C
           ) : data ? (
             <>
               {activeTab === "dashboard" && <DashboardView data={data} onTabChange={setActiveTab} />}
-              {activeTab === "payment" && <PaymentView data={data} />}
+              {activeTab === "payment" && <PaymentView data={data} reservationId={reservationId} />}
               {activeTab === "documents" && <DocumentsView data={data} />}
             </>
           ) : null}
@@ -305,15 +307,57 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: "d
 }
 
 /* ──────────────────── PAYMENT VIEW ──────────────────── */
-function PaymentView({ data }: { data: any }) {
+function PaymentView({ data, reservationId }: { data: any; reservationId: string }) {
   const [selectedCuotas, setSelectedCuotas] = useState<number[]>([data.nextInstallmentNumber || 0]);
   const [simulatedFile, setSimulatedFile] = useState<string | null>(null);
+  const [receiptBase64, setReceiptBase64] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const totalAmount = data.upcomingInstallments
     ? data.upcomingInstallments
         .filter((c: any) => selectedCuotas.includes(c.number))
         .reduce((acc: number, curr: any) => acc + curr.amount, 0)
     : data.valor_cuota;
+
+  const handleSubmit = async () => {
+    if (!receiptBase64) {
+      toast.error("Por favor, sube un comprobante");
+      return;
+    }
+
+    setUploading(true);
+    const result = await uploadPaymentReceipt({
+      reservationId,
+      amount: totalAmount,
+      scope: "INSTALLMENT", // POV always assumes installment for now in this view
+      receiptBase64,
+      installmentsCount: selectedCuotas.length,
+    });
+
+    if (result.success) {
+      setSuccess(true);
+      toast.success("Comprobante cargado exitosamente en nombre del cliente");
+    } else {
+      toast.error(result.error || "Error al cargar comprobante");
+    }
+    setUploading(false);
+  };
+
+  if (success) {
+    return (
+      <div className="py-20 text-center animate-fade-in">
+        <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-8">
+          <CheckCircle className="w-10 h-10 text-emerald-500" />
+        </div>
+        <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter mb-4">¡Carga Exitosa!</h3>
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 max-w-xs mx-auto">
+          El comprobante ha sido ingresado correctamente y aparecerá en la bandeja de pagos pendientes.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-10 max-w-4xl mx-auto">
       <div>
@@ -487,10 +531,15 @@ function PaymentView({ data }: { data: any }) {
                 const file = e.target.files?.[0];
                 if (file) {
                   if (file.size > 10 * 1024 * 1024) {
-                    alert("El archivo es demasiado grande (máximo 10MB)");
+                    toast.error("El archivo es demasiado grande (máximo 10MB)");
                     return;
                   }
                   setSimulatedFile(file.name);
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    setReceiptBase64(reader.result as string);
+                  };
+                  reader.readAsDataURL(file);
                 }
               }}
             />
@@ -515,6 +564,19 @@ function PaymentView({ data }: { data: any }) {
               )}
             </label>
           </div>
+
+          <button
+            onClick={handleSubmit}
+            disabled={uploading || !receiptBase64}
+            className={`w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-4 transition-all ${
+              receiptBase64 
+                ? 'bg-accent text-[#061010] hover:shadow-[0_10px_30px_rgba(212,168,75,0.4)]' 
+                : 'bg-white/5 text-white/10 cursor-not-allowed'
+            }`}
+          >
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            {uploading ? "Procesando..." : "Finalizar y Cargar Comprobante"}
+          </button>
         </div>
       </div>
     </div>
