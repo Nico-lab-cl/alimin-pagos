@@ -100,6 +100,28 @@ export default function ReceiptsPage() {
     currentPage * itemsPerPage
   );
 
+  const openReceipt = (url: string) => {
+    try {
+      if (url.startsWith('data:')) {
+        const parts = url.split(';base64,');
+        const contentType = parts[0].split(':')[1];
+        const raw = window.atob(parts[1]);
+        const rawLength = raw.length;
+        const uInt8Array = new Uint8Array(rawLength);
+        for (let i = 0; i < rawLength; ++i) {
+          uInt8Array[i] = raw.charCodeAt(i);
+        }
+        const blob = new Blob([uInt8Array], { type: contentType });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (e) {
+      window.open(url, '_blank');
+    }
+  };
+
   return (
     <div className="space-y-12 animate-fade-in px-4">
       {/* Header Section */}
@@ -211,7 +233,7 @@ export default function ReceiptsPage() {
                   {/* Floating View Action */}
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center gap-3">
                     <button 
-                      onClick={() => window.open(receipt.receipt_url, '_blank')}
+                      onClick={() => openReceipt(receipt.receipt_url)}
                       className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-white text-black font-black text-[10px] uppercase tracking-widest animate-slide-up"
                     >
                       <Eye className="w-4 h-4" />
