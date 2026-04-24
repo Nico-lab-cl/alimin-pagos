@@ -306,7 +306,14 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: "d
 
 /* ──────────────────── PAYMENT VIEW ──────────────────── */
 function PaymentView({ data }: { data: any }) {
+  const [selectedCuotas, setSelectedCuotas] = useState<number[]>([data.nextInstallmentNumber || 0]);
   const [simulatedFile, setSimulatedFile] = useState<string | null>(null);
+
+  const totalAmount = data.upcomingInstallments
+    ? data.upcomingInstallments
+        .filter((c: any) => selectedCuotas.includes(c.number))
+        .reduce((acc: number, curr: any) => acc + curr.amount, 0)
+    : data.valor_cuota;
   return (
     <div className="space-y-10 max-w-4xl mx-auto">
       <div>
