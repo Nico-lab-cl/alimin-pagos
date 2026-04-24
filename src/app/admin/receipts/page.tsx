@@ -192,6 +192,15 @@ export default function ReceiptsPage() {
                       alt="Payment Document"
                       className="w-full h-full object-cover opacity-60 group-hover/preview:opacity-100 group-hover/preview:scale-105 transition-all duration-700 font-black cursor-pointer"
                     />
+                  ) : receipt.receipt_url && receipt.receipt_url.startsWith("data:application/pdf") ? (
+                    <div className="w-full h-full relative">
+                      <iframe
+                        src={`${receipt.receipt_url}#toolbar=0&navpanes=0&scrollbar=0`}
+                        className="w-full h-full border-none opacity-40 group-hover/preview:opacity-90 transition-opacity"
+                        title="PDF Preview"
+                      />
+                      <div className="absolute inset-0 pointer-events-none" /> {/* Shield to allow hover/click on the card instead of iframe */}
+                    </div>
                   ) : (
                     <div className="flex flex-col items-center gap-4 opacity-20 group-hover/preview:opacity-100 transition-opacity">
                       <FileText className="w-12 h-12" />
@@ -201,11 +210,14 @@ export default function ReceiptsPage() {
                   
                   {/* Floating View Action */}
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                    <button className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-white text-black font-black text-[10px] uppercase tracking-widest animate-slide-up">
+                    <button 
+                      onClick={() => window.open(receipt.receipt_url, '_blank')}
+                      className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-white text-black font-black text-[10px] uppercase tracking-widest animate-slide-up"
+                    >
                       <Eye className="w-4 h-4" />
-                      Ver Pantalla Completa
+                      Abrir en Pantalla Completa
                     </button>
-                    <a href={receipt.receipt_url} download className="p-3 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition-all border border-white/10">
+                    <a href={receipt.receipt_url} download={`comprobante_${receipt.id}`} className="p-3 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition-all border border-white/10">
                       <Zap className="w-4 h-4" />
                     </a>
                   </div>
