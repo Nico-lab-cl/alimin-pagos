@@ -24,7 +24,7 @@ export default function UserDocuments() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [previewData, setPreviewData] = useState({ url: "", title: "" });
+  const [previewData, setPreviewData] = useState({ url: "", title: "", type: "" });
 
   useEffect(() => {
     getUserLots().then((result) => {
