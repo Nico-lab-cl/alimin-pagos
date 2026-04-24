@@ -102,7 +102,6 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
             <div className="w-full h-full flex items-center justify-center p-4">
               {(fileType?.startsWith("image/") || url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) ? (
                 <img 
-                <img 
                   src={url} 
                   alt={title} 
                   className="max-w-full max-h-full object-contain shadow-2xl rounded-lg animate-fade-in"
