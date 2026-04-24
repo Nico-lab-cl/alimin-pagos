@@ -138,7 +138,7 @@ export default function ClientPOVModal({ reservationId, clientName, onClose }: C
             </div>
           ) : data ? (
             <>
-              {activeTab === "dashboard" && <DashboardView data={data} />}
+              {activeTab === "dashboard" && <DashboardView data={data} onTabChange={setActiveTab} />}
               {activeTab === "payment" && <PaymentView data={data} />}
               {activeTab === "documents" && <DocumentsView data={data} />}
             </>
@@ -150,7 +150,7 @@ export default function ClientPOVModal({ reservationId, clientName, onClose }: C
 }
 
 /* ──────────────────── DASHBOARD VIEW ──────────────────── */
-function DashboardView({ data }: { data: any }) {
+function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: "dashboard" | "payment" | "documents") => void }) {
   const formatDate = (d: string | Date) => {
     const date = new Date(d);
     return date.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
@@ -285,12 +285,15 @@ function DashboardView({ data }: { data: any }) {
                 </div>
               )}
 
-              {/* Simulated CTA (non-functional) */}
+              {/* Simulated CTA */}
               <div className="ml-auto">
-                <div className="px-6 py-3 rounded-2xl bg-accent/10 border border-accent/20 text-accent text-[10px] font-black uppercase tracking-widest flex items-center gap-3 cursor-default opacity-60">
+                <button 
+                  onClick={() => onTabChange("payment")}
+                  className="px-6 py-3 rounded-2xl btn-metallic-gold text-[10px] font-black uppercase tracking-widest flex items-center gap-3 transition-all active:scale-95 shadow-[0_10px_20px_rgba(212,168,75,0.2)]"
+                >
                   <CreditCard className="w-4 h-4" />
                   Ejecutar Pago
-                </div>
+                </button>
               </div>
             </div>
           </div>
