@@ -76,8 +76,10 @@ model User {
   fcm_token            String?        @db.VarChar(255)
   last_platform        String?        @db.VarChar(50)
   created_at           DateTime?      @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
-  auditLogs            AuditLog[]
+  updated_at              DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
+  reset_password_token    String?        @db.Text
+  reset_password_expires  DateTime?      @db.Timestamptz(6)
+  auditLogs               AuditLog[]
   notifications        Notification[]
   reservations         Reservation[]
 

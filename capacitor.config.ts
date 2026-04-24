@@ -4,6 +4,7 @@ const config: CapacitorConfig = {
   appId: 'cl.aliminspa.pagos',
   appName: 'Pagos Alimin',
   webDir: 'public',
+  bundledWebRuntime: false,
   server: {
     url: 'https://pagos.aliminspa.cl',
     cleartext: true

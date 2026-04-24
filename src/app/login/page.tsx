@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Loader2, Eye, EyeOff, Building2, ShieldCheck, ArrowRight, Zap } from "lucide-react";
 
 export default function LoginPage() {
@@ -100,7 +101,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label htmlFor="password" className="label-premium">Clave de Acceso</label>
-                  <button type="button" className="text-[9px] font-black uppercase text-accent/40 hover:text-accent tracking-widest transition-colors mb-2">¿Olvidaste tu clave?</button>
+                  <Link href="/forgot-password" className="text-[9px] font-black uppercase text-accent/40 hover:text-accent tracking-widest transition-colors mb-2">¿Olvidaste tu clave?</Link>
                 </div>
                 <div className="relative group">
                   <input

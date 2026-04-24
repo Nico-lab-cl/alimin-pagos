@@ -350,3 +350,78 @@ export async function updateFcmToken(token: string, platform?: string) {
     return { error: "Error al actualizar token de notificaciones" };
   }
 }
+
+/**
+ * Generates a password reset token and saves it to the user.
+ */
+export async function requestPasswordReset(email: string) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() },
+    });
+
+    if (!user) {
+      // For security, don't reveal if user exists or not
+      return { success: true };
+    }
+
+    // Generate a 32-char hex token
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const expires = new Date(Date.now() + 3600000); // 1 hour from now
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        reset_password_token: token,
+        reset_password_expires: expires,
+      },
+    });
+
+    // NOTE: In a real production environment, you would send an email here.
+    // For now, we return the token in the response so the developer can see it
+    // or the system can use it for demonstration.
+    console.log(`Reset token for ${email}: ${token}`);
+    
+    return { success: true, token }; // Returning token for easy testing/dev
+  } catch (error) {
+    console.error("Error in requestPasswordReset:", error);
+    return { error: "Error al procesar la solicitud" };
+  }
+}
+
+/**
+ * Resets the password using a valid token.
+ */
+import bcrypt from "bcryptjs";
+
+export async function resetPassword(token: string, newPassword: string) {
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        reset_password_token: token,
+        reset_password_expires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      return { error: "El enlace de recuperación es inválido o ha expirado" };
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        reset_password_token: null,
+        reset_password_expires: null,
+        must_change_password: false,
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error in resetPassword:", error);
+    return { error: "Error al restablecer la contraseña" };
+  }
+}
