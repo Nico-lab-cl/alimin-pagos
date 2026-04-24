@@ -132,7 +132,7 @@ export async function getUserLots() {
 
         // Calculate upcoming installments (up to 12)
         const totalPendingRemaining = totalCuotas - paidCuotas;
-        const maxToShow = Math.min(12, totalPendingRemaining);
+        const maxToShow = totalPendingRemaining; // Show all available installments
         
         for (let i = 0; i < maxToShow; i++) {
           const installmentNumber = paidCuotas + 1 + i;

@@ -1113,9 +1113,9 @@ export async function getClientPOV(reservationId: string) {
         }
       }
 
-      // Upcoming installments (up to 12)
+      // Upcoming installments
       const totalPendingRemaining = totalCuotas - paidCuotas;
-      const maxToShow = Math.min(12, totalPendingRemaining);
+      const maxToShow = totalPendingRemaining;
       const formatMonth = new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Santiago' });
 
       for (let i = 0; i < maxToShow; i++) {
