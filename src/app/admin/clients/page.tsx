@@ -54,6 +54,8 @@ export default function ClientsPage() {
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docName, setDocName] = useState("");
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState({ url: "", title: "" });
   const [isTogglingMultiLot, setIsTogglingMultiLot] = useState(false);
   const [isTogglingAlContado, setIsTogglingAlContado] = useState(false);
   const [showPOV, setShowPOV] = useState(false);
