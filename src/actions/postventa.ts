@@ -364,7 +364,11 @@ export async function approveReceipt(receiptId: string) {
   try {
     const receipt = await prisma.paymentReceipt.findUnique({
       where: { id: receiptId },
-      include: { reservation: true },
+      include: { 
+        reservation: {
+          include: { user: { select: { fcm_token: true } } }
+        } 
+      },
     });
 
     if (!receipt) return { error: "Comprobante no encontrado" };
@@ -373,6 +377,16 @@ export async function approveReceipt(receiptId: string) {
       where: { id: receiptId },
       data: { status: "APPROVED", processed_at: new Date() },
     });
+
+    // Send Notification
+    if (receipt.reservation.user.fcm_token) {
+      const { sendPushNotification } = await import("@/lib/notifications");
+      sendPushNotification({
+        token: receipt.reservation.user.fcm_token,
+        title: "¡Pago Aprobado!",
+        body: `Tu pago de ${new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(receipt.amount_clp)} ha sido procesado con éxito.`,
+      });
+    }
 
     // Update reservation state and Ledger
     if (receipt.scope === "PIE") {
@@ -521,6 +535,15 @@ export async function rejectReceipt(receiptId: string, reason: string) {
   }
 
   try {
+    const receipt = await prisma.paymentReceipt.findUnique({
+      where: { id: receiptId },
+      include: { 
+        reservation: {
+          include: { user: { select: { fcm_token: true } } }
+        } 
+      },
+    });
+
     await prisma.paymentReceipt.update({
       where: { id: receiptId },
       data: {
@@ -529,6 +552,16 @@ export async function rejectReceipt(receiptId: string, reason: string) {
         processed_at: new Date(),
       },
     });
+
+    // Send Notification
+    if (receipt?.reservation?.user?.fcm_token) {
+      const { sendPushNotification } = await import("@/lib/notifications");
+      sendPushNotification({
+        token: receipt.reservation.user.fcm_token,
+        title: "Observación en tu Pago",
+        body: `Tu comprobante ha sido rechazado: ${reason}. Por favor, revisa los detalles.`,
+      });
+    }
 
     memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("receipts_");

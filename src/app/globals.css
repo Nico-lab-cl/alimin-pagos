@@ -127,6 +127,27 @@ body {
   text-transform: uppercase;
 }
 
+.title-responsive {
+  @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter uppercase leading-none;
+}
+
+.subtitle-responsive {
+  @apply text-[10px] sm:text-[11px] font-black uppercase tracking-[0.3em];
+}
+
+/* --- Mobile Specific Layout --- */
+
+.mobile-nav-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
+}
+
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 1.5rem !important;
+    border-radius: 1.5rem !important;
+  }
+}
+
 /* --- Custom Inputs --- */
 
 .input-premium {

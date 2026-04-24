@@ -316,3 +316,28 @@ export async function uploadPaymentReceipt({
     return { error: "Error al subir comprobante" };
   }
 }
+
+/**
+ * Updates the FCM token for the current user.
+ */
+export async function updateFcmToken(token: string, platform?: string) {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado" };
+
+  const userId = (session.user as any).id;
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        fcm_token: token,
+        last_platform: platform || "android",
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating FCM token:", error);
+    return { error: "Error al actualizar token de notificaciones" };
+  }
+}

@@ -22,6 +22,9 @@ export const metadata: Metadata = {
   },
 };
 
+import { MobileNav } from "@/components/MobileNav";
+import { FCMInitializer } from "@/components/FCMInitializer";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,7 +34,11 @@ export default function RootLayout({
     <html lang="es">
       <body className={`${inter.variable} ${outfit.variable} font-outfit antialiased`}>
         <AuthProvider>
-          {children}
+          <FCMInitializer />
+          <div className="mobile-nav-safe">
+            {children}
+          </div>
+          <MobileNav />
         </AuthProvider>
         <Toaster
           position="top-right"

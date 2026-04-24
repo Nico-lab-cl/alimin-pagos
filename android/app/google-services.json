@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "837898330426",
+    "project_id": "pagos-alimin",
+    "storage_bucket": "pagos-alimin.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:837898330426:android:bd85992a05ec994afaf003",
+        "android_client_info": {
+          "package_name": "cl.aliminspa.pagos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBol36KyT0tgD7eq5YuIux8Bc3UYSaiyUY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

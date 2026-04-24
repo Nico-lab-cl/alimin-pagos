@@ -81,9 +81,9 @@ export default function AlertsPage() {
             <div className="w-10 h-10 rounded-2xl bg-red-500/20 flex items-center justify-center border border-red-500/20">
               <ShieldAlert className="w-5 h-5 text-red-400" />
             </div>
-            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-red-400">Security & Risk</p>
+            <p className="subtitle-responsive text-red-400">Security & Risk</p>
           </div>
-          <h1 className="text-5xl font-black text-white tracking-tighter uppercase leading-none">
+          <h1 className="title-responsive">
             Centro de <span className="text-white/20">Alertas</span>
           </h1>
         </div>
@@ -103,7 +103,7 @@ export default function AlertsPage() {
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[200px]"
+            className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[200px]"
             style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1.5rem center", backgroundSize: "1rem" }}
           >
             {projects.map((p) => (
@@ -146,72 +146,72 @@ export default function AlertsPage() {
           {paginatedClients.map((client: any, idx: number) => (
             <div
               key={client.id}
-              className="group relative rounded-[2rem] p-8 flex flex-col [@media(min-width:1000px)]:flex-row [@media(min-width:1000px)]:items-center gap-8 glass-card animate-slide-up"
+              className="group relative rounded-[2rem] p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center gap-6 sm:gap-8 glass-card animate-slide-up"
               style={{ 
                 animationDelay: `${idx * 40}ms`,
                 animationFillMode: "both"
               }}
             >
-              <div className="flex items-center gap-6 flex-1 min-w-0">
-                <div className="w-16 h-16 rounded-[1.5rem] bg-white/5 border border-white/10 flex items-center justify-center text-xl font-black text-white group-hover:scale-110 transition-transform duration-500 shadow-2xl">
+              <div className="flex items-center gap-4 sm:gap-6 flex-1 min-w-0">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-[1rem] sm:rounded-[1.5rem] bg-white/5 border border-white/10 flex items-center justify-center text-lg sm:text-xl font-black text-white group-hover:scale-110 transition-transform duration-500 shadow-2xl">
                   {client.clientName?.substring(0, 2).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-2xl font-black text-white tracking-tighter uppercase italic group-hover:text-accent transition-colors truncate">
+                  <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter uppercase italic group-hover:text-accent transition-colors truncate">
                     {client.clientName}
                   </h3>
-                  <div className="flex flex-wrap items-center gap-4 mt-2">
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2">
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5">
                       <Zap className="w-3.5 h-3.5 text-accent" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Lote {client.lotNumber}</span>
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-white/60">Lote {client.lotNumber}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-white/20 uppercase tracking-widest">
-                      <span>Proceso: {client.paidCuotas}/{client.totalCuotas}</span>
+                    <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-white/20 uppercase tracking-widest">
+                      <span>{client.paidCuotas}/{client.totalCuotas}</span>
                       <div className="w-1 h-1 rounded-full bg-white/10" />
-                      <span>{formatCLP(client.valor_cuota)}/mes</span>
+                      <span>{formatCLP(client.valor_cuota)}/m</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-6 flex-shrink-0">
+              <div className="flex flex-wrap items-center justify-between lg:justify-end gap-6 flex-shrink-0">
                 {/* Financial Status */}
-                <div className="grid gap-1 text-right">
-                  <p className={`text-xl font-black tracking-tight ${client.penaltyAmount > 0 ? "text-red-400" : "text-emerald-400"}`}>
+                <div className="grid gap-1 text-left sm:text-right">
+                  <p className={`text-lg sm:text-xl font-black tracking-tight ${client.penaltyAmount > 0 ? "text-red-400" : "text-emerald-400"}`}>
                     {client.penaltyAmount > 0 ? `+${formatCLP(client.penaltyAmount)}` : "Al Día"}
                   </p>
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20">
-                    {client.penaltyAmount > 0 ? `${client.lateDays} Días Suspendido` : "Sin Recargos"}
+                  <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] opacity-20">
+                    {client.penaltyAmount > 0 ? `${client.lateDays} Días Mora` : "Sin Recargos"}
                   </p>
                 </div>
 
-                <div className="w-px h-12 bg-white/5 hidden [@media(min-width:1000px)]:block" />
+                <div className="w-px h-10 bg-white/5 hidden lg:block" />
 
                 {/* Date Status */}
-                <div className="grid gap-1 text-right">
-                  <p className="text-base font-black text-white/80">
+                <div className="grid gap-1 text-right hidden sm:grid">
+                  <p className="text-sm sm:text-base font-black text-white/80">
                     {client.nextDueDate ? formatDate(client.nextDueDate) : "No Definido"}
                   </p>
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20">Próxima Conciliación</p>
+                  <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] opacity-20">Próxima Fecha</p>
                 </div>
 
                 {/* Status Badge */}
                 <div
                   className={`
-                    px-6 py-3 rounded-2xl text-[10px] font-black tracking-[0.2em] border shadow-2xl
+                    px-4 sm:px-6 py-2 sm:py-3 rounded-2xl text-[8px] sm:text-[10px] font-black tracking-[0.2em] border shadow-2xl
                     ${client.status === "LATE" ? "bg-red-500/10 text-red-400 border-red-500/20"
                       : client.status === "GRACE" ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
                       : client.status === "UPCOMING" ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/20"
                       : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"}
                   `}
                 >
-                  {client.status === "LATE" ? "MORA CRÍTICA"
-                    : client.status === "GRACE" ? "EN GRACIA"
-                    : client.status === "UPCOMING" ? "POR VENCER"
+                  {client.status === "LATE" ? "MORA"
+                    : client.status === "GRACE" ? "GRACIA"
+                    : client.status === "UPCOMING" ? "VENCE"
                     : "AL DÍA"}
                 </div>
 
-                <button className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-accent hover:text-[#061010] transition-all">
+                <button className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-accent hover:text-[#061010] transition-all">
                   <ChevronRight className="w-5 h-5" />
                 </button>
               </div>

@@ -73,6 +73,8 @@ model User {
   role                 UserRole?      @default(USER)
   must_change_password Boolean?       @default(false)
   allowed_projects     Json?
+  fcm_token            String?        @db.VarChar(255)
+  last_platform        String?        @db.VarChar(50)
   created_at           DateTime?      @default(now()) @db.Timestamptz(6)
   updated_at           DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
   auditLogs            AuditLog[]
@@ -128,6 +130,7 @@ model Reservation {
   mora_status            String?               @default("ACTIVO") @db.VarChar(20)
   manual_penalty         Int?
   penalty_mode           String?               @default("AUTO") @db.VarChar(10)
+  last_notified_status   String?               @db.VarChar(20)
   is_multilote           Boolean?              @default(false)
   receipts               PaymentReceipt[]
   documents              ReservationDocument[]

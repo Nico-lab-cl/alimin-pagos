@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
+import PreviewModal from "@/components/shared/PreviewModal";
 import { formatCLP, formatDate } from "@/lib/utils";
 import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -1073,7 +1074,10 @@ export default function ClientsPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <button 
-                            onClick={() => window.open(doc.url, "_blank")}
+                            onClick={() => {
+                              setPreviewData({ url: doc.url, title: doc.name });
+                              setIsPreviewOpen(true);
+                            }}
                             className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/20 hover:bg-white/10 hover:text-white transition-all duration-300"
                             title="Previsualizar"
                           >

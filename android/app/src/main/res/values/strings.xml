@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pagos Alimin</string>
+    <string name="title_activity_main">Pagos Alimin</string>
+    <string name="package_name">cl.aliminspa.pagos</string>
+    <string name="custom_url_scheme">cl.aliminspa.pagos</string>
+</resources>

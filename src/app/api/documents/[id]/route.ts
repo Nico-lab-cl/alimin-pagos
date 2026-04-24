@@ -40,10 +40,22 @@ export async function GET(
         : document.base64_content;
     const buffer = Buffer.from(base64Data, 'base64');
 
+    // Refine Content-Type based on extension if generic
+    let contentType = document.file_type || "application/octet-stream";
+    const extension = document.name.split('.').pop()?.toLowerCase();
+
+    if (contentType === "application/octet-stream" || !contentType) {
+        if (extension === 'pdf') contentType = 'application/pdf';
+        else if (['jpg', 'jpeg'].includes(extension!)) contentType = 'image/jpeg';
+        else if (extension === 'png') contentType = 'image/png';
+        else if (extension === 'webp') contentType = 'image/webp';
+    }
+
     return new NextResponse(buffer, {
       headers: {
-        "Content-Type": document.file_type || "application/octet-stream",
+        "Content-Type": contentType,
         "Content-Disposition": `inline; filename="${encodeURIComponent(document.name)}"`,
+        "Cache-Control": "public, max-age=3600",
       },
     });
   } catch (error) {

@@ -14,13 +14,17 @@ import {
   ShieldCheck,
   Zap,
   Building2,
-  ChevronRight
+  ChevronRight,
+  Eye
 } from "lucide-react";
+import PreviewModal from "@/components/shared/PreviewModal";
 
 export default function UserDocuments() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState({ url: "", title: "" });
 
   useEffect(() => {
     getUserLots().then((result) => {
@@ -109,13 +113,25 @@ export default function UserDocuments() {
                         <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center transition-transform group-hover:scale-110 duration-500">
                           <FileText className="w-6 h-6 text-accent" />
                         </div>
-                        <a 
-                          href={doc.url} 
-                          download 
-                          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-accent hover:text-[#061010] hover:shadow-[0_0_20px_rgba(212,168,75,0.4)] transition-all"
-                        >
-                          <Download className="w-4 h-4" />
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => {
+                              setPreviewData({ url: doc.url, title: doc.name });
+                              setIsPreviewOpen(true);
+                            }}
+                            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:bg-white/10 hover:text-accent transition-all"
+                            title="Previsualizar"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <a 
+                            href={doc.url} 
+                            download 
+                            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:bg-accent hover:text-[#061010] hover:shadow-[0_0_20px_rgba(212,168,75,0.4)] transition-all"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </div>
                       </div>
 
                       <div className="flex-1">
@@ -153,6 +169,13 @@ export default function UserDocuments() {
           </button>
         </div>
       </div>
+
+      <PreviewModal 
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        url={previewData.url}
+        title={previewData.title}
+      />
     </div>
   );
 }
