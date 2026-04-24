@@ -329,44 +329,48 @@ function PaymentView({ data }: { data: any }) {
 
           {data.upcomingInstallments && data.upcomingInstallments.length > 0 ? (
             <div className="grid gap-3 max-h-[400px] overflow-y-auto pr-2">
-              {data.upcomingInstallments.map((cuota: any, idx: number) => (
-                <div
-                  key={cuota.number}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                    idx === 0
-                      ? "bg-accent/10 border-accent/40 text-white shadow-[0_0_15px_rgba(212,168,75,0.1)]"
-                      : "bg-white/[0.02] border-white/5 text-white/50"
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border ${idx === 0 ? "bg-accent border-accent text-[#061010]" : "border-white/20"}`}>
-                      {idx === 0 && <CheckCircle className="w-4 h-4" />}
-                    </div>
-                    <div className="text-left">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-none mb-1 text-white/40">Cuota {cuota.number}</p>
-                      <p className="text-sm font-black italic">{cuota.monthName}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-black tracking-tighter ${idx === 0 ? "text-accent" : "text-white/80"}`}>
-                      {formatCLP(cuota.amount)}
-                    </p>
-                    {cuota.hasPenalty && (
-                      <div className="mt-1 flex flex-col items-end">
-                        <p className="text-[8px] font-bold uppercase text-red-400 tracking-widest bg-red-500/10 px-2 py-0.5 rounded-full">
-                          Incluye Mora ({cuota.lateDays} {cuota.lateDays === 1 ? "Día" : "Días"})
-                        </p>
-                        <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest mt-1">
-                          Interés Diario: {formatCLP(cuota.dailyPenalty)}
-                        </p>
-                        <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest">
-                          Interés Total: {formatCLP(cuota.penaltyAmount)}
-                        </p>
+              {data.upcomingInstallments.map((cuota: any, idx: number) => {
+                const isSelected = selectedCuotas.includes(cuota.number);
+                return (
+                  <button
+                    key={cuota.number}
+                    type="button"
+                    onClick={() => {
+                      const newSelected = data.upcomingInstallments
+                        .slice(0, idx + 1)
+                        .map((c: any) => c.number);
+                      setSelectedCuotas(newSelected);
+                    }}
+                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                      isSelected
+                        ? "bg-accent/10 border-accent/40 text-white shadow-[0_0_15px_rgba(212,168,75,0.1)]"
+                        : "bg-white/[0.02] border-white/5 text-white/50 hover:bg-white/[0.05]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors ${isSelected ? "bg-accent border-accent text-[#061010]" : "border-white/20"}`}>
+                        {isSelected && <CheckCircle className="w-4 h-4" />}
                       </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                      <div className="text-left">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-none mb-1 text-white/40">Cuota {cuota.number}</p>
+                        <p className="text-sm font-black italic">{cuota.monthName}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-lg font-black tracking-tighter ${isSelected ? "text-accent" : "text-white/80"}`}>
+                        {formatCLP(cuota.amount)}
+                      </p>
+                      {cuota.hasPenalty && (
+                        <div className="mt-1 flex flex-col items-end">
+                          <p className="text-[8px] font-bold uppercase text-red-400 tracking-widest bg-red-500/10 px-2 py-0.5 rounded-full">
+                            Incluye Mora ({cuota.lateDays} {cuota.lateDays === 1 ? "Día" : "Días"})
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="py-12 text-center">
@@ -376,35 +380,48 @@ function PaymentView({ data }: { data: any }) {
           )}
 
           {/* Summary Box */}
-          {data.upcomingInstallments?.[0] && (
-            <div className="p-6 rounded-[1.5rem] bg-white/[0.03] border border-white/5 space-y-3">
+          <div className="p-6 rounded-[1.5rem] bg-white/[0.03] border border-white/5 space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Resumen de Pago</span>
+              <div className="px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-[9px] font-black text-accent uppercase tracking-widest">CLP</div>
+            </div>
+            <p className="text-4xl font-black text-white tracking-tighter italic">
+              {formatCLP(totalAmount)}
+            </p>
+            
+            <div className="pt-3 border-t border-white/5 space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Próximo Pago</span>
-                <div className="px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-[9px] font-black text-accent uppercase tracking-widest">CLP</div>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">Total Cuotas Base ({selectedCuotas.length})</span>
+                <span className="text-sm font-black text-white/60">
+                  {formatCLP(
+                    data.upcomingInstallments
+                      ? data.upcomingInstallments
+                          .filter((c: any) => selectedCuotas.includes(c.number))
+                          .reduce((acc: number, curr: any) => acc + (curr.baseAmount || curr.amount), 0)
+                      : 0
+                  )}
+                </span>
               </div>
-              <p className="text-4xl font-black text-white tracking-tighter italic">
-                {formatCLP(data.upcomingInstallments[0].amount)}
-              </p>
-              {data.upcomingInstallments[0].hasPenalty && (
-                <div className="pt-3 border-t border-white/5 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">Cuota Base</span>
-                    <span className="text-sm font-black text-white/60">{formatCLP(data.upcomingInstallments[0].baseAmount)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-red-400/60">
-                      Mora ({data.upcomingInstallments[0].lateDays} Días × {formatCLP(data.upcomingInstallments[0].dailyPenalty)}/día)
-                    </span>
-                    <span className="text-sm font-black text-red-400">+ {formatCLP(data.upcomingInstallments[0].penaltyAmount)}</span>
-                  </div>
+              
+              {data.upcomingInstallments?.some((c: any) => selectedCuotas.includes(c.number) && c.hasPenalty) && (
+                <div className="flex justify-between items-center">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-red-400/60">Total Intereses Acumulados</span>
+                  <span className="text-sm font-black text-red-400">
+                    + {formatCLP(
+                      data.upcomingInstallments
+                        .filter((c: any) => selectedCuotas.includes(c.number))
+                        .reduce((acc: number, curr: any) => acc + (curr.penaltyAmount || 0), 0)
+                    )}
+                  </span>
                 </div>
               )}
-              <div className="pt-3 border-t border-white/5 flex items-center gap-3">
-                <ShieldCheck className="w-4 h-4 text-emerald-400 opacity-50" />
-                <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.15em]">Operación Protegida & Cifrada</p>
-              </div>
             </div>
-          )}
+            
+            <div className="pt-3 border-t border-white/5 flex items-center gap-3">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 opacity-50" />
+              <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.15em]">Simulación de Pago Protegida</p>
+            </div>
+          </div>
         </div>
 
         {/* Right: Bank Info */}
