@@ -8,9 +8,10 @@ interface PreviewModalProps {
   onClose: () => void;
   url: string;
   title: string;
+  fileType?: string;
 }
 
-export default function PreviewModal({ isOpen, onClose, url, title }: PreviewModalProps) {
+export default function PreviewModal({ isOpen, onClose, url, title, fileType }: PreviewModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -69,11 +70,11 @@ export default function PreviewModal({ isOpen, onClose, url, title }: PreviewMod
         </div>
 
         {/* Viewer */}
-        <div className="flex-1 relative bg-black/20">
+        <div className="flex-1 relative bg-black/20 overflow-auto">
           {loading && !error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-20 bg-[#0a0a0a]">
               <Loader2 className="w-10 h-10 animate-spin text-accent" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Cargando visor...</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Preparando Visor...</p>
             </div>
           )}
 
@@ -85,7 +86,7 @@ export default function PreviewModal({ isOpen, onClose, url, title }: PreviewMod
               <div>
                 <h4 className="text-xl font-black text-white uppercase italic tracking-tighter mb-2">No se pudo cargar la vista previa</h4>
                 <p className="text-xs font-bold text-white/20 uppercase tracking-widest leading-relaxed max-w-xs mx-auto">
-                  El formato del archivo puede no ser compatible con el visor integrado. Prueba descargándolo directamente.
+                  El formato del archivo puede no ser compatible con el visor integrado.
                 </p>
               </div>
               <a 
@@ -98,15 +99,31 @@ export default function PreviewModal({ isOpen, onClose, url, title }: PreviewMod
               </a>
             </div>
           ) : (
-            <iframe 
-              src={`${url}#toolbar=0`} 
-              className="w-full h-full border-none"
-              onLoad={() => setLoading(false)}
-              onError={() => {
-                setLoading(false);
-                setError(true);
-              }}
-            />
+            <div className="w-full h-full flex items-center justify-center p-4">
+              {(fileType?.startsWith("image/") || url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) ? (
+                <img 
+                <img 
+                  src={url} 
+                  alt={title} 
+                  className="max-w-full max-h-full object-contain shadow-2xl rounded-lg animate-fade-in"
+                  onLoad={() => setLoading(false)}
+                  onError={() => {
+                    setLoading(false);
+                    setError(true);
+                  }}
+                />
+              ) : (
+                <iframe 
+                  src={`${url}#toolbar=0`} 
+                  className="w-full h-full border-none rounded-lg shadow-2xl animate-fade-in"
+                  onLoad={() => setLoading(false)}
+                  onError={() => {
+                    setLoading(false);
+                    setError(true);
+                  }}
+                />
+              )}
+            </div>
           )}
         </div>
 

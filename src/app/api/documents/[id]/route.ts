@@ -40,21 +40,31 @@ export async function GET(
         : document.base64_content;
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Refine Content-Type based on extension if generic
+    // DETECCIÓN ROBUSTA DE TIPO DE ARCHIVO (Magic Numbers)
     let contentType = document.file_type || "application/octet-stream";
-    const extension = document.name.split('.').pop()?.toLowerCase();
+    let detectedExtension = "";
 
-    if (contentType === "application/octet-stream" || !contentType) {
-        if (extension === 'pdf') contentType = 'application/pdf';
-        else if (['jpg', 'jpeg'].includes(extension!)) contentType = 'image/jpeg';
-        else if (extension === 'png') contentType = 'image/png';
-        else if (extension === 'webp') contentType = 'image/webp';
+    // Leer los primeros bytes para identificar el archivo
+    const header = buffer.subarray(0, 4).toString('hex');
+    
+    if (header === "25504446") { // %PDF
+        contentType = "application/pdf";
+        detectedExtension = "pdf";
+    } else if (header.startsWith("89504e47")) { // .PNG
+        contentType = "image/png";
+        detectedExtension = "png";
+    } else if (header.startsWith("ffd8ff")) { // JPEG
+        contentType = "image/jpeg";
+        detectedExtension = "jpg";
+    } else if (header.startsWith("52494646")) { // WebP/RIFF
+        contentType = "image/webp";
+        detectedExtension = "webp";
     }
 
-    // Ensure filename has an extension
+    // Asegurar que el nombre tenga la extensión correcta para que Windows/Android lo reconozcan
     let filename = document.name;
-    if (extension && !filename.toLowerCase().endsWith(`.${extension}`)) {
-        filename = `${filename}.${extension}`;
+    if (detectedExtension && !filename.toLowerCase().endsWith(`.${detectedExtension}`)) {
+        filename = `${filename}.${detectedExtension}`;
     }
 
     return new NextResponse(buffer, {

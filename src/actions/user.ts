@@ -202,6 +202,7 @@ export async function getUserLots() {
           name: d.name,
           category: d.category,
           uploadedAt: d.created_at,
+          fileType: d.file_type,
           url: `/api/documents/${d.id}`,
         }));
         documents = [...newDocs, ...documents];

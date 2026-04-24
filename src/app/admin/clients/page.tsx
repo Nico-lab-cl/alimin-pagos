@@ -54,8 +54,6 @@ export default function ClientsPage() {
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docName, setDocName] = useState("");
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [previewData, setPreviewData] = useState({ url: "", title: "" });
   const [isTogglingMultiLot, setIsTogglingMultiLot] = useState(false);
   const [isTogglingAlContado, setIsTogglingAlContado] = useState(false);
   const [showPOV, setShowPOV] = useState(false);
@@ -105,6 +103,7 @@ export default function ClientsPage() {
           name: d.name,
           date: d.created_at,
           url: `/api/documents/${d.id}`,
+          fileType: d.file_type,
           type: 'table'
         }));
         
@@ -1077,7 +1076,7 @@ export default function ClientsPage() {
                         <div className="flex items-center gap-2">
                           <button 
                             onClick={() => {
-                              setPreviewData({ url: doc.url, title: doc.name });
+                              setPreviewData({ url: doc.url, title: doc.name, type: doc.fileType });
                               setIsPreviewOpen(true);
                             }}
                             className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/20 hover:bg-white/10 hover:text-white transition-all duration-300"
@@ -1119,6 +1118,14 @@ export default function ClientsPage() {
           </div>
         </div>
       )}
+
+      <PreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        url={previewData.url}
+        title={previewData.title}
+        fileType={previewData.type}
+      />
 
       {/* Client POV Modal */}
       {showPOV && selectedClient && (

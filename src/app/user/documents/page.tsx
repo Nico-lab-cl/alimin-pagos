@@ -116,7 +116,7 @@ export default function UserDocuments() {
                         <div className="flex items-center gap-2">
                           <button 
                             onClick={() => {
-                              setPreviewData({ url: doc.url, title: doc.name });
+                              setPreviewData({ url: doc.url, title: doc.name, type: doc.fileType });
                               setIsPreviewOpen(true);
                             }}
                             className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:bg-white/10 hover:text-accent transition-all"
@@ -175,6 +175,7 @@ export default function UserDocuments() {
         onClose={() => setIsPreviewOpen(false)}
         url={previewData.url}
         title={previewData.title}
+        fileType={previewData.type}
       />
     </div>
   );
