@@ -51,10 +51,16 @@ export async function GET(
         else if (extension === 'webp') contentType = 'image/webp';
     }
 
+    // Ensure filename has an extension
+    let filename = document.name;
+    if (extension && !filename.toLowerCase().endsWith(`.${extension}`)) {
+        filename = `${filename}.${extension}`;
+    }
+
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${encodeURIComponent(document.name)}"`,
+        "Content-Disposition": `inline; filename="${encodeURIComponent(filename)}"`,
         "Cache-Control": "public, max-age=3600",
       },
     });
