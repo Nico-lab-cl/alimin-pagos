@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Loader2, Download, ExternalLink } from "lucide-react";
+import { X, Loader2, Download, ExternalLink, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface PreviewModalProps {
