@@ -45,9 +45,9 @@ export async function GET(
     let detectedExtension = "";
 
     // Leer los primeros bytes para identificar el archivo
-    const header = buffer.subarray(0, 4).toString('hex');
+    const header = buffer.subarray(0, 8).toString('hex'); // Leemos 8 bytes para más precisión
     
-    if (header === "25504446") { // %PDF
+    if (header.startsWith("25504446")) { // %PDF
         contentType = "application/pdf";
         detectedExtension = "pdf";
     } else if (header.startsWith("89504e47")) { // .PNG
@@ -59,6 +59,13 @@ export async function GET(
     } else if (header.startsWith("52494646")) { // WebP/RIFF
         contentType = "image/webp";
         detectedExtension = "webp";
+    } else if (header.startsWith("504b0304")) { // ZIP / DOCX / XLSX
+        // Por defecto para office moderno si no sabemos cuál es
+        contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        detectedExtension = "docx";
+    } else if (header.startsWith("d0cf11e0")) { // DOC antiguo
+        contentType = "application/msword";
+        detectedExtension = "doc";
     }
 
     // Asegurar que el nombre tenga la extensión correcta para que Windows/Android lo reconozcan
