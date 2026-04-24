@@ -21,7 +21,10 @@ import {
   ChevronRight
 } from "lucide-react";
 
+import { useSearch } from "@/context/SearchContext";
+
 export default function ReceiptsPage() {
+  const { search } = useSearch();
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [receipts, setReceipts] = useState<any[]>([]);
@@ -84,8 +87,15 @@ export default function ReceiptsPage() {
     setProcessing(null);
   };
 
-  const totalPages = Math.ceil(receipts.length / itemsPerPage);
-  const paginatedReceipts = receipts.slice(
+  const filteredReceipts = receipts.filter(r => 
+    !search ||
+    r.reservation?.name?.toLowerCase().includes(search.toLowerCase()) ||
+    r.reservation?.last_name?.toLowerCase().includes(search.toLowerCase()) ||
+    r.lot?.number?.toString().toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredReceipts.length / itemsPerPage);
+  const paginatedReceipts = filteredReceipts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -230,7 +240,7 @@ export default function ReceiptsPage() {
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-20">
-            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, receipts.length)} de {receipts.length} Comprobantes
+            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredReceipts.length)} de {filteredReceipts.length} Comprobantes
           </p>
           <div className="flex items-center gap-2">
             <button

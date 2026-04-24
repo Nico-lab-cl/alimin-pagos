@@ -9,12 +9,14 @@ import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone,
 import { DatePicker } from "@/components/ui/DatePicker";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
 
+import { useSearch } from "@/context/SearchContext";
+
 export default function ClientsPage() {
+  const { search, setSearch } = useSearch();
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
   const [selectedStage, setSelectedStage] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedClient, setSelectedClient] = useState<any>(null);

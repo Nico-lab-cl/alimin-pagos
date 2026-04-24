@@ -5,12 +5,14 @@ import { getAdminProjects, getAdminLots } from "@/actions/postventa";
 import { formatCLP } from "@/lib/utils";
 import { Loader2, Search, Map as MapIcon, Layers, ChevronRight, Zap, Filter, LayoutGrid, List } from "lucide-react";
 
+import { useSearch } from "@/context/SearchContext";
+
 export default function AdminLotsPage() {
+  const { search, setSearch } = useSearch();
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [lots, setLots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
