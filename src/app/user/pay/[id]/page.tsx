@@ -69,6 +69,10 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("El archivo es demasiado grande (máximo 10MB)");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setReceiptBase64(reader.result as string);

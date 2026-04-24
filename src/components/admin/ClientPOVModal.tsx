@@ -22,6 +22,7 @@ import {
   Eye,
   Monitor,
   Calendar,
+  Upload,
 } from "lucide-react";
 
 interface ClientPOVModalProps {
@@ -305,6 +306,7 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: "d
 
 /* ──────────────────── PAYMENT VIEW ──────────────────── */
 function PaymentView({ data }: { data: any }) {
+  const [simulatedFile, setSimulatedFile] = useState<string | null>(null);
   return (
     <div className="space-y-10 max-w-4xl mx-auto">
       <div>
@@ -443,10 +445,43 @@ function PaymentView({ data }: { data: any }) {
           </div>
 
           {/* Simulated Upload Area */}
-          <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-white/10 rounded-[2rem] bg-white/[0.02] cursor-default opacity-50">
-            <CreditCard className="w-10 h-10 mx-auto mb-4 opacity-20" />
-            <p className="text-xs font-black text-white/30 uppercase tracking-widest">Subir Comprobante</p>
-            <p className="text-[9px] text-white/15 mt-2 font-bold uppercase tracking-widest">JPG, PNG o PDF (Max 10MB)</p>
+          <div className="relative">
+            <input 
+              type="file" 
+              id="sim-upload" 
+              className="hidden" 
+              accept="image/*,.pdf"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  if (file.size > 10 * 1024 * 1024) {
+                    alert("El archivo es demasiado grande (máximo 10MB)");
+                    return;
+                  }
+                  setSimulatedFile(file.name);
+                }
+              }}
+            />
+            <label 
+              htmlFor="sim-upload"
+              className={`flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-[2rem] cursor-pointer transition-all duration-500 ${simulatedFile ? 'border-accent bg-accent/[0.03]' : 'border-white/10 hover:border-accent/40 bg-white/[0.02]'}`}
+            >
+              {simulatedFile ? (
+                <div className="text-center animate-fade-in">
+                  <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center mx-auto mb-4 shadow-xl">
+                    <CheckCircle className="w-8 h-8 text-[#061010]" />
+                  </div>
+                  <p className="text-[10px] font-black text-accent uppercase tracking-widest leading-none">Comprobante Cargado</p>
+                  <p className="text-[8px] text-white/40 mt-2 font-bold truncate max-w-[200px] italic">{simulatedFile}</p>
+                </div>
+              ) : (
+                <div className="text-center opacity-40 hover:opacity-100 transition-opacity">
+                  <Upload className="w-10 h-10 mx-auto mb-4" />
+                  <p className="text-xs font-black text-white uppercase tracking-widest leading-none">Subir Comprobante</p>
+                  <p className="text-[9px] text-white/30 mt-3 font-bold uppercase tracking-widest">JPG, PNG o PDF (Max 10MB)</p>
+                </div>
+              )}
+            </label>
           </div>
         </div>
       </div>
