@@ -32,6 +32,7 @@ export default function ReceiptsPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   
   const [currentPage, setCurrentPage] = useState(1);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -99,28 +100,6 @@ export default function ReceiptsPage() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  const openReceipt = (url: string) => {
-    try {
-      if (url.startsWith('data:')) {
-        const parts = url.split(';base64,');
-        const contentType = parts[0].split(':')[1];
-        const raw = window.atob(parts[1]);
-        const rawLength = raw.length;
-        const uInt8Array = new Uint8Array(rawLength);
-        for (let i = 0; i < rawLength; ++i) {
-          uInt8Array[i] = raw.charCodeAt(i);
-        }
-        const blob = new Blob([uInt8Array], { type: contentType });
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
-      } else {
-        window.open(url, '_blank');
-      }
-    } catch (e) {
-      window.open(url, '_blank');
-    }
-  };
 
   return (
     <div className="space-y-12 animate-fade-in px-4">
@@ -233,11 +212,11 @@ export default function ReceiptsPage() {
                   {/* Floating View Action */}
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center gap-3">
                     <button 
-                      onClick={() => openReceipt(receipt.receipt_url)}
+                      onClick={() => setPreviewUrl(receipt.receipt_url)}
                       className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-white text-black font-black text-[10px] uppercase tracking-widest animate-slide-up"
                     >
                       <Eye className="w-4 h-4" />
-                      Abrir en Pantalla Completa
+                      Ampliar Comprobante
                     </button>
                     <a href={receipt.receipt_url} download={`comprobante_${receipt.id}`} className="p-3 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition-all border border-white/10">
                       <Zap className="w-4 h-4" />
@@ -292,6 +271,42 @@ export default function ReceiptsPage() {
             >
               <ChevronRight className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Full Screen Preview Modal */}
+      {previewUrl && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 animate-fade-in"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" />
+          
+          <button 
+            className="absolute top-8 right-8 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all z-10"
+            onClick={() => setPreviewUrl(null)}
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          <div 
+            className="relative w-full max-w-5xl h-full flex items-center justify-center animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {previewUrl.startsWith('data:application/pdf') ? (
+              <iframe 
+                src={previewUrl} 
+                className="w-full h-full rounded-[2rem] border border-white/10 shadow-2xl"
+                title="Full Preview"
+              />
+            ) : (
+              <img 
+                src={previewUrl} 
+                className="max-w-full max-h-full object-contain rounded-[2rem] shadow-2xl border border-white/10"
+                alt="Full Preview"
+              />
+            )}
           </div>
         </div>
       )}
