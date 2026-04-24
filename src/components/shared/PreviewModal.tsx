@@ -16,20 +16,38 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    let timeout: NodeJS.Timeout;
     if (isOpen) {
       setLoading(true);
       setError(false);
-      // Bloquear scroll del body
       document.body.style.overflow = "hidden";
+
+      // Timeout de seguridad: si en 10s no carga, mostrar error/descarga
+      timeout = setTimeout(() => {
+        setLoading(false);
+        setError(true);
+      }, 10000);
+
+      // Si sabemos de antemano que no es previsualizable (ej: Word)
+      const isOffice = fileType?.includes("officedocument") || fileType?.includes("msword");
+      if (isOffice) {
+        setLoading(false);
+        setError(true);
+        clearTimeout(timeout);
+      }
     } else {
       document.body.style.overflow = "unset";
     }
     return () => {
       document.body.style.overflow = "unset";
+      if (timeout) clearTimeout(timeout);
     };
-  }, [isOpen]);
+  }, [isOpen, fileType]);
 
   if (!isOpen) return null;
+
+  const isImage = fileType?.startsWith("image/") || url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
+  const isPDF = fileType?.includes("pdf") || url.toLowerCase().match(/\.pdf$/);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 animate-fade-in">
@@ -80,27 +98,27 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
 
           {error ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-10 text-center">
-              <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center">
-                <X className="w-10 h-10 text-red-500/40" />
+              <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+                <FileText className="w-10 h-10 text-white/20" />
               </div>
               <div>
-                <h4 className="text-xl font-black text-white uppercase italic tracking-tighter mb-2">No se pudo cargar la vista previa</h4>
+                <h4 className="text-xl font-black text-white uppercase italic tracking-tighter mb-2">Formato no previsualizable</h4>
                 <p className="text-xs font-bold text-white/20 uppercase tracking-widest leading-relaxed max-w-xs mx-auto">
-                  El formato del archivo puede no ser compatible con el visor integrado.
+                  Este archivo (Word, Excel o similar) no se puede mostrar en el navegador. Usa el botón de abajo para descargarlo.
                 </p>
               </div>
               <a 
                 href={url}
-                target="_blank"
-                className="px-8 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-white hover:bg-white/10 transition-all flex items-center gap-3"
+                download
+                className="px-8 py-4 bg-accent text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 transition-all flex items-center gap-3 shadow-[0_0_30px_rgba(212,168,75,0.3)]"
               >
-                Abrir en nueva pestaña
-                <ExternalLink className="w-3 h-3" />
+                Descargar Archivo Original
+                <Download className="w-3 h-3" />
               </a>
             </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center p-4">
-              {(fileType?.startsWith("image/") || url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) ? (
+              {isImage ? (
                 <img 
                   src={url} 
                   alt={title} 
