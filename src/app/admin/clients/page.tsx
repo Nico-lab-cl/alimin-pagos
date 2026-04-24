@@ -51,6 +51,8 @@ export default function ClientsPage() {
 
   // Document State
   const [docs, setDocs] = useState<any[]>([]);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState({ url: "", title: "", type: "" });
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docName, setDocName] = useState("");
