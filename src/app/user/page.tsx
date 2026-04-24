@@ -123,14 +123,14 @@ export default function UserDashboard() {
                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Progreso de Adquisición</span>
                     </div>
                     <span className="text-lg font-black italic text-white leading-none">
-                      {lot.totalToPay > 0 ? Math.round((lot.totalPaid / lot.totalToPay) * 100) : 0}%
+                      {lot.acquisitionProgress}%
                     </span>
                   </div>
                   <div className="h-4 rounded-full bg-white/5 border border-white/5 overflow-hidden p-1">
                     <div 
                       className="h-full rounded-full transition-all duration-[2s] ease-out shadow-[0_0_20px_rgba(212,168,75,0.4)]"
                       style={{ 
-                        width: `${lot.totalToPay > 0 ? Math.min(100, (lot.totalPaid / lot.totalToPay) * 100) : 0}%`,
+                        width: `${Math.min(100, lot.acquisitionProgress)}%`,
                         background: 'linear-gradient(90deg, #d4a84b 0%, #e0be72 50%, #b88e35 100%)'
                       }}
                     />

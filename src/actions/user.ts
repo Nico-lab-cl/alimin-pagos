@@ -79,6 +79,13 @@ export async function getUserLots() {
         totalToPay - totalPaid + (res.pending_amount || 0)
       );
 
+      // Milestone-based progress
+      const hasPie = pieAmount > 0;
+      const pieStepPaid = actualPie > 0 || paidCuotas > 0;
+      const totalSteps = (hasPie ? 1 : 0) + totalCuotas;
+      const completedSteps = (pieStepPaid ? 1 : 0) + paidCuotas;
+      const acquisitionProgress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
       let nextDueDate: Date | null = null;
       let penaltyAmount = 0;
       let lateDays = 0;
@@ -220,6 +227,7 @@ export async function getUserLots() {
         pendingBalance,
         paidCuotas,
         totalCuotas,
+        acquisitionProgress,
         nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
         nextInstallmentMonth: nextDueDate ? formatMonth.format(nextDueDate).toUpperCase() : null,
         pieStatus: res.pie_status,

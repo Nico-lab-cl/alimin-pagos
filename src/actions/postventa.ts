@@ -1064,6 +1064,14 @@ export async function getClientPOV(reservationId: string) {
     const totalToPay = lot.price_total_clp || 0;
     const pendingBalance = Math.max(0, totalToPay - totalPaid + (res.pending_amount || 0));
 
+    // Calculate Acquisition Progress based on milestones (Steps in the plan)
+    // Milestone 1: PIE, Milestones 2..N: Installments
+    const hasPie = pieAmount > 0;
+    const pieStepPaid = actualPie > 0 || paidCuotas > 0; // If they are paying installments, PIE is assumed settled in progress
+    const totalSteps = (hasPie ? 1 : 0) + totalCuotas;
+    const completedSteps = (pieStepPaid ? 1 : 0) + paidCuotas;
+    const acquisitionProgress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
     let nextDueDate: Date | null = null;
     let penaltyAmount = 0;
     let lateDays = 0;
@@ -1198,6 +1206,7 @@ export async function getClientPOV(reservationId: string) {
         pendingBalance,
         paidCuotas,
         totalCuotas,
+        acquisitionProgress,
         nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
         nextInstallmentMonth,
         pieStatus: res.pie_status,
