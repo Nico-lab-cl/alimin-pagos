@@ -46,3 +46,11 @@ next-env.d.ts
 .DS_Store
 .npm
 .cache
+*.json
+!package.json
+!tsconfig.json
+!capacitor.config.ts
+!eslint.config.mjs
+*.mp4
+comprobante
+promesa*

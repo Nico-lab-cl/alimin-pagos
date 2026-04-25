@@ -65,23 +65,23 @@ model Lot {
 }
 
 model User {
-  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email                String         @unique @db.VarChar(255)
-  email_verified       DateTime?      @db.Timestamptz(6)
-  password             String         @db.VarChar(255)
-  name                 String         @db.VarChar(255)
-  role                 UserRole?      @default(USER)
-  must_change_password Boolean?       @default(false)
-  allowed_projects     Json?
-  fcm_token            String?        @db.VarChar(255)
-  last_platform        String?        @db.VarChar(50)
-  created_at           DateTime?      @default(now()) @db.Timestamptz(6)
-  updated_at              DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
-  reset_password_token    String?        @db.Text
-  reset_password_expires  DateTime?      @db.Timestamptz(6)
-  auditLogs               AuditLog[]
-  notifications        Notification[]
-  reservations         Reservation[]
+  id                     String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                  String         @unique @db.VarChar(255)
+  email_verified         DateTime?      @db.Timestamptz(6)
+  password               String         @db.VarChar(255)
+  name                   String         @db.VarChar(255)
+  role                   UserRole?      @default(USER)
+  must_change_password   Boolean?       @default(false)
+  allowed_projects       Json?
+  created_at             DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
+  fcm_token              String?        @db.VarChar(255)
+  last_platform          String?        @db.VarChar(50)
+  reset_password_token   String?
+  reset_password_expires DateTime?      @db.Timestamptz(6)
+  auditLogs              AuditLog[]
+  notifications          Notification[]
+  reservations           Reservation[]
 
   @@index([email], map: "idx_users_email")
   @@index([role], map: "idx_users_role")
@@ -132,11 +132,11 @@ model Reservation {
   mora_status            String?               @default("ACTIVO") @db.VarChar(20)
   manual_penalty         Int?
   penalty_mode           String?               @default("AUTO") @db.VarChar(10)
-  last_notified_status   String?               @db.VarChar(20)
   is_multilote           Boolean?              @default(false)
+  last_notified_status   String?               @db.VarChar(20)
+  financialLedgers       FinancialLedger[]
   receipts               PaymentReceipt[]
   documents              ReservationDocument[]
-  financialLedgers       FinancialLedger[]
   lot                    Lot                   @relation(fields: [lot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   project                Project               @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   user                   User                  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -228,7 +228,7 @@ model FinancialLedger {
   id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   reservation_id String      @db.Uuid
   amount_clp     Int
-  category       String      @db.VarChar(20) // "CUOTA", "PENALTY", "PIE"
+  category       String      @db.VarChar(20)
   description    String?
   paid_at        DateTime?   @default(now()) @db.Timestamptz(6)
   created_at     DateTime?   @default(now()) @db.Timestamptz(6)
