@@ -47,7 +47,7 @@ export default function ClientsPage() {
     penalty_mode: "AUTO",
     manual_penalty: 0,
     extra_paid_amount: 0,
-    installment_ranges: [],
+    installment_ranges: [] as any[],
     debt_start_date: "",
     next_payment_date: "",
     installment_start_date: ""
