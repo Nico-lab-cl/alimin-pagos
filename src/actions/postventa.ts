@@ -755,6 +755,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
   manual_penalty?: number | null;
   debt_start_date?: string | null;
   next_payment_date?: string | null;
+  extra_paid_amount?: number;
 }) {
   const session = await auth();
   const adminUser = session?.user as any;
@@ -817,6 +818,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
           installments_paid: Number(data.installments_paid) || 0,
           penalty_mode: data.penalty_mode || "AUTO",
           manual_penalty: data.penalty_mode === "FIXED" ? (Number(data.manual_penalty) || null) : null,
+          extra_paid_amount: Number(data.extra_paid_amount) || 0,
           ...(startDateObj && { installment_start_date: startDateObj }),
         }
       })

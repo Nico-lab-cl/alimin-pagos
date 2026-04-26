@@ -46,6 +46,7 @@ export default function ClientsPage() {
     mora_status: "ACTIVO",
     penalty_mode: "AUTO",
     manual_penalty: 0,
+    extra_paid_amount: 0,
     debt_start_date: "",
     next_payment_date: "",
     installment_start_date: ""
@@ -313,6 +314,7 @@ export default function ClientsPage() {
                         mora_status: c.mora_status || (c.mora_frozen ? "CONGELADO" : "ACTIVO"),
                         penalty_mode: c.penalty_mode || "AUTO",
                         manual_penalty: c.manual_penalty || 0,
+                        extra_paid_amount: c.extra_paid_amount || 0,
                         debt_start_date: c.debt_start_date ? new Date(c.debt_start_date).toISOString().split('T')[0] : "",
                         next_payment_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : "",
                         installment_start_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : ""
@@ -792,6 +794,22 @@ export default function ClientsPage() {
                             <div className="space-y-2">
                               <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Días de Gracia</label>
                               <input type="number" min="0" value={finForm.grace_days} onChange={e=>setFinForm({...finForm, grace_days: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest flex items-center justify-between">
+                                Ajuste Manual (Saldo Extra)
+                                <span className={finForm.extra_paid_amount < 0 ? "text-red-400" : "text-emerald-400"}>
+                                  {finForm.extra_paid_amount < 0 ? "DESCUENTO" : "RECARGO"}
+                                </span>
+                              </label>
+                              <input 
+                                type="number" 
+                                value={finForm.extra_paid_amount} 
+                                onChange={e=>setFinForm({...finForm, extra_paid_amount: Number(e.target.value)})} 
+                                placeholder="Ej: -650000"
+                                className={`w-full bg-black/40 border rounded-xl px-3 py-2 text-sm focus:border-accent outline-none font-bold ${finForm.extra_paid_amount < 0 ? "text-red-400 border-red-500/20" : "text-emerald-400 border-emerald-500/20"}`} 
+                              />
+                              <p className="text-[7px] text-white/20 uppercase font-bold px-1 italic">Para corregir desfases históricos o errores de cálculo pasados.</p>
                             </div>
                           </div>
                           
