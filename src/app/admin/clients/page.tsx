@@ -76,6 +76,14 @@ export default function ClientsPage() {
 
   const itemsPerPage = 10;
 
+  const refreshMainData = async () => {
+    if (!selectedProject) return;
+    setLoading(true);
+    const result = await getFullPostventaData({ projectSlug: selectedProject });
+    setData(result);
+    setLoading(false);
+  };
+
   useEffect(() => {
     getAdminProjects().then((result) => {
       if (result.projects?.length) {
@@ -86,13 +94,7 @@ export default function ClientsPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedProject) {
-      setLoading(true);
-      getFullPostventaData({ projectSlug: selectedProject }).then((result) => {
-        setData(result);
-        setLoading(false);
-      });
-    }
+    refreshMainData();
   }, [selectedProject]);
 
   useEffect(() => {
@@ -616,11 +618,25 @@ export default function ClientsPage() {
                               if (res.error) {
                                 setEditMsg({ text: res.error, type: "error" });
                               } else {
-                                setEditMsg({ text: "Datos actualizados. Cerrando...", type: "success" });
+                                setEditMsg({ text: "Datos actualizados correctamente.", type: "success" });
+                                // Update local selectedClient state immediately
+                                setSelectedClient({
+                                  ...selectedClient,
+                                  name: editForm.name,
+                                  clientName: editForm.name,
+                                  email: editForm.email,
+                                  clientEmail: editForm.email,
+                                  phone: editForm.phone,
+                                  clientPhone: editForm.phone,
+                                  rut: editForm.rut,
+                                  observation: editForm.observation
+                                });
+                                // Refresh main list in background
+                                refreshMainData();
                                 setTimeout(() => {
-                                  setSelectedClient(null); // Close modal on success to refresh cleanly
                                   setIsEditing(false);
-                                }, 1500);
+                                  setEditMsg({ text: "", type: "" });
+                                }, 1000);
                               }
                             } catch(e) {
                               setEditMsg({ text: "Error de servidor.", type: "error" });
@@ -636,29 +652,36 @@ export default function ClientsPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-4">
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-5">
                       <div>
                         <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1 flex items-center justify-between">
                           Correo Electrónico
-                          {selectedClient.clientEmail?.includes("@libertadyalegria") && <span className="text-red-400">CORREO TEMPORAL CREADO POR SISTEMA</span>}
+                          {selectedClient.clientEmail?.includes("@libertadyalegria") && <span className="text-red-400 text-[7px]">CORREO TEMPORAL</span>}
                         </p>
                         <p className={`text-sm font-bold ${selectedClient.clientEmail?.includes("@libertadyalegria") ? "text-red-300" : "text-white/80"}`}>{selectedClient.clientEmail}</p>
                       </div>
                       <div>
                         <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1 flex items-center justify-between">
                           Teléfono
-                          {!selectedClient.clientPhone && <span className="text-orange-400">FALTA TELÉFONO</span>}
+                          {!selectedClient.clientPhone && <span className="text-orange-400 text-[7px]">FALTA TELÉFONO</span>}
                         </p>
                         <p className={`text-sm font-bold ${!selectedClient.clientPhone ? "text-orange-300 italic" : "text-white/80"}`}>{selectedClient.clientPhone || "No registrado"}</p>
                       </div>
-                      {selectedClient.observation && (
-                        <div>
-                          <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Observaciones</p>
-                          <div className="bg-accent/5 border border-accent/10 rounded-xl p-4">
-                            <p className="text-xs font-medium text-accent/80 italic">"{selectedClient.observation}"</p>
-                          </div>
+                      
+                      <div className="pt-2">
+                        <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-2 flex items-center gap-2">
+                          <FileText className="w-3 h-3" /> Observaciones Post-Venta
+                        </p>
+                        <div className={`rounded-xl p-4 border ${selectedClient.observation ? 'bg-accent/5 border-accent/20' : 'bg-black/20 border-white/5'}`}>
+                          {selectedClient.observation ? (
+                            <p className="text-xs font-medium text-accent/90 whitespace-pre-wrap leading-relaxed italic">
+                              "{selectedClient.observation}"
+                            </p>
+                          ) : (
+                            <p className="text-[10px] font-bold text-white/10 uppercase italic">Sin observaciones registradas</p>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
                 </div>
