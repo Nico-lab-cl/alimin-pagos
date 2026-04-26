@@ -267,6 +267,7 @@ export async function getFullPostventaData({
         is_multilote: res.is_multilote || false,
         lot,
         buyer: res.user,
+        observation: res.observation,
       };
     });
 
@@ -676,7 +677,7 @@ export async function getAdminLots(projectSlug: string) {
 /**
  * Updates a client's profile data, updating both Reservation and underlying User login email.
  */
-export async function updateClientProfile(reservationId: string, data: { name: string, email: string, rut: string, phone: string }) {
+export async function updateClientProfile(reservationId: string, data: { name: string, email: string, rut: string, phone: string, observation?: string }) {
   const session = await auth();
   const adminUser = session?.user as any;
   if (!session?.user || adminUser?.role !== "ADMIN") {
@@ -716,7 +717,8 @@ export async function updateClientProfile(reservationId: string, data: { name: s
           name: data.name,
           email: data.email,
           rut: data.rut,
-          phone: data.phone
+          phone: data.phone,
+          observation: data.observation
         }
       })
     ]);

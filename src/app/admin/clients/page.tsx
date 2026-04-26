@@ -25,7 +25,7 @@ export default function ClientsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editMsg, setEditMsg] = useState({ text: "", type: "" });
-  const [editForm, setEditForm] = useState({ name: "", email: "", rut: "", phone: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", rut: "", phone: "", observation: "" });
   
   // Financial Edit State
   const [isEditingFin, setIsEditingFin] = useState(false);
@@ -295,7 +295,8 @@ export default function ClientsPage() {
                         name: c.clientName || "",
                         email: c.clientEmail || "",
                         rut: c.rut || "",
-                        phone: c.clientPhone || ""
+                        phone: c.clientPhone || "",
+                        observation: c.observation || ""
                       });
                       setFinForm({
                         price_total_clp: c.totalToPay || 0,
@@ -576,6 +577,15 @@ export default function ClientsPage() {
                         <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Teléfono de Contacto</label>
                         <input type="text" value={editForm.phone} onChange={e=>setEditForm({...editForm, phone: e.target.value})} className={`w-full bg-black/40 border rounded-xl px-4 py-3 text-sm text-white focus:border-accent outline-none font-bold ${!editForm.phone ? "border-orange-500/40" : "border-white/10"}`} />
                       </div>
+                      <div className="space-y-3">
+                        <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Observaciones Post-Venta</label>
+                        <textarea 
+                          value={editForm.observation} 
+                          onChange={e=>setEditForm({...editForm, observation: e.target.value})} 
+                          placeholder="Escribe aquí cualquier detalle relevante sobre el cliente..."
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-accent outline-none font-bold min-h-[100px] resize-none"
+                        />
+                      </div>
 
                       {editMsg.text && (
                         <div className={`text-[10px] font-black uppercase tracking-widest p-3 rounded-xl border ${editMsg.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
@@ -629,6 +639,14 @@ export default function ClientsPage() {
                         </p>
                         <p className={`text-sm font-bold ${!selectedClient.clientPhone ? "text-orange-300 italic" : "text-white/80"}`}>{selectedClient.clientPhone || "No registrado"}</p>
                       </div>
+                      {selectedClient.observation && (
+                        <div>
+                          <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1">Observaciones</p>
+                          <div className="bg-accent/5 border border-accent/10 rounded-xl p-4">
+                            <p className="text-xs font-medium text-accent/80 italic">"{selectedClient.observation}"</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
