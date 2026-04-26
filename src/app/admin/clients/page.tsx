@@ -47,6 +47,7 @@ export default function ClientsPage() {
     penalty_mode: "AUTO",
     manual_penalty: 0,
     extra_paid_amount: 0,
+    installment_ranges: [],
     debt_start_date: "",
     next_payment_date: "",
     installment_start_date: ""
@@ -315,6 +316,9 @@ export default function ClientsPage() {
                         penalty_mode: c.penalty_mode || "AUTO",
                         manual_penalty: c.manual_penalty || 0,
                         extra_paid_amount: c.extra_paid_amount || 0,
+                        installment_ranges: c.installment_ranges 
+                          ? (typeof c.installment_ranges === 'string' ? JSON.parse(c.installment_ranges) : c.installment_ranges)
+                          : [],
                         debt_start_date: c.debt_start_date ? new Date(c.debt_start_date).toISOString().split('T')[0] : "",
                         next_payment_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : "",
                         installment_start_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : ""
@@ -811,6 +815,67 @@ export default function ClientsPage() {
                               />
                               <p className="text-[7px] text-white/20 uppercase font-bold px-1 italic">Para corregir desfases históricos o errores de cálculo pasados.</p>
                             </div>
+                          </div>
+
+                          <div className="mt-6 border-t border-white/5 pt-6">
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-1">Tramos de Valor Diferente (Historial)</p>
+                                <p className="text-[8px] text-white/30 uppercase font-bold">Configura precios distintos para cuotas pasadas</p>
+                              </div>
+                              <button 
+                                onClick={() => setFinForm({...finForm, installment_ranges: [...finForm.installment_ranges, {from:1, to:1, amount: 0}]})}
+                                className="bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-lg text-[8px] font-black uppercase text-accent hover:bg-accent/20 transition-all"
+                              >
+                                + Agregar Tramo
+                              </button>
+                            </div>
+                            
+                            {finForm.installment_ranges.length === 0 ? (
+                              <p className="text-[8px] text-white/20 italic uppercase font-bold text-center py-6 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">No hay tramos configurados. Todas las cuotas usan el valor actual de ${finForm.valor_cuota?.toLocaleString('es-CL')}.</p>
+                            ) : (
+                              <div className="space-y-3">
+                                {finForm.installment_ranges.map((range: any, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-xl p-3 animate-fade-in">
+                                    <div className="flex-1 space-y-1">
+                                       <label className="text-[7px] text-white/40 uppercase font-black">Desde Cuota #</label>
+                                       <input type="number" value={range.from} onChange={e => {
+                                         const nr = [...finForm.installment_ranges];
+                                         nr[idx].from = Number(e.target.value);
+                                         setFinForm({...finForm, installment_ranges: nr});
+                                       }} className="w-full bg-transparent text-xs text-white outline-none font-bold" />
+                                    </div>
+                                    <div className="flex-1 space-y-1">
+                                       <label className="text-[7px] text-white/40 uppercase font-black">Hasta Cuota #</label>
+                                       <input type="number" value={range.to} onChange={e => {
+                                         const nr = [...finForm.installment_ranges];
+                                         nr[idx].to = Number(e.target.value);
+                                         setFinForm({...finForm, installment_ranges: nr});
+                                       }} className="w-full bg-transparent text-xs text-white outline-none font-bold" />
+                                    </div>
+                                    <div className="flex-[2] space-y-1 border-l border-white/10 pl-3">
+                                       <label className="text-[7px] text-white/40 uppercase font-black">Valor Cuota en ese tramo ($)</label>
+                                       <input type="number" value={range.amount} onChange={e => {
+                                         const nr = [...finForm.installment_ranges];
+                                         nr[idx].amount = Number(e.target.value);
+                                         setFinForm({...finForm, installment_ranges: nr});
+                                       }} className="w-full bg-transparent text-xs text-accent outline-none font-black" />
+                                    </div>
+                                    <button 
+                                      onClick={() => {
+                                        const nr = [...finForm.installment_ranges];
+                                        nr.splice(idx, 1);
+                                        setFinForm({...finForm, installment_ranges: nr});
+                                      }}
+                                      className="text-red-500/40 hover:text-red-500 transition-colors p-2"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                                <p className="text-[7px] text-white/20 uppercase font-bold px-1 italic text-center">Las cuotas que NO estén en estos rangos usarán el valor de cuota general configurado arriba.</p>
+                              </div>
+                            )}
                           </div>
                           
                           {/* Financial Status Dropdown */}
