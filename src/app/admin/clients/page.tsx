@@ -805,67 +805,54 @@ export default function ClientsPage() {
                               <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Días de Gracia</label>
                               <input type="number" min="0" value={finForm.grace_days} onChange={e=>setFinForm({...finForm, grace_days: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-accent outline-none font-bold" />
                             </div>
-                            <div className="space-y-2">
-                              <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest flex items-center justify-between">
-                                Ajuste Manual (Saldo Extra)
-                                <span className={finForm.extra_paid_amount < 0 ? "text-red-400" : "text-emerald-400"}>
-                                  {finForm.extra_paid_amount < 0 ? "DESCUENTO" : "RECARGO"}
-                                </span>
-                              </label>
-                              <input 
-                                type="number" 
-                                value={finForm.extra_paid_amount} 
-                                onChange={e=>setFinForm({...finForm, extra_paid_amount: Number(e.target.value)})} 
-                                placeholder="Ej: -650000"
-                                className={`w-full bg-black/40 border rounded-xl px-3 py-2 text-sm focus:border-accent outline-none font-bold ${finForm.extra_paid_amount < 0 ? "text-red-400 border-red-500/20" : "text-emerald-400 border-emerald-500/20"}`} 
-                              />
-                              <p className="text-[7px] text-white/20 uppercase font-bold px-1 italic">Para corregir desfases históricos o errores de cálculo pasados.</p>
-                            </div>
                           </div>
 
                           <div className="mt-6 border-t border-white/5 pt-6">
                             <div className="flex items-center justify-between mb-4">
                               <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-1">Tramos de Valor Diferente (Historial)</p>
-                                <p className="text-[8px] text-white/30 uppercase font-bold">Configura precios distintos para cuotas pasadas</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-1">Precios de Cuotas Anteriores</p>
+                                <p className="text-[8px] text-white/30 uppercase font-bold">Usa esto si el cliente pagó cuotas más baratas o caras en el pasado</p>
                               </div>
                               <button 
                                 onClick={() => setFinForm({...finForm, installment_ranges: [...finForm.installment_ranges, {from:1, to:1, amount: 0}]})}
-                                className="bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-lg text-[8px] font-black uppercase text-accent hover:bg-accent/20 transition-all"
+                                className="bg-accent/10 border border-accent/20 px-4 py-2 rounded-xl text-[9px] font-black uppercase text-accent hover:bg-accent/20 transition-all flex items-center gap-2"
                               >
-                                + Agregar Tramo
+                                <span>+ Agregar Historial</span>
                               </button>
                             </div>
                             
                             {finForm.installment_ranges.length === 0 ? (
-                              <p className="text-[8px] text-white/20 italic uppercase font-bold text-center py-6 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">No hay tramos configurados. Todas las cuotas usan el valor actual de ${finForm.valor_cuota?.toLocaleString('es-CL')}.</p>
+                              <div className="py-8 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center gap-2">
+                                <p className="text-[9px] text-white/20 italic uppercase font-black tracking-widest text-center">No hay precios anteriores registrados</p>
+                                <p className="text-[7px] text-white/10 uppercase font-bold">Todas las cuotas se calculan a ${finForm.valor_cuota?.toLocaleString('es-CL')}</p>
+                              </div>
                             ) : (
                               <div className="space-y-3">
                                 {finForm.installment_ranges.map((range: any, idx: number) => (
-                                  <div key={idx} className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-xl p-3 animate-fade-in">
-                                    <div className="flex-1 space-y-1">
-                                       <label className="text-[7px] text-white/40 uppercase font-black">Desde Cuota #</label>
+                                  <div key={idx} className="flex items-center gap-4 bg-black/40 border border-white/10 rounded-2xl p-4 animate-fade-in">
+                                    <div className="flex-1 space-y-2">
+                                       <label className="text-[8px] text-white/40 uppercase font-black tracking-widest">De la cuota #</label>
                                        <input type="number" value={range.from} onChange={e => {
                                          const nr = [...finForm.installment_ranges];
                                          nr[idx].from = Number(e.target.value);
                                          setFinForm({...finForm, installment_ranges: nr});
-                                       }} className="w-full bg-transparent text-xs text-white outline-none font-bold" />
+                                       }} className="w-full bg-white/5 border border-white/5 rounded-lg px-3 py-2 text-xs text-white outline-none font-bold focus:border-accent/40" />
                                     </div>
-                                    <div className="flex-1 space-y-1">
-                                       <label className="text-[7px] text-white/40 uppercase font-black">Hasta Cuota #</label>
+                                    <div className="flex-1 space-y-2">
+                                       <label className="text-[8px] text-white/40 uppercase font-black tracking-widest">A la cuota #</label>
                                        <input type="number" value={range.to} onChange={e => {
                                          const nr = [...finForm.installment_ranges];
                                          nr[idx].to = Number(e.target.value);
                                          setFinForm({...finForm, installment_ranges: nr});
-                                       }} className="w-full bg-transparent text-xs text-white outline-none font-bold" />
+                                       }} className="w-full bg-white/5 border border-white/5 rounded-lg px-3 py-2 text-xs text-white outline-none font-bold focus:border-accent/40" />
                                     </div>
-                                    <div className="flex-[2] space-y-1 border-l border-white/10 pl-3">
-                                       <label className="text-[7px] text-white/40 uppercase font-black">Valor Cuota en ese tramo ($)</label>
+                                    <div className="flex-[2] space-y-2 border-l border-white/10 pl-4">
+                                       <label className="text-[8px] text-white/40 uppercase font-black tracking-widest">Precio que tenían ($)</label>
                                        <input type="number" value={range.amount} onChange={e => {
                                          const nr = [...finForm.installment_ranges];
                                          nr[idx].amount = Number(e.target.value);
                                          setFinForm({...finForm, installment_ranges: nr});
-                                       }} className="w-full bg-transparent text-xs text-accent outline-none font-black" />
+                                       }} className="w-full bg-accent/5 border border-accent/20 rounded-lg px-3 py-2 text-xs text-accent outline-none font-black focus:border-accent" />
                                     </div>
                                     <button 
                                       onClick={() => {
@@ -873,7 +860,8 @@ export default function ClientsPage() {
                                         nr.splice(idx, 1);
                                         setFinForm({...finForm, installment_ranges: nr});
                                       }}
-                                      className="text-red-500/40 hover:text-red-500 transition-colors p-2"
+                                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all group"
+                                      title="Eliminar este tramo"
                                     >
                                       ✕
                                     </button>
