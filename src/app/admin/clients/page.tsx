@@ -340,6 +340,12 @@ export default function ClientsPage() {
                             {c.internalStatus === 'ARCHIVED' && (
                               <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-black text-white/40 uppercase tracking-widest">H-VERIFY</span>
                             )}
+                            {c.observation && (
+                              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-[8px] font-black text-accent uppercase tracking-widest animate-pulse">
+                                <FileText className="w-2.5 h-2.5" />
+                                <span>NOTA</span>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{c.rut || "SIN RUT"}</span>
