@@ -1359,11 +1359,11 @@ export async function activateClientProfile(reservationId: string) {
     // Determine webhook URL based on project
     let webhookUrl = "";
     if (reservation.project.slug === "arena-y-sol") {
-      webhookUrl = "https://webhook.site/arena-y-sol-placeholder"; // TODO: Reemplazar con URL real de N8N
+      webhookUrl = "https://n8n.aliminlomasdelmar.com/webhook/517e9ba2-64af-4b34-b926-c9265cbfed88";
     } else if (reservation.project.slug === "libertad-y-alegria") {
-      webhookUrl = "https://webhook.site/libertad-y-alegria-placeholder"; // TODO: Reemplazar con URL real de N8N
+      webhookUrl = "https://n8n.aliminlomasdelmar.com/webhook/517e9ba2-64af-4b34-b926-c9265cbfed88";
     } else {
-      webhookUrl = "https://webhook.site/default-placeholder";
+      webhookUrl = "https://n8n.aliminlomasdelmar.com/webhook/517e9ba2-64af-4b34-b926-c9265cbfed88"; // Fallback to the same webhook
     }
 
     // Prepare payload
