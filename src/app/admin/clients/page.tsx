@@ -252,7 +252,7 @@ export default function ClientsPage() {
       </div>
 
       {/* Tabs and Counts */}
-      {!loading && rawClients.length > 0 && uniqueStages.length > 0 && (
+      {!loading && rawClients.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 animate-fade-in">
           <button
             onClick={() => setSelectedStage("ALL")}
