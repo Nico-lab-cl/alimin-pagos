@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, ShieldCheck, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { signOut } from "next-auth/react";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function ChangePasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,9 +37,15 @@ export default function ChangePasswordPage() {
 
       const data = await res.json();
       if (data.success) {
-        toast.success("Contraseña actualizada correctamente");
-        router.push("/user");
-        router.refresh();
+        setIsSuccess(true);
+        toast.success("¡Contraseña actualizada! Sesión cerrada por seguridad.");
+        
+        setTimeout(() => {
+          signOut({ 
+            redirect: true, 
+            callbackUrl: "/login" 
+          });
+        }, 3000);
       } else {
         toast.error(data.error || "Error al cambiar contraseña");
       }
@@ -84,79 +92,94 @@ export default function ChangePasswordPage() {
         <div className="glass-card p-10 rounded-[2.5rem] space-y-8 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-accent/10 transition-colors duration-1000" />
           
-          <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
-            <div className="space-y-2">
-              <label htmlFor="current" className="label-premium">
-                Contraseña Temporal
-              </label>
-              <div className="relative">
-                <input
-                  id="current"
-                  type="password"
-                  placeholder="••••••••"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                  className="input-premium w-full pr-12 focus:ring-accent/20"
-                />
-                <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+          {isSuccess ? (
+            <div className="text-center py-10 space-y-6 animate-fade-in relative z-10">
+              <div className="w-20 h-20 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-success/30">
+                <ShieldCheck className="w-10 h-10 text-success" />
+              </div>
+              <h2 className="text-2xl font-black text-white italic">¡Contraseña Cambiada!</h2>
+              <p className="text-sm text-white/40 max-w-[200px] mx-auto leading-relaxed uppercase tracking-tighter font-bold">
+                Redirigiendo al inicio de sesión en <span className="text-accent animate-pulse">3 segundos</span>...
+              </p>
+              <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden mt-8">
+                <div className="bg-accent h-full animate-[progress_3s_linear_forwards]" />
               </div>
             </div>
-
-            <div className="h-px bg-white/5 w-full" />
-
-            <div className="space-y-6">
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
               <div className="space-y-2">
-                <label htmlFor="new" className="label-premium">
-                  Nueva Contraseña
+                <label htmlFor="current" className="label-premium">
+                  Contraseña Temporal
                 </label>
-                <input
-                  id="new"
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="input-premium w-full focus:ring-accent/20"
-                />
+                <div className="relative">
+                  <input
+                    id="current"
+                    type="password"
+                    placeholder="••••••••"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
+                    className="input-premium w-full pr-12 focus:ring-accent/20"
+                  />
+                  <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="confirm" className="label-premium">
-                  Confirmar Contraseña
-                </label>
-                <input
-                  id="confirm"
-                  type="password"
-                  placeholder="Repite la contraseña"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="input-premium w-full focus:ring-accent/20"
-                />
-              </div>
-            </div>
+              <div className="h-px bg-white/5 w-full" />
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-metallic-gold w-full py-5 rounded-2xl flex items-center justify-center gap-3 group/btn active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Procesando...</span>
-                </>
-              ) : (
-                <>
-                  <span>Actualizar Ahora</span>
-                  <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
-                </>
-              )}
-            </button>
-          </form>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label htmlFor="new" className="label-premium">
+                    Nueva Contraseña
+                  </label>
+                  <input
+                    id="new"
+                    type="password"
+                    placeholder="Mínimo 6 caracteres"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="input-premium w-full focus:ring-accent/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="confirm" className="label-premium">
+                    Confirmar Contraseña
+                  </label>
+                  <input
+                    id="confirm"
+                    type="password"
+                    placeholder="Repite la contraseña"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="input-premium w-full focus:ring-accent/20"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-metallic-gold w-full py-5 rounded-2xl flex items-center justify-center gap-3 group/btn active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Procesando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Actualizar Ahora</span>
+                    <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
 
           {/* Footer Note */}
           <p className="text-[9px] font-bold text-center text-white/20 uppercase tracking-widest pt-4">
@@ -164,6 +187,13 @@ export default function ChangePasswordPage() {
           </p>
         </div>
       </div>
+      
+      <style jsx global>{`
+        @keyframes progress {
+          from { width: 0%; }
+          to { width: 100%; }
+        }
+      `}</style>
     </div>
   );
 }
