@@ -49,6 +49,7 @@ export default function ClientsPage() {
     extra_paid_amount: 0,
     installment_ranges: [] as any[],
     debt_start_date: "",
+    debt_end_date: "",
     next_payment_date: "",
     installment_start_date: ""
   });
@@ -344,7 +345,8 @@ export default function ClientsPage() {
                           ? (typeof c.installment_ranges === 'string' ? JSON.parse(c.installment_ranges) : c.installment_ranges)
                           : [],
                         debt_start_date: c.debt_start_date ? new Date(c.debt_start_date).toISOString().split('T')[0] : "",
-                        next_payment_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : "",
+                        debt_end_date: c.debt_end_date ? new Date(c.debt_end_date).toISOString().split('T')[0] : "",
+                        next_payment_date: c.next_payment_date ? new Date(c.next_payment_date).toISOString().split('T')[0] : "",
                         installment_start_date: c.nextDueDate ? new Date(c.nextDueDate).toISOString().split('T')[0] : ""
                       });
                     }}
@@ -1017,11 +1019,18 @@ export default function ClientsPage() {
                           )}
 
                           {!finForm.mora_frozen && finForm.penalty_mode !== "FIXED" && (
-                              <DatePicker 
-                                label="Fecha Inicio de Deuda (Opcional - Fuerza Mora)"
-                                date={finForm.debt_start_date}
-                                onChange={val => setFinForm({...finForm, debt_start_date: val})}
-                              />
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <DatePicker 
+                                  label="Inicio Deuda (Fuerza Mora)"
+                                  date={finForm.debt_start_date}
+                                  onChange={val => setFinForm({...finForm, debt_start_date: val})}
+                                />
+                                <DatePicker 
+                                  label="Fin Deuda (Opcional)"
+                                  date={finForm.debt_end_date}
+                                  onChange={val => setFinForm({...finForm, debt_end_date: val})}
+                                />
+                              </div>
                           )}
                         </div>
                       </div>

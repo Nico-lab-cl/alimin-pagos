@@ -36,12 +36,22 @@ export function calculateTotalInterest(
   gracePeriodDays: number = 5,
   dailyPenaltyAmount: number = 10000,
   debtStartDate?: Date | string | null,
-  penaltyStartDate?: Date | string | null
+  penaltyStartDate?: Date | string | null,
+  debtEndDate?: Date | string | null
 ): number {
   if (moraFrozen) return 0;
 
-  const pDate = new Date(paymentDate);
+  let pDate = new Date(paymentDate);
   pDate.setHours(0, 0, 0, 0);
+
+  // If debtEndDate is set, cap pDate at that date
+  if (debtEndDate) {
+    const dEnd = new Date(debtEndDate);
+    dEnd.setHours(0, 0, 0, 0);
+    if (pDate > dEnd) {
+      pDate = dEnd;
+    }
+  }
 
   let gDate: Date;
 

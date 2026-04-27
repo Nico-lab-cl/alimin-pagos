@@ -109,6 +109,7 @@ model Reservation {
   installment_start_date DateTime?             @db.Timestamptz(6)
   installment_ranges     Json?
   debt_start_date        DateTime?             @db.Timestamptz(6)
+  debt_end_date          DateTime?             @db.Timestamptz(6)
   next_payment_date      DateTime?             @db.Timestamptz(6)
   mora_frozen            Boolean?              @default(false)
   advisor                String?               @db.VarChar(100)

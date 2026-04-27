@@ -141,7 +141,8 @@ export async function getFullPostventaData({
             res.grace_days ?? project.grace_period_days ?? 5,
             activeDailyPenalty,
             res.debt_start_date,
-            project.penalty_start_date
+            project.penalty_start_date,
+            res.debt_end_date
           );
 
           if (penaltyAmount > 0 && activeDailyPenalty > 0) {
@@ -253,6 +254,7 @@ export async function getFullPostventaData({
         installment_start_date: res.installment_start_date,
         installment_ranges: res.installment_ranges,
         debt_start_date: res.debt_start_date,
+        debt_end_date: res.debt_end_date,
         next_payment_date: res.next_payment_date,
         pie: res.pie || lot.pie || 0,
         extra_paid_amount: res.extra_paid_amount,
@@ -756,6 +758,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
   penalty_mode?: string;
   manual_penalty?: number | null;
   debt_start_date?: string | null;
+  debt_end_date?: string | null;
   next_payment_date?: string | null;
   extra_paid_amount?: number;
   installment_ranges?: any[];
@@ -816,6 +819,9 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
           mora_status: data.mora_status,
           debt_start_date: (data.debt_start_date && data.debt_start_date.trim() !== "") 
             ? new Date(data.debt_start_date + "T12:00:00") 
+            : null,
+          debt_end_date: (data.debt_end_date && data.debt_end_date.trim() !== "") 
+            ? new Date(data.debt_end_date + "T12:00:00") 
             : null,
           next_payment_date: nextDateObj || null,
           installments_paid: Number(data.installments_paid) || 0,
