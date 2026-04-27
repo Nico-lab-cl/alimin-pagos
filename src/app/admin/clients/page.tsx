@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import { formatCLP, formatDate } from "@/lib/utils";
-import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye } from "lucide-react";
+import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye, Key } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
 
@@ -63,6 +63,7 @@ export default function ClientsPage() {
   const [isTogglingMultiLot, setIsTogglingMultiLot] = useState(false);
   const [isTogglingAlContado, setIsTogglingAlContado] = useState(false);
   const [showPOV, setShowPOV] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
 
   // Manual Payment State
   const [showManualPayment, setShowManualPayment] = useState(false);
@@ -532,6 +533,33 @@ export default function ClientsPage() {
                   {isTogglingAlContado ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
                   {selectedClient.status === "COMPLETED" ? "AL CONTADO: SI" : "AL CONTADO: NO"}
                 </button>
+
+                {!selectedClient.portal_active && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm("¿Seguro que deseas activar este cliente y enviar sus credenciales?")) return;
+                      setIsActivating(true);
+                      try {
+                        const res = await activateClientProfile(selectedClient.id);
+                        if (res.error) {
+                          alert(res.error);
+                        } else {
+                          alert("Cliente activado exitosamente. Credenciales enviadas.");
+                          setSelectedClient({ ...selectedClient, portal_active: true });
+                          refreshMainData();
+                        }
+                      } catch (e) {
+                        alert("Ocurrió un error al activar el cliente.");
+                      }
+                      setIsActivating(false);
+                    }}
+                    disabled={isActivating}
+                    className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20 hover:shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+                  >
+                    {isActivating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
+                    Activar Cliente
+                  </button>
+                )}
 
                 <button
                   onClick={() => setShowPOV(true)}

@@ -9,6 +9,7 @@ import {
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
+import { hash } from "bcryptjs";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -54,7 +55,7 @@ export async function getFullPostventaData({
       orderBy: { created_at: "desc" },
       include: {
         lot: true,
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, portal_active: true } },
         receipts: {
           where: { status: "APPROVED" },
           orderBy: { created_at: "desc" },
@@ -268,6 +269,7 @@ export async function getFullPostventaData({
         lot,
         buyer: res.user,
         observation: res.observation,
+        portal_active: res.user?.portal_active || false,
       };
     });
 
@@ -1312,5 +1314,80 @@ export async function getProjectLedgerStats(projectSlug: string, month?: number,
   } catch (error) {
     console.error("Error getting ledger stats:", error);
     return { error: "Error interno al cargar caja" };
+  }
+}
+
+/**
+ * Activates a client's portal access.
+ * Generates a temporary password, updates the DB, and triggers the webhook.
+ */
+export async function activateClientProfile(reservationId: string) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { user: true, project: true }
+    });
+
+    if (!reservation) {
+      return { error: "Reserva no encontrada" };
+    }
+
+    if (reservation.user.portal_active) {
+      return { error: "El cliente ya ha sido activado" };
+    }
+
+    // Generate random 8-character temporary password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const hashedPassword = await hash(tempPassword, 10);
+
+    // Update user record
+    await prisma.user.update({
+      where: { id: reservation.user_id },
+      data: {
+        password: hashedPassword,
+        must_change_password: true,
+        portal_active: true
+      }
+    });
+
+    // Determine webhook URL based on project
+    let webhookUrl = "";
+    if (reservation.project.slug === "arena-y-sol") {
+      webhookUrl = "https://webhook.site/arena-y-sol-placeholder"; // TODO: Reemplazar con URL real de N8N
+    } else if (reservation.project.slug === "libertad-y-alegria") {
+      webhookUrl = "https://webhook.site/libertad-y-alegria-placeholder"; // TODO: Reemplazar con URL real de N8N
+    } else {
+      webhookUrl = "https://webhook.site/default-placeholder";
+    }
+
+    // Prepare payload
+    const payload = {
+      nombre: reservation.name,
+      correo: reservation.user.email, // using user's email as it's the login
+      contraseña: tempPassword,
+      proyecto: reservation.project.name
+    };
+
+    // Trigger webhook in background (don't await to avoid blocking)
+    fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(err => console.error("Error triggering webhook:", err));
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error activating client:", error);
+    return { error: "Error interno del servidor al activar cliente" };
   }
 }
