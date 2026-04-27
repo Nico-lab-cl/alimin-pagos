@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile, deletePaymentReceipt, updateMoraDates } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import { formatCLP, formatDate } from "@/lib/utils";
-import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye, Key } from "lucide-react";
+import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye, Key, ShieldAlert } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
+import { format } from "date-fns";
 
 import { useSearch } from "@/context/SearchContext";
 
@@ -75,6 +76,12 @@ export default function ClientsPage() {
     paidAt: new Date().toISOString().split("T")[0],
     isPie: false
   });
+  const [manualPaymentFile, setManualPaymentFile] = useState<File | null>(null);
+
+  // Manual Mora State
+  const [moraStartDate, setMoraStartDate] = useState<string | null>(null);
+  const [moraEndDate, setMoraEndDate] = useState<string | null>(null);
+  const [isUpdatingMora, setIsUpdatingMora] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -148,11 +155,23 @@ export default function ClientsPage() {
     
     setIsRegisteringPayment(true);
     try {
+      let receiptUrl: string | undefined;
+
+      if (manualPaymentFile) {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(manualPaymentFile);
+        });
+        receiptUrl = await base64Promise;
+      }
+
       const res = await registerManualPayment(selectedClient.id, {
         amount: paymentForm.amount,
         installmentsCount: paymentForm.installmentsCount,
         paidAt: paymentForm.paidAt,
-        isPie: paymentForm.isPie
+        isPie: paymentForm.isPie,
+        receiptUrl
       });
       
       if (res.error) {
@@ -160,10 +179,11 @@ export default function ClientsPage() {
       } else {
         setShowManualPayment(false);
         setPaymentForm({ amount: 0, installmentsCount: 1, paidAt: new Date().toISOString().split("T")[0], isPie: false });
+        setManualPaymentFile(null);
         // Refresh data
-        const freshData = await getFullPostventaData({ projectSlug: selectedProject });
-        setData(freshData);
+        await refreshMainData();
         // Update selectedClient
+        const freshData = await getFullPostventaData({ projectSlug: selectedProject });
         const updatedClient = (freshData?.data || []).find((c: any) => c.id === selectedClient.id);
         if (updatedClient) setSelectedClient(updatedClient);
       }
@@ -171,6 +191,40 @@ export default function ClientsPage() {
       alert("Error al procesar pago");
     } finally {
       setIsRegisteringPayment(false);
+    }
+  };
+
+  const handleUpdateMoraRange = async () => {
+    if (!selectedClient || isUpdatingMora) return;
+    setIsUpdatingMora(true);
+    const res = await updateMoraDates(selectedClient.id, moraStartDate, moraEndDate);
+    setIsUpdatingMora(false);
+    if (res.error) {
+      alert(res.error);
+    } else {
+      alert(res.message);
+      await refreshMainData();
+      const freshData = await getFullPostventaData({ projectSlug: selectedProject });
+      const updatedClient = (freshData?.data || []).find((c: any) => c.id === selectedClient.id);
+      if (updatedClient) setSelectedClient(updatedClient);
+    }
+  };
+
+  const handleDeleteReceipt = async (receiptId: string) => {
+    if (!confirm("¿Estás seguro de que deseas eliminar este comprobante? Si está aprobado, se revertirá el conteo de cuotas.")) return;
+    
+    const res = await deletePaymentReceipt(receiptId);
+    if (res.error) {
+      alert(res.error);
+    } else {
+      alert("Comprobante eliminado");
+      await refreshMainData();
+      const freshData = await getFullPostventaData({ projectSlug: selectedProject });
+      const updatedClient = (freshData?.data || []).find((c: any) => c.id === selectedClient.id);
+      if (updatedClient) {
+          setSelectedClient(updatedClient);
+          refreshDocs(updatedClient.id, updatedClient);
+      }
     }
   };
 
@@ -794,6 +848,15 @@ export default function ClientsPage() {
                             <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Es pago del PIE</span>
                           </label>
                         </div>
+                        <div className="space-y-2 col-span-2">
+                          <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Comprobante de Pago (Imagen/PDF)</label>
+                          <input 
+                            type="file" 
+                            accept="image/*,.pdf"
+                            onChange={e => setManualPaymentFile(e.target.files?.[0] || null)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none font-bold file:bg-emerald-500/10 file:border-0 file:text-emerald-400 file:text-[10px] file:font-black file:uppercase file:tracking-widest file:px-3 file:py-1 file:rounded-md file:mr-4 file:cursor-pointer hover:file:bg-emerald-500/20" 
+                          />
+                        </div>
                       </div>
                       
                       <div className="flex gap-3 pt-2">
@@ -1113,12 +1176,115 @@ export default function ClientsPage() {
                 <div className="space-y-4">
                   <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><Activity className="w-3 h-3"/> Estado Operativo</h3>
                   <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6">
-                    <div className="flex items-center gap-4 mb-5">
-                      <div className={`w-3 h-3 rounded-full animate-pulse ${selectedClient.status === "LATE" ? "bg-red-500" : selectedClient.status === "FROZEN" ? "bg-blue-500" : selectedClient.status === "GRACE" ? "bg-orange-500" : selectedClient.status === "UPCOMING" ? "bg-indigo-500" : "bg-emerald-500"}`} />
-                      <p className={`text-sm font-black uppercase tracking-widest ${selectedClient.status === "LATE" ? "text-red-400" : selectedClient.status === "FROZEN" ? "text-blue-400" : selectedClient.status === "GRACE" ? "text-orange-400" : selectedClient.status === "UPCOMING" ? "text-indigo-400" : "text-emerald-400"}`}>
-                        {selectedClient.status === "LATE" ? "En Mora" : selectedClient.status === "FROZEN" ? "Mora Congelada" : selectedClient.status === "GRACE" ? "Periodo de Gracia" : selectedClient.status === "UPCOMING" ? "Aviso Próximo" : "Al Día"}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${selectedClient.status === "LATE" ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} />
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${selectedClient.status === "LATE" ? "text-red-400" : "text-emerald-400"}`}>
+                        {selectedClient.status === "LATE" ? "ESTADO: MORA" : "ESTADO: AL DÍA"}
+                      </span>
                     </div>
+
+                    {/* SECCIÓN: Rango de Mora Manual */}
+                    <div className="mt-8 pt-8 border-t border-white/5 space-y-4">
+                      <div className="flex items-center gap-2 text-white/30">
+                          <ShieldAlert className="w-4 h-4" />
+                          <h4 className="text-[10px] font-black uppercase tracking-widest">Rango de Mora Manual</h4>
+                      </div>
+                      <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Inicio Cálculo Interés</label>
+                              <input 
+                                type="date" 
+                                value={moraStartDate || (selectedClient.debt_start_date ? new Date(selectedClient.debt_start_date).toISOString().split('T')[0] : "")} 
+                                onChange={e => setMoraStartDate(e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-accent"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest">Fin Cálculo Interés (Congelar)</label>
+                              <input 
+                                type="date" 
+                                value={moraEndDate || (selectedClient.debt_end_date ? new Date(selectedClient.debt_end_date).toISOString().split('T')[0] : "")} 
+                                onChange={e => setMoraEndDate(e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-accent"
+                              />
+                            </div>
+                          </div>
+                          <button 
+                            onClick={handleUpdateMoraRange}
+                            disabled={isUpdatingMora}
+                            className="w-full py-3 rounded-xl bg-accent/10 border border-accent/30 text-accent text-[9px] font-black uppercase tracking-widest hover:bg-accent/20 transition-all flex items-center justify-center gap-2"
+                          >
+                            {isUpdatingMora ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                            Aplicar Rango de Mora
+                          </button>
+                          <p className="text-[8px] text-white/20 uppercase tracking-widest leading-relaxed text-center">
+                            * Si dejas el fin vacío, la mora se calculará hasta el día de hoy. Si lo fijas, la deuda no aumentará después de esa fecha.
+                          </p>
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN: Historial de Transacciones */}
+                    <div className="mt-8 pt-8 border-t border-white/5 space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-white/30">
+                            <Activity className="w-4 h-4" />
+                            <h4 className="text-[10px] font-black uppercase tracking-widest">Historial de Transacciones (Portal & Caja)</h4>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        {selectedClient.receipts && selectedClient.receipts.length > 0 ? (
+                          selectedClient.receipts.sort((a:any, b:any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((receipt: any) => (
+                            <div key={receipt.id} className="group flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.04] transition-all">
+                              <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                                  receipt.status === 'APPROVED' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                                  receipt.status === 'REJECTED' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                                  'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                                }`}>
+                                  <FileCheck2 className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-xs font-black text-white italic tracking-tighter uppercase">{receipt.scope === 'PIE' ? 'PAGO PIE' : `CUOTA ${receipt.nominal_installment_range || receipt.nominal_installment_number || 'S/N'}`}</p>
+                                    <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${
+                                      receipt.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' :
+                                      receipt.status === 'REJECTED' ? 'bg-red-500/20 text-red-400' :
+                                      'bg-amber-500/20 text-amber-400'
+                                    }`}>{receipt.status}</span>
+                                  </div>
+                                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{formatCLP(receipt.amount_clp)} • {formatDate(receipt.created_at)}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <a 
+                                  href={receipt.receipt_url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:bg-white/10 hover:text-white transition-all"
+                                  title="Ver Comprobante"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </a>
+                                <button 
+                                  onClick={() => handleDeleteReceipt(receipt.id)}
+                                  className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/10 text-red-500/40 hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                                  title="Eliminar Transacción"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-10 bg-white/[0.01] border border-dashed border-white/5 rounded-2xl">
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 italic">Sin transacciones registradas</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     {selectedClient.status === "LATE" && (
                       <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mt-2">
                         <p className="text-xs text-red-300 font-bold mb-1">Atraso Contable: {selectedClient.lateDays} Días</p>

@@ -909,6 +909,7 @@ export async function registerManualPayment(
     installmentsCount: number;
     paidAt: string;
     isPie: boolean;
+    receiptUrl?: string;
   }
 ) {
   const session = await auth();
@@ -928,7 +929,7 @@ export async function registerManualPayment(
     const paymentDate = new Date(data.paidAt + "T12:00:00");
 
     if (data.isPie) {
-      await prisma.$transaction([
+      const operations: any[] = [
         prisma.reservation.update({
           where: { id: reservationId },
           data: { pie_status: "PAID" },
@@ -942,7 +943,25 @@ export async function registerManualPayment(
             paid_at: paymentDate,
           },
         }),
-      ]);
+      ];
+
+      if (data.receiptUrl) {
+        operations.push(
+          prisma.paymentReceipt.create({
+            data: {
+              reservation_id: reservationId,
+              lot_id: res.lot_id,
+              amount_clp: data.amount,
+              receipt_url: data.receiptUrl,
+              scope: "PIE",
+              status: "APPROVED",
+              processed_at: new Date(),
+            },
+          })
+        );
+      }
+
+      await prisma.$transaction(operations);
     } else {
       let expectedCuotaBase = res.lot.valor_cuota || 0;
       const ranges = res.installment_ranges
@@ -1006,6 +1025,28 @@ export async function registerManualPayment(
               category: "PENALTY",
               description: `Pago Manual Mora`,
               paid_at: paymentDate,
+            },
+          })
+        );
+      }
+
+      if (data.receiptUrl) {
+        operations.push(
+          prisma.paymentReceipt.create({
+            data: {
+              reservation_id: reservationId,
+              lot_id: res.lot_id,
+              amount_clp: data.amount,
+              receipt_url: data.receiptUrl,
+              scope: "INSTALLMENT",
+              installments_count: data.installmentsCount,
+              status: "APPROVED",
+              processed_at: new Date(),
+              nominal_installment_number: nextInstNum,
+              nominal_installment_range:
+                data.installmentsCount > 1
+                  ? `${nextInstNum}-${nextInstNum + data.installmentsCount - 1}`
+                  : null,
             },
           })
         );
@@ -1466,5 +1507,96 @@ export async function activateClientProfile(reservationId: string) {
   } catch (error) {
     console.error("Error activating client:", error);
     return { error: "Error interno del servidor al activar cliente" };
+  }
+}
+
+export async function deletePaymentReceipt(receiptId: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const receipt = await prisma.paymentReceipt.findUnique({
+      where: { id: receiptId },
+      include: { reservation: true },
+    });
+
+    if (!receipt) return { error: "Comprobante no encontrado" };
+
+    // Revert reservation state if approved
+    if (receipt.status === "APPROVED") {
+      if (receipt.scope === "INSTALLMENT") {
+        await prisma.reservation.update({
+          where: { id: receipt.reservation_id },
+          data: {
+            installments_paid: { decrement: receipt.installments_count || 1 },
+          },
+        });
+      } else if (receipt.scope === "PIE") {
+        await prisma.reservation.update({
+          where: { id: receipt.reservation_id },
+          data: { pie_status: "PENDING" },
+        });
+      }
+
+      // Also remove from financial ledger if it was added
+      await prisma.financialLedger.deleteMany({
+        where: {
+          reservation_id: receipt.reservation_id,
+          amount_clp: receipt.amount_clp,
+          created_at: {
+            gte: new Date(receipt.processed_at!.getTime() - 5000),
+            lte: new Date(receipt.processed_at!.getTime() + 5000),
+          },
+        },
+      });
+    }
+
+    await prisma.paymentReceipt.delete({
+      where: { id: receiptId },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    memoryCache.deleteByPrefix("receipts_");
+    revalidatePath("/admin");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting receipt:", error);
+    return { error: "Error al eliminar el comprobante" };
+  }
+}
+
+export async function updateMoraDates(
+  reservationId: string,
+  startDate: string | null,
+  endDate: string | null
+) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: {
+        debt_start_date: startDate ? new Date(startDate) : null,
+        debt_end_date: endDate ? new Date(endDate) : null,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin");
+
+    return { success: true, message: "Fechas de mora actualizadas" };
+  } catch (error) {
+    console.error("Error updating mora dates:", error);
+    return { error: "Error al actualizar fechas de mora" };
   }
 }
