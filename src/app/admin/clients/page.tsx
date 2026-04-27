@@ -174,19 +174,30 @@ export default function ClientsPage() {
   };
 
   const rawClients = data?.data || [];
-  const uniqueStages: string[] = Array.from(new Set(rawClients.map((c: any) => c.lotStage).filter(Boolean)));
+  const isTest = (c: any) => c.clientName?.toLowerCase().includes("nicolas cabrera") || c.clientEmail?.toLowerCase().includes("nicolas");
+  const nonTestClients = rawClients.filter((c: any) => !isTest(c));
+  const testClients = rawClients.filter((c: any) => isTest(c));
+
+  const uniqueStages: string[] = Array.from(new Set(nonTestClients.map((c: any) => c.lotStage).filter(Boolean)));
   
   const stageCounts = uniqueStages.reduce((acc: any, stage: string) => {
-    acc[stage] = rawClients.filter((c: any) => c.lotStage === stage).length;
+    acc[stage] = nonTestClients.filter((c: any) => c.lotStage === stage).length;
     return acc;
   }, {});
 
   const filteredClients = rawClients.filter((c: any) => {
+    const isTestClient = isTest(c);
     const matchesSearch = !search ||
       c.clientName?.toLowerCase().includes(search.toLowerCase()) ||
       c.clientEmail?.toLowerCase().includes(search.toLowerCase()) ||
       c.lotNumber?.toString().toUpperCase().includes(search.toUpperCase());
     
+    if (selectedStage === "PRUEBAS") {
+      return matchesSearch && isTestClient;
+    }
+    
+    if (isTestClient) return false;
+
     if (selectedStage === "MULTILOTE") {
       return matchesSearch && c.isMultiLot;
     }
@@ -247,15 +258,25 @@ export default function ClientsPage() {
             onClick={() => setSelectedStage("ALL")}
             className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border ${selectedStage === "ALL" ? "bg-accent/10 border-accent/40 text-accent shadow-[0_0_15px_rgba(212,168,75,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}
           >
-            Todos ({rawClients.length})
+            Todos ({nonTestClients.length})
           </button>
           
           <button
             onClick={() => setSelectedStage("MULTILOTE")}
             className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border ${selectedStage === "MULTILOTE" ? "bg-amber-500/10 border-amber-500/40 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}
           >
-            Multi-Lotes ({rawClients.filter((c: any) => c.isMultiLot).length})
+            Multi-Lotes ({nonTestClients.filter((c: any) => c.isMultiLot).length})
           </button>
+          
+          {testClients.length > 0 && (
+            <button
+              onClick={() => setSelectedStage("PRUEBAS")}
+              className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border ${selectedStage === "PRUEBAS" ? "bg-red-500/10 border-red-500/40 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}
+            >
+              Pruebas ({testClients.length})
+            </button>
+          )}
+
           {uniqueStages.map((stage) => (
             <button
               key={stage}
@@ -534,7 +555,7 @@ export default function ClientsPage() {
                   {selectedClient.status === "COMPLETED" ? "AL CONTADO: SI" : "AL CONTADO: NO"}
                 </button>
 
-                {!selectedClient.portal_active && (
+                {(!selectedClient.portal_active || selectedClient.clientName?.toLowerCase().includes("nicolas cabrera") || selectedClient.clientEmail?.toLowerCase().includes("nicolas")) && (
                   <button
                     onClick={async () => {
                       if (!confirm("¿Seguro que deseas activar este cliente y enviar sus credenciales?")) return;
