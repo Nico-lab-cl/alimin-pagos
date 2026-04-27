@@ -164,7 +164,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               <Zap className="w-5 h-5 text-accent animate-pulse" />
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Pasarela de Verificación</p>
             </div>
-            <h2 className="text-6xl font-black text-white tracking-tighter uppercase italic leading-none mb-4">
+            <h2 className="text-5xl lg:text-6xl font-black text-white tracking-tighter uppercase italic leading-none mb-4">
               Cargar <span className="text-white/20">Pago</span>
             </h2>
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 leading-relaxed">
@@ -172,7 +172,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             </p>
           </div>
 
-          <div className="rounded-[2.5rem] glass-panel p-10 space-y-10">
+          <div className="rounded-[2.5rem] glass-panel p-6 md:p-10 space-y-10">
             {/* Type Selector */}
             <div className="space-y-4">
               <label className="text-[10px] font-black uppercase tracking-widest text-white/20">Propósito del Abono</label>
@@ -268,12 +268,12 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             )}
 
             {/* Summary Box */}
-            <div className="p-8 rounded-[2rem] bg-white/[0.03] border border-white/5 space-y-4">
+            <div className="p-6 md:p-8 rounded-[2rem] bg-white/[0.03] border border-white/5 space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Cálculo de Transacción</span>
                 <div className="px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-[9px] font-black text-accent uppercase tracking-widest">CLP</div>
               </div>
-              <p className="text-5xl font-black text-white tracking-tighter italic text-glow">
+              <p className="text-4xl md:text-5xl font-black text-white tracking-tighter italic text-glow">
                 {formatCLP(amount)}
               </p>
               
@@ -318,7 +318,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
         {/* Right: Bank Details & Upload */}
         <div className="space-y-8">
           {/* Bank Info */}
-          <div className="rounded-[2.5rem] bg-white/[0.02] border border-white/5 p-10 space-y-8 relative overflow-hidden group">
+          <div className="rounded-[2.5rem] bg-white/[0.02] border border-white/5 p-6 md:p-10 space-y-8 relative overflow-hidden group">
             <Building className="absolute -bottom-10 -right-10 w-48 h-48 opacity-5 text-white group-hover:scale-110 transition-transform duration-1000" />
             
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 relative z-10">
@@ -390,7 +390,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               <label
                 htmlFor="receipt"
                 className={`
-                  flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-[2.5rem] cursor-pointer transition-all duration-500
+                  flex flex-col items-center justify-center py-10 md:py-16 border-2 border-dashed rounded-[2.5rem] cursor-pointer transition-all duration-500
                   ${receiptBase64 ? 'border-accent bg-accent/[0.03]' : 'border-white/10 hover:border-accent/40 bg-white/[0.02]'}
                 `}
               >

@@ -50,19 +50,19 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* Header / Navbar */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${scrolled ? 'bg-[#061010]/95 backdrop-blur-xl py-5 border-b border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)]' : 'bg-transparent py-10'}`}>
-        <div className="max-w-7xl mx-auto px-8 md:px-12 flex items-center justify-between">
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${scrolled ? 'bg-[#061010]/95 backdrop-blur-xl py-4 md:py-5 border-b border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)]' : 'bg-transparent py-6 md:py-10'}`}>
+        <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
           {/* Logo Area */}
           <Link href="/user" className="group flex items-center gap-5 transition-all hover:scale-105 active:scale-95">
             <div className="relative">
               <div className="absolute inset-0 bg-accent/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
-              <div className="relative w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-[0_10px_30px_rgba(212,168,75,0.2)] transition-transform duration-500 group-hover:rotate-3 p-2">
+              <div className="relative w-10 h-10 md:w-14 md:h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-[0_10px_30px_rgba(212,168,75,0.2)] transition-transform duration-500 group-hover:rotate-3 p-2">
                 <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
               </div>
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tighter uppercase leading-none text-white italic text-glow">Alimin</h1>
-              <p className="text-[10px] font-black text-accent tracking-[0.4em] uppercase mt-1.5 opacity-60">Portal de Inversión</p>
+              <h1 className="text-2xl md:text-3xl font-black tracking-tighter uppercase leading-none text-white italic text-glow">Alimin</h1>
+              <p className="text-[8px] md:text-[10px] font-black text-accent tracking-[0.4em] uppercase mt-1 md:mt-1.5 opacity-60">Portal de Inversión</p>
             </div>
           </Link>
 
@@ -97,9 +97,9 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
             </button>
             <button 
               onClick={() => setIsOpen(!isOpen)}
-              className="lg:hidden p-4 rounded-2xl bg-white/5 text-accent border border-white/10 active:scale-90 transition-transform"
+              className="lg:hidden p-3 md:p-4 rounded-2xl bg-white/5 text-accent border border-white/10 active:scale-90 transition-transform"
             >
-              <Menu className="w-7 h-7" />
+              <Menu className="w-6 h-6 md:w-7 md:h-7" />
             </button>
             <button 
               onClick={handleSignOut}
@@ -113,7 +113,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
       </nav>
 
       {/* Main Content Area */}
-      <main className="flex-1 pt-32 pb-20 px-6 md:px-12 max-w-7xl mx-auto w-full relative z-10 animate-fade-in">
+      <main className="flex-1 pt-24 md:pt-32 pb-20 px-4 md:px-12 max-w-7xl mx-auto w-full relative z-10 animate-fade-in">
         {children}
       </main>
 

@@ -62,7 +62,7 @@ export default function UserDocuments() {
             <div className="w-8 h-px bg-accent" />
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Archivo Digital</p>
           </div>
-          <h2 className="text-5xl font-black text-white tracking-tighter uppercase leading-none italic">
+          <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none italic">
             Centro de <span className="text-white/20">Documentos</span>
           </h2>
         </div>
@@ -156,10 +156,10 @@ export default function UserDocuments() {
       )}
 
       {/* Proactive Help Card */}
-      <div className="rounded-[3rem] p-12 bg-gradient-to-br from-accent to-accent-dark text-[#061010] relative overflow-hidden group shadow-[0_20px_50px_rgba(212,168,75,0.2)]">
+      <div className="rounded-[3rem] p-8 md:p-12 bg-gradient-to-br from-accent to-accent-dark text-[#061010] relative overflow-hidden group shadow-[0_20px_50px_rgba(212,168,75,0.2)]">
         <ShieldCheck className="absolute -bottom-10 -right-10 w-64 h-64 text-[#061010]/10 group-hover:scale-110 transition-transform duration-1000" />
         <div className="relative z-10 max-w-2xl">
-          <h4 className="text-4xl font-black uppercase italic tracking-tighter leading-none mb-6">¿Falta algún documento?</h4>
+          <h4 className="text-3xl md:text-4xl font-black uppercase italic tracking-tighter leading-none mb-6">¿Falta algún documento?</h4>
           <p className="text-sm font-black uppercase tracking-widest leading-relaxed opacity-70 mb-10 italic">
             Los folios, certificados de inscripción y escrituras notariales pueden tardar hasta 45 días hábiles después de la firma en estar disponibles digitalmente.
           </p>

@@ -76,7 +76,7 @@ export default function UserDashboard() {
           <div className="w-8 h-px bg-accent" />
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Resumen de Inversiones</p>
         </div>
-        <h2 className="text-5xl font-black text-white tracking-tighter uppercase leading-none italic">
+        <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none italic">
           Mis <span className="text-white/20">Activos</span>
         </h2>
       </div>
@@ -125,11 +125,11 @@ export default function UserDashboard() {
           >
             <div className="grid grid-cols-1 lg:grid-cols-12">
               {/* Left Column: Property Visual & Basic Info */}
-              <div className="lg:col-span-5 p-8 md:p-12 relative overflow-hidden border-b lg:border-b-0 lg:border-r border-white/5">
+              <div className="lg:col-span-5 p-6 md:p-12 relative overflow-hidden border-b lg:border-b-0 lg:border-r border-white/5">
                 <div className="relative z-10 h-full flex flex-col">
                   <div className="mb-10">
                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent mb-2">{lot.projectName}</p>
-                    <h3 className="text-5xl font-black text-white tracking-tighter uppercase italic leading-none mb-4">
+                    <h3 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase italic leading-none mb-4">
                       Lote <span className="group-hover:text-accent transition-colors">#{lot.lotNumber}</span>
                     </h3>
                     <div className="flex items-center gap-4">
@@ -163,7 +163,7 @@ export default function UserDashboard() {
               </div>
 
               {/* Right Column: Financials & Actions */}
-              <div className="lg:col-span-7 p-8 md:p-12 space-y-10">
+              <div className="lg:col-span-7 p-6 md:p-12 space-y-10">
                 {/* Visual Progress Bar */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
@@ -187,22 +187,22 @@ export default function UserDashboard() {
                 </div>
 
                 {/* Financial Stats Grid */}
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="rounded-2xl p-6 bg-white/[0.02] border border-white/5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                  <div className="rounded-2xl p-5 md:p-6 bg-white/[0.02] border border-white/5">
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20 mb-2">Total Invertido</p>
                     <p className="text-2xl font-black text-emerald-400 tracking-tighter">{formatCLP(lot.totalPaid)}</p>
                   </div>
-                  <div className="rounded-2xl p-6 bg-white/[0.02] border border-white/5">
+                  <div className="rounded-2xl p-5 md:p-6 bg-white/[0.02] border border-white/5">
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20 mb-2">Compromiso Total</p>
                     <p className="text-2xl font-black text-white/90 tracking-tighter">{formatCLP(lot.totalToPay)}</p>
                   </div>
-                  <div className="rounded-2xl p-6 bg-white/[0.02] border border-white/5">
+                  <div className="rounded-2xl p-5 md:p-6 bg-white/[0.02] border border-white/5">
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20 mb-2">Cuotas Pagadas</p>
                     <p className="text-2xl font-black text-white tracking-tighter italic">
                       {lot.paidCuotas} <span className="text-xs opacity-20 not-italic ml-1">/ {lot.totalCuotas}</span>
                     </p>
                   </div>
-                  <div className="rounded-2xl p-6 bg-white/[0.02] border border-white/5">
+                  <div className="rounded-2xl p-5 md:p-6 bg-white/[0.02] border border-white/5">
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20 mb-2">Saldo Remanente</p>
                     <p className={`text-2xl font-black tracking-tighter ${lot.pendingBalance > 0 ? "text-orange-400" : "text-emerald-400"}`}>
                       {formatCLP(lot.pendingBalance)}
