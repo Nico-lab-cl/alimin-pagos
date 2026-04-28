@@ -186,6 +186,7 @@ export async function getUserLots() {
           }
           
           const dailyPenaltyRate = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
+          const isOverdue = currentDue < currentDate;
           const monthNameRaw = formatMonth.format(currentDue);
           upcomingInstallments.push({
             number: installmentNumber,
@@ -196,7 +197,8 @@ export async function getUserLots() {
             hasPenalty,
             penaltyAmount: installmentPenaltyAmount,
             lateDays: installmentLateDays,
-            dailyPenalty: hasPenalty ? dailyPenaltyRate : 0
+            dailyPenalty: hasPenalty ? dailyPenaltyRate : 0,
+            isOverdue
           });
         }
       }

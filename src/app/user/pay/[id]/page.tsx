@@ -58,7 +58,12 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
       if (paymentType === "PIE") {
         setAmount(lot.pieAmount || 0);
       } else if (lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
-        const sum = lot.upcomingInstallments.slice(0, installmentsCount).reduce((acc: number, curr: any) => acc + curr.amount, 0);
+        const mandatoryCount = Math.max(1, lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length);
+        const actualCount = Math.max(installmentsCount, mandatoryCount);
+        if (actualCount !== installmentsCount) {
+          setInstallmentsCount(actualCount);
+        }
+        const sum = lot.upcomingInstallments.slice(0, actualCount).reduce((acc: number, curr: any) => acc + curr.amount, 0);
         setAmount(sum);
       } else {
         setAmount((lot.valor_cuota || 0) * installmentsCount);
@@ -207,11 +212,13 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                         key={cuota.number}
                         type="button"
                         onClick={() => {
-                          if (idx + 1 === installmentsCount) {
-                            setInstallmentsCount(idx);
-                          } else {
-                            setInstallmentsCount(idx + 1);
+                          const mandatoryCount = Math.max(1, lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length);
+                          let newCount = (idx + 1 === installmentsCount) ? idx : idx + 1;
+                          if (newCount < mandatoryCount) {
+                            toast.error("Las cuotas con mora son obligatorias");
+                            newCount = mandatoryCount;
                           }
+                          setInstallmentsCount(newCount);
                         }}
                         className={`flex items-center justify-between p-6 rounded-2xl border transition-all cursor-pointer ${
                           isSelected 

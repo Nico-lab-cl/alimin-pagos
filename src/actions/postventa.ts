@@ -1187,6 +1187,22 @@ export async function getClientPOV(reservationId: string) {
         if (activeDailyPenalty > 0) {
           lateDays = Math.round(penaltyAmount / activeDailyPenalty);
         }
+      } else if (res.penalty_mode === "MIXED") {
+        const autoPenalty = calculateTotalInterest(
+          nextDueDate,
+          currentDate,
+          res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
+          res.grace_days ?? project.grace_period_days ?? 5,
+          activeDailyPenalty,
+          res.debt_start_date,
+          project.penalty_start_date
+        );
+        const fixedPenalty = (res.manual_penalty != null && res.manual_penalty > 0) ? res.manual_penalty : 0;
+        penaltyAmount = autoPenalty + fixedPenalty;
+
+        if (penaltyAmount > 0 && activeDailyPenalty > 0) {
+          lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+        }
       } else {
         penaltyAmount = calculateTotalInterest(
           nextDueDate,
@@ -1238,6 +1254,7 @@ export async function getClientPOV(reservationId: string) {
           installmentLateDays = lateDays;
         }
 
+        const isOverdue = currentDue < currentDate;
         const monthNameRaw = formatMonth.format(currentDue);
         upcomingInstallments.push({
           number: installmentNumber,
@@ -1249,6 +1266,7 @@ export async function getClientPOV(reservationId: string) {
           penaltyAmount: installmentPenaltyAmount,
           lateDays: installmentLateDays,
           dailyPenalty: hasPenalty ? activeDailyPenalty : 0,
+          isOverdue
         });
       }
     }

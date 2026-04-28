@@ -308,11 +308,18 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: "d
 
 /* ──────────────────── PAYMENT VIEW ──────────────────── */
 function PaymentView({ data, reservationId }: { data: any; reservationId: string }) {
-  const [selectedCuotas, setSelectedCuotas] = useState<number[]>([data.nextInstallmentNumber || 0]);
+  const [selectedCuotas, setSelectedCuotas] = useState<number[]>([]);
   const [simulatedFile, setSimulatedFile] = useState<string | null>(null);
   const [receiptBase64, setReceiptBase64] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (data.upcomingInstallments) {
+      const mandatoryCount = Math.max(1, data.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length);
+      setSelectedCuotas(data.upcomingInstallments.slice(0, mandatoryCount).map((c: any) => c.number));
+    }
+  }, [data.upcomingInstallments]);
 
   const totalAmount = data.upcomingInstallments
     ? data.upcomingInstallments
@@ -387,17 +394,16 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
                     key={cuota.number}
                     type="button"
                     onClick={() => {
+                      const mandatoryCount = Math.max(1, data.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length);
                       const isLastSelected = idx + 1 === selectedCuotas.length;
-                      let newSelected;
-                      if (isLastSelected) {
-                        newSelected = data.upcomingInstallments
-                          .slice(0, idx)
-                          .map((c: any) => c.number);
-                      } else {
-                        newSelected = data.upcomingInstallments
-                          .slice(0, idx + 1)
-                          .map((c: any) => c.number);
+                      let newCount = isLastSelected ? idx : idx + 1;
+                      
+                      if (newCount < mandatoryCount) {
+                        toast.error("Las cuotas atrasadas son obligatorias");
+                        newCount = mandatoryCount;
                       }
+                      
+                      const newSelected = data.upcomingInstallments.slice(0, newCount).map((c: any) => c.number);
                       setSelectedCuotas(newSelected);
                     }}
                     className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
