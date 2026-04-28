@@ -1317,7 +1317,7 @@ export async function getClientPOV(reservationId: string) {
           isGracePeriod = true;
         }
 
-        const isOverdue = installmentPenaltyAmount > 0 || isGracePeriod;
+        const isOverdue = currentDate >= currentDue;
 
         const monthNameRaw = formatMonth.format(currentDue);
         upcomingInstallments.push({
