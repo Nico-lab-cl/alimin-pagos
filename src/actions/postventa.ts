@@ -848,7 +848,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
           next_payment_date: nextDateObj || null,
           installments_paid: Number(data.installments_paid) || 0,
           penalty_mode: data.penalty_mode || "AUTO",
-          manual_penalty: data.penalty_mode === "FIXED" ? (Number(data.manual_penalty) || null) : null,
+          manual_penalty: (data.penalty_mode === "FIXED" || data.penalty_mode === "MIXED") ? (Number(data.manual_penalty) || null) : null,
           extra_paid_amount: Number(data.extra_paid_amount) || 0,
           installment_ranges: data.installment_ranges || [],
           ...(startDateObj && { installment_start_date: startDateObj }),
