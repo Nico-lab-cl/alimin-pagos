@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import { getInstallmentDueDate, calculateTotalInterest } from "../lib/financials";
+import { getInstallmentDueDate, calculateTotalInterest, calculateAggregatedAutoPenalty } from "../lib/financials";
 import { sendPushNotification } from "../lib/notifications";
 
 async function runDailyAlerts() {
@@ -35,14 +35,19 @@ async function runDailyAlerts() {
 
     const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
     
-    const penaltyAmount = calculateTotalInterest(
-      nextDueDate,
+    const { totalPenaltyAmount: penaltyAmount } = calculateAggregatedAutoPenalty(
+      totalCuotas - paidCuotas,
+      paidCuotas,
+      res.installment_start_date!,
+      res.due_day ?? project.due_day_of_month ?? 5,
       currentDate,
       res.mora_frozen || false,
       res.grace_days ?? project.grace_period_days ?? 5,
       activeDailyPenalty,
       res.debt_start_date,
-      project.penalty_start_date
+      project.penalty_start_date,
+      null, // debtEndDate
+      res.next_payment_date
     );
 
     let status = "OK";

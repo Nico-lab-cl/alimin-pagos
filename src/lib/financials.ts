@@ -96,6 +96,69 @@ export function calculateTotalInterest(
 }
 
 /**
+ * Calculates the total aggregated automatic penalty across all pending installments.
+ * It loops through each pending installment, calculates its due date, and evaluates its penalty independently.
+ */
+export function calculateAggregatedAutoPenalty(
+  totalPendingRemaining: number,
+  paidCuotas: number,
+  installmentStartDate: Date | string | null,
+  dueDay: number,
+  currentDate: Date,
+  moraFrozen: boolean,
+  gracePeriodDays: number,
+  activeDailyPenalty: number,
+  firstInstallmentDebtStartDate?: Date | string | null,
+  penaltyStartDate?: Date | string | null,
+  debtEndDate?: Date | string | null,
+  firstInstallmentOverrideDate?: Date | string | null
+): { totalPenaltyAmount: number; totalLateDays: number } {
+  let totalPenaltyAmount = 0;
+  let totalLateDays = 0;
+
+  for (let i = 0; i < totalPendingRemaining; i++) {
+    const installmentNumber = paidCuotas + 1 + i;
+    let currentDue: Date;
+    
+    // Admin next_payment_date override applies ONLY to the very first pending installment
+    if (i === 0 && firstInstallmentOverrideDate) {
+      currentDue = new Date(firstInstallmentOverrideDate);
+    } else if (installmentStartDate) {
+      currentDue = getInstallmentDueDate(
+        installmentStartDate,
+        installmentNumber,
+        dueDay
+      );
+    } else {
+      continue; // Can't calculate if no installment start date
+    }
+
+    // The manual debt_start_date override only applies to the FIRST missed installment
+    const appliedDebtStartDate = i === 0 ? firstInstallmentDebtStartDate : null;
+
+    const penalty = calculateTotalInterest(
+      currentDue,
+      currentDate,
+      moraFrozen,
+      gracePeriodDays,
+      activeDailyPenalty,
+      appliedDebtStartDate,
+      penaltyStartDate,
+      debtEndDate
+    );
+
+    if (penalty > 0) {
+      totalPenaltyAmount += penalty;
+      if (activeDailyPenalty > 0) {
+        totalLateDays += Math.round(penalty / activeDailyPenalty);
+      }
+    }
+  }
+
+  return { totalPenaltyAmount, totalLateDays };
+}
+
+/**
  * Gets the project configuration for financial calculations.
  */
 export async function getProjectConfig(projectId: string) {
