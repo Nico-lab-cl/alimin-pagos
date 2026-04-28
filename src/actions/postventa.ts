@@ -1264,14 +1264,54 @@ export async function getClientPOV(reservationId: string) {
         let installmentPenaltyAmount = 0;
         let installmentLateDays = 0;
 
-        if (i === 0 && penaltyAmount > 0 && res.mora_status === "ACTIVO") {
-          finalAmount += penaltyAmount;
-          hasPenalty = true;
-          installmentPenaltyAmount = penaltyAmount;
-          installmentLateDays = lateDays;
+        // Calculate auto penalty for this specific installment
+        let autoPenaltyForThis = 0;
+        if (res.penalty_mode !== "FIXED" && res.mora_status === "ACTIVO") {
+          autoPenaltyForThis = calculateTotalInterest(
+            currentDue,
+            currentDate,
+            res.mora_frozen || false,
+            res.grace_days ?? project.grace_period_days ?? 5,
+            activeDailyPenalty,
+            i === 0 ? res.debt_start_date : null,
+            project.penalty_start_date,
+            res.debt_end_date
+          );
         }
 
-        const isOverdue = currentDue < currentDate;
+        // Add manual penalty to the first box if applicable
+        if (i === 0) {
+          const manual = (res.manual_penalty != null && res.manual_penalty > 0) ? Number(res.manual_penalty) : 0;
+          if (res.penalty_mode === "FIXED") {
+            installmentPenaltyAmount = manual;
+          } else if (res.penalty_mode === "MIXED") {
+            installmentPenaltyAmount = autoPenaltyForThis + manual;
+          } else {
+            installmentPenaltyAmount = autoPenaltyForThis;
+          }
+        } else {
+          installmentPenaltyAmount = autoPenaltyForThis;
+        }
+
+        if (installmentPenaltyAmount > 0) {
+          finalAmount += installmentPenaltyAmount;
+          hasPenalty = true;
+          installmentLateDays = Math.round(installmentPenaltyAmount / activeDailyPenalty);
+        }
+
+        // Status flags
+        let isGracePeriod = false;
+        const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
+        const graceEnd = new Date(currentDue);
+        graceEnd.setDate(currentDue.getDate() + graceDays);
+        graceEnd.setHours(23, 59, 59, 999);
+
+        if (currentDate >= currentDue && installmentPenaltyAmount === 0 && !res.mora_frozen && currentDate <= graceEnd) {
+          isGracePeriod = true;
+        }
+
+        const isOverdue = installmentPenaltyAmount > 0 || isGracePeriod;
+
         const monthNameRaw = formatMonth.format(currentDue);
         upcomingInstallments.push({
           number: installmentNumber,

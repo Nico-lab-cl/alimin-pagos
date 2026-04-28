@@ -63,11 +63,14 @@ export function calculateTotalInterest(
     const gracePeriodEnd = new Date(dueDate);
     gracePeriodEnd.setDate(dueDate.getDate() + gracePeriodDays);
     gracePeriodEnd.setHours(23, 59, 59, 999);
-    gDate = gracePeriodEnd;
-
+    
     if (paymentDate <= gracePeriodEnd) {
       return 0;
     }
+
+    // The first day of penalty is the day AFTER grace period ends
+    gDate = new Date(gracePeriodEnd);
+    gDate.setDate(gDate.getDate() + 1);
   }
   gDate.setHours(0, 0, 0, 0);
 
@@ -79,18 +82,13 @@ export function calculateTotalInterest(
     if (pDate < cutoff) return 0;
     if (gDate < cutoff) {
       gDate.setTime(cutoff.getTime());
-      gDate.setDate(gDate.getDate() - 1);
     }
   }
 
+  if (pDate < gDate) return 0;
+
   const diffTime = pDate.getTime() - gDate.getTime();
-  let daysLate = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (daysLate > 0) {
-    daysLate += 1; // First day of penalty is also counted
-  }
-
-  if (daysLate <= 0) return 0;
+  const daysLate = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
   return dailyPenaltyAmount * daysLate;
 }
