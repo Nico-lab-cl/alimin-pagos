@@ -159,6 +159,24 @@ export async function getUserLots() {
         const totalPendingRemaining = totalCuotas - paidCuotas;
         const maxToShow = totalPendingRemaining; // Show all available installments
         
+        // 1. Add historical penalty as a separate item if in FIXED or MIXED mode
+        if ((res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") && res.manual_penalty != null && res.manual_penalty > 0) {
+          upcomingInstallments.push({
+            number: 0,
+            dueDate: null,
+            baseAmount: 0,
+            amount: Number(res.manual_penalty),
+            monthName: "Intereses Anteriores (Mora Histórica)",
+            hasPenalty: true,
+            penaltyAmount: Number(res.manual_penalty),
+            lateDays: null, 
+            dailyPenalty: 0,
+            isOverdue: true,
+            isHistorical: true
+          });
+        }
+
+        // 2. Loop through installments
         for (let i = 0; i < maxToShow; i++) {
           const installmentNumber = paidCuotas + 1 + i;
           
@@ -201,19 +219,7 @@ export async function getUserLots() {
             );
           }
 
-          // Add manual penalty to the first box if applicable
-          if (i === 0) {
-            const manual = (res.manual_penalty != null && res.manual_penalty > 0) ? Number(res.manual_penalty) : 0;
-            if (res.penalty_mode === "FIXED") {
-              installmentPenaltyAmount = manual;
-            } else if (res.penalty_mode === "MIXED") {
-              installmentPenaltyAmount = autoPenaltyForThis + manual;
-            } else {
-              installmentPenaltyAmount = autoPenaltyForThis;
-            }
-          } else {
-            installmentPenaltyAmount = autoPenaltyForThis;
-          }
+          installmentPenaltyAmount = autoPenaltyForThis;
 
           if (installmentPenaltyAmount > 0) {
             finalAmount += installmentPenaltyAmount;

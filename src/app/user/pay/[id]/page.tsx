@@ -231,9 +231,11 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                             {isSelected && <CheckCircle className="w-4 h-4" />}
                           </div>
                           <div className="text-left">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-none mb-1 text-white/40">
-                              Cuota {cuota.number}
-                            </p>
+                            {cuota.number !== 0 && (
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-none mb-1 text-white/40">
+                                Cuota {cuota.number}
+                              </p>
+                            )}
                             <p className="text-sm font-black italic">{cuota.monthName}</p>
                           </div>
                         </div>
@@ -243,7 +245,9 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                           </p>
                           {cuota.hasPenalty && (
                             <div className="mt-1 flex flex-col items-end">
-                              <p className="text-[8px] font-bold uppercase text-red-400 tracking-widest bg-red-500/10 px-2 py-0.5 rounded-full">Incluye Mora ({cuota.lateDays} {cuota.lateDays === 1 ? 'Día' : 'Días'})</p>
+                              {cuota.lateDays != null && (
+                                <p className="text-[8px] font-bold uppercase text-red-400 tracking-widest bg-red-500/10 px-2 py-0.5 rounded-full">Incluye Mora ({cuota.lateDays} {cuota.lateDays === 1 ? 'Día' : 'Días'})</p>
+                              )}
                               <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest mt-1">Interés Diario: {formatCLP(cuota.dailyPenalty)}</p>
                               <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest">Interés Total: {formatCLP(cuota.penaltyAmount)}</p>
                             </div>
