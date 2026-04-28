@@ -127,10 +127,27 @@ export async function getFullPostventaData({
           nextDueDate = calculatedDueDate;
         }
 
-        // Determine penalty: FIXED (manual) or AUTO (date-based)
+        // Determine penalty: FIXED (manual), MIXED (manual + auto) or AUTO (date-based)
         if (res.penalty_mode === "FIXED" && res.manual_penalty != null && res.manual_penalty > 0) {
           penaltyAmount = res.manual_penalty;
           if (activeDailyPenalty > 0) {
+            lateDays = Math.round(penaltyAmount / activeDailyPenalty);
+          }
+        } else if (res.penalty_mode === "MIXED") {
+          const autoPenalty = calculateTotalInterest(
+            nextDueDate,
+            currentDate,
+            res.mora_frozen || false,
+            res.grace_days ?? project.grace_period_days ?? 5,
+            activeDailyPenalty,
+            res.debt_start_date,
+            project.penalty_start_date,
+            res.debt_end_date
+          );
+          const fixedPenalty = (res.manual_penalty != null && res.manual_penalty > 0) ? res.manual_penalty : 0;
+          penaltyAmount = autoPenalty + fixedPenalty;
+
+          if (penaltyAmount > 0 && activeDailyPenalty > 0) {
             lateDays = Math.round(penaltyAmount / activeDailyPenalty);
           }
         } else {
@@ -454,6 +471,11 @@ export async function approveReceipt(receiptId: string) {
 
         const operations = [];
 
+        let nextPenaltyMode = "AUTO";
+        if (shortfall > 0) {
+          nextPenaltyMode = res.penalty_mode === "MIXED" ? "MIXED" : "FIXED";
+        }
+
         operations.push(prisma.reservation.update({
           where: { id: receipt.reservation_id },
           data: {
@@ -462,7 +484,7 @@ export async function approveReceipt(receiptId: string) {
             },
             next_payment_date: null,
             manual_penalty: shortfall > 0 ? shortfall : null,
-            penalty_mode: shortfall > 0 ? "FIXED" : "AUTO",
+            penalty_mode: nextPenaltyMode,
             debt_start_date: null,
           },
         }));

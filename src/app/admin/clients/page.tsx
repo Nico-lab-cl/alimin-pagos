@@ -1037,7 +1037,7 @@ export default function ClientsPage() {
                           {finForm.mora_status === "ACTIVO" && (
                             <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-4 space-y-4">
                               <p className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-3">Modo de Cálculo de Penalización</p>
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-3 gap-3">
                                 <button
                                   type="button"
                                   onClick={() => setFinForm({...finForm, penalty_mode: "AUTO", manual_penalty: 0})}
@@ -1051,6 +1051,17 @@ export default function ClientsPage() {
                                 </button>
                                 <button
                                   type="button"
+                                  onClick={() => setFinForm({...finForm, penalty_mode: "MIXED"})}
+                                  className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
+                                    finForm.penalty_mode === "MIXED" 
+                                      ? "bg-orange-500/10 border-orange-500/40 text-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.15)]" 
+                                      : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"
+                                  }`}
+                                >
+                                  Mixto (Fijo+Auto)
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => setFinForm({...finForm, penalty_mode: "FIXED"})}
                                   className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
                                     finForm.penalty_mode === "FIXED" 
@@ -1061,9 +1072,11 @@ export default function ClientsPage() {
                                   Monto Fijo
                                 </button>
                               </div>
-                              {finForm.penalty_mode === "FIXED" && (
+                              {(finForm.penalty_mode === "FIXED" || finForm.penalty_mode === "MIXED") && (
                                 <div className="space-y-2 animate-fade-in">
-                                  <label className="block text-[8px] text-red-400/80 uppercase font-black tracking-widest">Monto Total de Multa Fija ($)</label>
+                                  <label className="block text-[8px] text-red-400/80 uppercase font-black tracking-widest">
+                                    {finForm.penalty_mode === "MIXED" ? "Monto Base de Multa Fija ($)" : "Monto Total de Multa Fija ($)"}
+                                  </label>
                                   <input 
                                     type="number" 
                                     min="0"
@@ -1072,7 +1085,11 @@ export default function ClientsPage() {
                                     className="w-full bg-black/40 border border-red-500/30 rounded-xl px-3 py-3 text-lg text-red-400 focus:border-red-400 outline-none font-black" 
                                     placeholder="Ej: 500000"
                                   />
-                                  <p className="text-[8px] text-white/20 uppercase tracking-widest">Este monto se sumará a la cuota del cliente en su portal de pago</p>
+                                  <p className="text-[8px] text-white/20 uppercase tracking-widest">
+                                    {finForm.penalty_mode === "MIXED" 
+                                      ? "Este monto se sumará a la mora automática que genere el cliente." 
+                                      : "Este monto se sumará a la cuota del cliente en su portal de pago."}
+                                  </p>
                                 </div>
                               )}
                               {finForm.penalty_mode === "AUTO" && (
