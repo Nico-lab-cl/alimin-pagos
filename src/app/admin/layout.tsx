@@ -16,7 +16,8 @@ import {
   Zap,
   Globe,
   Bell,
-  Search
+  Search,
+  Mail
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
@@ -26,6 +27,7 @@ const menuItems = [
   { href: "/admin/alerts", label: "Alertas", icon: AlertCircle },
   { href: "/admin/clients", label: "Clientes", icon: Users },
   { href: "/admin/receipts", label: "Comprobantes", icon: CheckSquare },
+  { href: "/admin/email-marketing", label: "Email Marketing", icon: Mail },
 ];
 
 import { SearchProvider, useSearch } from "@/context/SearchContext";
