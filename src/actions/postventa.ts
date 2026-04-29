@@ -728,34 +728,78 @@ export async function updateClientProfile(reservationId: string, data: { name: s
       return { error: "Reserva no encontrada" };
     }
 
-    // Check if new email conflicts with another user
-    if (data.email !== reservation.email && data.email !== reservation.user.email) {
-      const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
-      if (existingUser) {
+    // Check if new email conflicts with another user (excluding the current one)
+    if (data.email !== reservation.user.email) {
+      const existingUserWithNewEmail = await prisma.user.findUnique({ where: { email: data.email } });
+      if (existingUserWithNewEmail) {
         return { error: "Ese correo electrónico ya está registrado por otro usuario en la plataforma." };
       }
     }
 
-    // Attempt the transaction to guarantee integrity
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: reservation.user_id },
+    // Check for shared users (decoupling logic)
+    const otherReservationsWithSameUser = await prisma.reservation.findMany({
+      where: { 
+        user_id: reservation.user_id,
+        id: { not: reservationId }
+      }
+    });
+
+    const isSharedUser = otherReservationsWithSameUser.length > 0;
+    
+    // We decouple if it's shared AND (email is changing OR names are different)
+    const shouldDecouple = isSharedUser && (
+      data.email !== reservation.user.email || 
+      data.name.toLowerCase() !== reservation.user.name.toLowerCase()
+    );
+
+    if (shouldDecouple) {
+      console.log(`Decoupling reservation ${reservationId} from shared user ${reservation.user_id}`);
+      
+      // Create a NEW user for this reservation
+      const newUser = await prisma.user.create({
         data: {
           email: data.email,
-          name: data.name
+          name: data.name,
+          password: reservation.user.password, // Inherit password
+          role: "USER",
+          portal_active: reservation.user.portal_active,
+          fcm_token: null, // Don't inherit push token as it's device-specific
         }
-      }),
-      prisma.reservation.update({
+      });
+
+      await prisma.reservation.update({
         where: { id: reservationId },
         data: {
+          user_id: newUser.id,
           name: data.name,
           email: data.email,
           rut: data.rut,
           phone: data.phone,
           observation: data.observation
         }
-      })
-    ]);
+      });
+    } else {
+      // Regular update (either not shared, or same person with multiple lots)
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: reservation.user_id },
+          data: {
+            email: data.email,
+            name: data.name
+          }
+        }),
+        prisma.reservation.update({
+          where: { id: reservationId },
+          data: {
+            name: data.name,
+            email: data.email,
+            rut: data.rut,
+            phone: data.phone,
+            observation: data.observation
+          }
+        })
+      ]);
+    }
 
     memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");

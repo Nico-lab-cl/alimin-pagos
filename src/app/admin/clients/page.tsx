@@ -667,10 +667,10 @@ export default function ClientsPage() {
               <div className="space-y-8">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><Mail className="w-3 h-3"/> Contacto</h3>
+                    <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><Mail className="w-3 h-3"/> Información de Contacto</h3>
                     {!isEditing && (
-                      <button onClick={() => setIsEditing(true)} className="text-[10px] uppercase font-black tracking-widest text-accent hover:text-white transition-colors flex items-center gap-1.5 bg-accent/10 px-3 py-1.5 rounded-lg">
-                        <Edit3 className="w-3 h-3" /> Editar
+                      <button onClick={() => setIsEditing(true)} className="text-[10px] uppercase font-black tracking-widest text-accent hover:text-white transition-colors flex items-center gap-1.5 bg-accent/20 px-4 py-2 rounded-xl border border-accent/30 shadow-[0_0_15px_rgba(212,168,75,0.1)]">
+                        <Edit3 className="w-3.5 h-3.5" /> Editar Datos
                       </button>
                     )}
                   </div>
@@ -760,10 +760,27 @@ export default function ClientsPage() {
                     <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 space-y-5">
                       <div>
                         <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1 flex items-center justify-between">
-                          Correo Electrónico
+                          Correo / Usuario Acceso
                           {selectedClient.clientEmail?.includes("@libertadyalegria") && <span className="text-red-400 text-[7px]">CORREO TEMPORAL</span>}
                         </p>
-                        <p className={`text-sm font-bold ${selectedClient.clientEmail?.includes("@libertadyalegria") ? "text-red-300" : "text-white/80"}`}>{selectedClient.clientEmail}</p>
+                        <div className="flex items-center justify-between group/email">
+                          <p className={`text-sm font-bold ${selectedClient.clientEmail?.includes("@libertadyalegria") ? "text-red-300" : "text-white/80"}`}>
+                            {selectedClient.clientEmail}
+                          </p>
+                          <button 
+                            onClick={() => {
+                              setEditForm({
+                                ...editForm,
+                                email: selectedClient.clientEmail || ""
+                              });
+                              setIsEditing(true);
+                            }}
+                            className="opacity-0 group-hover/email:opacity-100 transition-opacity p-2 hover:bg-white/5 rounded-lg text-accent"
+                            title="Cambiar correo electrónico"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <p className="text-[9px] text-white/20 uppercase font-black tracking-widest mb-1 flex items-center justify-between">
