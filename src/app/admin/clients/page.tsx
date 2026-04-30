@@ -1284,9 +1284,45 @@ export default function ClientsPage() {
                             <Loader2 className="w-6 h-6 animate-spin" />
                             <p className="text-[8px] font-black uppercase tracking-widest">Consultando Libro Mayor...</p>
                           </div>
-                        ) : financialHistory.length > 0 ? (
-                          financialHistory.map((entry: any) => (
-                            <div key={entry.id} className="group flex items-center justify-between p-4 bg-emerald-500/[0.03] border border-emerald-500/10 rounded-2xl hover:bg-emerald-500/[0.05] transition-all">
+                        ) : (() => {
+                          const hasLedger = financialHistory.length > 0;
+                          
+                          // Reconstruction logic for migrated/manual data
+                          const reconstructed = (() => {
+                            if (hasLedger) return [];
+                            const items: any[] = [];
+                            const ranges = selectedClient.installment_ranges 
+                              ? (typeof selectedClient.installment_ranges === 'string' ? JSON.parse(selectedClient.installment_ranges) : selectedClient.installment_ranges)
+                              : [];
+
+                            if (selectedClient.pieStatus === 'PAID') {
+                              items.push({ id: 'v-pie', category: 'PIE', amount_clp: selectedClient.pieAmount, description: 'Pie Inicial (Migrado)', isVirtual: true });
+                            }
+
+                            for (let i = 1; i <= selectedClient.paidCuotas; i++) {
+                              const range = (ranges as any[]).find((r: any) => i >= Number(r.from) && i <= Number(r.to));
+                              const amount = range ? Number(range.amount) : (selectedClient.valor_cuota || 0);
+                              items.push({ id: `v-c-${i}`, category: 'CUOTA', amount_clp: amount, description: `Cuota #${i} (Migrado)`, isVirtual: true });
+                            }
+
+                            if (selectedClient.extra_paid_amount > 0) {
+                              items.push({ id: 'v-e', category: 'EXTRA', amount_clp: selectedClient.extra_paid_amount, description: 'Abonos Extra (Migrado)', isVirtual: true });
+                            }
+                            return items.reverse(); // Newest first
+                          })();
+
+                          const displayData = hasLedger ? financialHistory : reconstructed;
+
+                          if (displayData.length === 0) {
+                            return (
+                              <div className="text-center py-10 bg-white/[0.01] border border-dashed border-white/5 rounded-2xl">
+                                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 italic">No hay pagos conciliados aún</p>
+                              </div>
+                            );
+                          }
+
+                          return displayData.map((entry: any) => (
+                            <div key={entry.id} className={`group flex items-center justify-between p-4 border rounded-2xl transition-all ${entry.isVirtual ? 'bg-white/[0.02] border-white/5 opacity-60 hover:opacity-100' : 'bg-emerald-500/[0.03] border-emerald-500/10 hover:bg-emerald-500/[0.05]'}`}>
                               <div className="flex items-center gap-4">
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
                                   entry.category === 'PIE' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
@@ -1300,8 +1336,10 @@ export default function ClientsPage() {
                                     <p className="text-xs font-black text-white italic tracking-tighter uppercase">
                                       {entry.category === 'PIE' ? 'ABONO CAPITAL (PIE)' : 
                                        entry.category === 'PENALTY' ? 'PAGO INTERÉS / MORA' : 
+                                       entry.category === 'EXTRA' ? 'ABONO ADICIONAL' :
                                        'PAGO DE CUOTA'}
                                     </p>
+                                    {entry.isVirtual && <span className="text-[7px] font-black bg-white/5 px-1.5 py-0.5 rounded text-white/30 uppercase tracking-widest border border-white/10">Histórico</span>}
                                   </div>
                                   <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mt-0.5">
                                     {entry.description || 'Sin descripción'}
@@ -1310,15 +1348,15 @@ export default function ClientsPage() {
                               </div>
                               <div className="text-right">
                                 <p className="text-sm font-black text-emerald-400 italic tracking-tighter">{formatCLP(entry.amount_clp)}</p>
-                                <p className="text-[8px] font-black uppercase tracking-widest text-white/10">{formatDate(entry.paid_at || entry.created_at)}</p>
+                                {entry.paid_at || entry.created_at ? (
+                                  <p className="text-[8px] font-black uppercase tracking-widest text-white/10">{formatDate(entry.paid_at || entry.created_at)}</p>
+                                ) : (
+                                  <p className="text-[8px] font-black uppercase tracking-widest text-white/10 italic">Pre-Sistema</p>
+                                )}
                               </div>
                             </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-10 bg-white/[0.01] border border-dashed border-white/5 rounded-2xl">
-                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 italic">No hay pagos conciliados aún</p>
-                          </div>
-                        )}
+                          ));
+                        })()}
                       </div>
                     </div>
 
