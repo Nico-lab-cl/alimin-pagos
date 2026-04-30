@@ -5,10 +5,11 @@ import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClie
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import { formatCLP, formatDate } from "@/lib/utils";
-import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye, Key, ShieldAlert } from "lucide-react";
+import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye, Key, ShieldAlert, Lock } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 import { useSearch } from "@/context/SearchContext";
 
@@ -370,6 +371,7 @@ export default function ClientsPage() {
                   <th className="px-8 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 text-center">Propiedad</th>
                   <th className="px-8 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Salud Financiera</th>
                   <th className="px-8 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Cierre Contractual</th>
+                  <th className="px-8 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 text-center">Contraseña</th>
                   <th className="px-8 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 text-right">Saldo Pendiente</th>
                 </tr>
               </thead>
@@ -497,6 +499,33 @@ export default function ClientsPage() {
                           : c.status === "UPCOMING" ? "AVISO" 
                           : "AL DÍA"}
                       </div>
+                    </td>
+                    <td className="px-8 py-7 text-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (c.temp_password) {
+                            toast.success(`Credenciales de ${c.clientName}`, {
+                              description: `Usuario: ${c.clientEmail} | Clave: ${c.temp_password}`,
+                              duration: 10000,
+                              action: {
+                                label: "Copiar Clave",
+                                onClick: () => {
+                                  navigator.clipboard.writeText(c.temp_password);
+                                  toast.success("Contraseña copiada al portapapeles");
+                                }
+                              }
+                            });
+                          } else {
+                            toast.error("No hay contraseña temporal", {
+                              description: "El cliente debe ser activado primero o ya cambió su clave."
+                            });
+                          }
+                        }}
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${c.temp_password ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20" : "bg-white/5 text-white/20 border border-white/5"}`}
+                      >
+                        <Lock className="w-4 h-4" />
+                      </button>
                     </td>
                     <td className="px-8 py-7 text-right">
                       <p className="text-xl font-black text-white italic tracking-tighter group-hover:text-accent transition-colors">{formatCLP(c.pendingBalance)}</p>
