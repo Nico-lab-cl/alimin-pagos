@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile, deletePaymentReceipt, updateMoraDates, getFinancialHistory } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile, deletePaymentReceipt, updateMoraDates, getFinancialHistory, generateTemporaryPassword } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import { formatCLP, formatDate } from "@/lib/utils";
@@ -502,27 +502,53 @@ export default function ClientsPage() {
                     </td>
                     <td className="px-8 py-7 text-center">
                       <button
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          if (c.temp_password) {
-                            toast.success(`Credenciales de ${c.clientName}`, {
-                              description: `Usuario: ${c.clientEmail} | Clave: ${c.temp_password}`,
-                              duration: 10000,
-                              action: {
-                                label: "Copiar Clave",
-                                onClick: () => {
-                                  navigator.clipboard.writeText(c.temp_password);
-                                  toast.success("Contraseña copiada al portapapeles");
-                                }
+                          try {
+                            let pass = c.temp_password;
+                            
+                            if (!pass) {
+                              toast.loading("Generando contraseña temporal...", { id: `gen-pass-${c.id}` });
+                              const res = await generateTemporaryPassword(c.id);
+                              if (res.success) {
+                                pass = res.tempPassword;
+                                toast.success("Contraseña generada correctamente", { id: `gen-pass-${c.id}` });
+                                
+                                // Update local state immediately so the icon turns blue
+                                setData(prev => {
+                                  if (!prev) return prev;
+                                  return {
+                                    ...prev,
+                                    data: prev.data.map(item => 
+                                      item.id === c.id ? { ...item, temp_password: res.tempPassword } : item
+                                    )
+                                  };
+                                });
+                              } else {
+                                toast.error(res.error || "Error al generar contraseña", { id: `gen-pass-${c.id}` });
+                                return;
                               }
-                            });
-                          } else {
-                            toast.error("No hay contraseña temporal", {
-                              description: "El cliente debe ser activado primero o ya cambió su clave."
-                            });
+                            }
+
+                            if (pass) {
+                              toast.success(`Acceso: ${c.clientName}`, {
+                                description: `Usuario: ${c.clientEmail}\nClave: ${pass}`,
+                                duration: 15000,
+                                action: {
+                                  label: "Copiar Clave",
+                                  onClick: () => {
+                                    navigator.clipboard.writeText(pass);
+                                    toast.success("Contraseña copiada");
+                                  }
+                                }
+                              });
+                            }
+                          } catch (err) {
+                            console.error("Error in password click:", err);
+                            toast.error("Error inesperado al gestionar credenciales");
                           }
                         }}
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${c.temp_password ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20" : "bg-white/5 text-white/20 border border-white/5"}`}
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${c.temp_password ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]" : "bg-white/5 text-white/20 border border-white/5 hover:bg-white/10"}`}
                       >
                         <Lock className="w-4 h-4" />
                       </button>

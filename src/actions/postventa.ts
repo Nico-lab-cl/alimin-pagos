@@ -1740,6 +1740,45 @@ export async function activateClientProfile(reservationId: string) {
   }
 }
 
+export async function generateTemporaryPassword(reservationId: string) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { user: true }
+    });
+
+    if (!reservation) return { error: "Reserva no encontrada" };
+
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const hashedPassword = await hash(tempPassword, 10);
+
+    await prisma.user.update({
+      where: { id: reservation.user_id },
+      data: {
+        password: hashedPassword,
+        must_change_password: true,
+        temp_password: tempPassword,
+        portal_active: true
+      }
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true, tempPassword, email: reservation.user.email };
+  } catch (error) {
+    console.error("Error generating password:", error);
+    return { error: "Error al generar contraseña" };
+  }
+}
+
 export async function deletePaymentReceipt(receiptId: string) {
   const session = await auth();
   const user = session?.user as any;
