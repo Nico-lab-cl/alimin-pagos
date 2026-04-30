@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
+import { format, addMonths, subMonths, addYears, subYears, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +45,16 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
     setCurrentMonth(addMonths(currentMonth, 1));
   };
 
+  const handlePrevYear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentMonth(subYears(currentMonth, 1));
+  };
+
+  const handleNextYear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentMonth(addYears(currentMonth, 1));
+  };
+
   const handleSelect = (day: Date) => {
     // Format to YYYY-MM-DD for standard input values
     const formatted = format(day, "yyyy-MM-dd");
@@ -83,18 +93,34 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
               <h2 className="text-sm font-black text-white uppercase tracking-widest italic">
                 {format(currentMonth, "MMMM yyyy", { locale: es })}
               </h2>
-              <div className="flex gap-1">
+              <div className="flex gap-0.5">
+                <button
+                  onClick={handlePrevYear}
+                  title="Año Anterior"
+                  className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-white transition-all"
+                >
+                  <ChevronsLeft className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={handlePrevMonth}
-                  className="p-2 rounded-xl hover:bg-white/5 text-white/40 hover:text-white transition-all"
+                  title="Mes Anterior"
+                  className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-white transition-all"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={handleNextMonth}
-                  className="p-2 rounded-xl hover:bg-white/5 text-white/40 hover:text-white transition-all"
+                  title="Siguiente Mes"
+                  className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-white transition-all"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={handleNextYear}
+                  title="Siguiente Año"
+                  className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-white transition-all"
+                >
+                  <ChevronsRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
