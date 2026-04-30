@@ -515,7 +515,7 @@ export default function ClientsPage() {
                                 toast.success("Contraseña generada correctamente", { id: `gen-pass-${c.id}` });
                                 
                                 // Update local state immediately so the icon turns blue
-                                setData(prev => {
+                                setData((prev: any) => {
                                   if (!prev) return prev;
                                   return {
                                     ...prev,
