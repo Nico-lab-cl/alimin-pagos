@@ -105,14 +105,14 @@ export async function getFullPostventaData({
           : (lot.valor_cuota || 0);
       }
 
-      // Total Invertido includes nominal installments and pie
+      // Total Invertido strictly follows (Cuotas + Pie)
       const totalPaid = actualPie + calculatedCuotasTotal;
       
       // Total Commitment is the total lot price
       const totalToPay = lot.price_total_clp || 0;
       
-      // Saldo Remanente = Total Invertido - Compromiso Total (Literal requested formula)
-      let pendingBalance = totalPaid - totalToPay;
+      // Saldo Remanente = Compromiso Total - Total Invertido (Positive value as requested)
+      let pendingBalance = totalToPay - totalPaid;
 
       // Due date & penalty
       let nextDueDate: Date | null = null;
@@ -1282,7 +1282,7 @@ export async function getClientPOV(reservationId: string) {
 
     const totalPaid = actualPie + calculatedCuotasTotal;
     const totalToPay = lot.price_total_clp || 0;
-    const pendingBalance = totalPaid - totalToPay;
+    const pendingBalance = totalToPay - totalPaid;
 
     // Calculate Acquisition Progress based on milestones (Steps in the plan)
     // Milestone 1: PIE, Milestones 2..N: Installments

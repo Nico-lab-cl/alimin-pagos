@@ -79,12 +79,12 @@ export async function getUserLots() {
           : (lot.valor_cuota || 0);
       }
 
-      // Total Invertido includes nominal installments and pie
+      // Total Invertido strictly follows (Cuotas + Pie)
       const totalPaid = actualPie + calculatedCuotasTotal;
       const totalToPay = lot.price_total_clp || 0;
       
-      // Saldo Remanente = Total Invertido - Compromiso Total (Literal requested formula)
-      const pendingBalance = totalPaid - totalToPay;
+      // Saldo Remanente = Compromiso Total - Total Invertido (Positive as requested)
+      const pendingBalance = totalToPay - totalPaid;
 
       // Milestone-based progress
       const hasPie = pieAmount > 0;
