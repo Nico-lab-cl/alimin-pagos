@@ -106,7 +106,8 @@ export async function getFullPostventaData({
       }
 
       // Total Invertido strictly follows (Cuotas + Pie)
-      const totalPaid = actualPie + calculatedCuotasTotal;
+      // As requested, we always include the full Pie amount because if they are in the system, it's paid.
+      const totalPaid = calculatedCuotasTotal + pieAmount;
       
       // Total Commitment is the total lot price
       const totalToPay = lot.price_total_clp || 0;
@@ -1280,7 +1281,7 @@ export async function getClientPOV(reservationId: string) {
         : (lot.valor_cuota || 0);
     }
 
-    const totalPaid = actualPie + calculatedCuotasTotal;
+    const totalPaid = calculatedCuotasTotal + pieAmount;
     const totalToPay = lot.price_total_clp || 0;
     const pendingBalance = totalToPay - totalPaid;
 
