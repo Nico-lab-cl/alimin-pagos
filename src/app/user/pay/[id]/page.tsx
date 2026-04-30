@@ -43,11 +43,8 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
       if (found) {
         setLot(found);
         setAmount(found.valor_cuota);
-        // Default to PIE if it's pending and valor_cuota is not the priority
-        if (found.pieStatus !== "PAID") {
-          setPaymentType("PIE");
-          setAmount(found.pieAmount || 0);
-        }
+        // Default strictly to INSTALLMENT
+        setPaymentType("INSTALLMENT");
       }
       setLoading(false);
     });
@@ -55,9 +52,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => {
     if (lot) {
-      if (paymentType === "PIE") {
-        setAmount(lot.pieAmount || 0);
-      } else if (lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
+      if (lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
         const mandatoryCount = Math.max(1, lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length);
         const actualCount = Math.max(installmentsCount, mandatoryCount);
         if (actualCount !== installmentsCount) {
@@ -178,22 +173,14 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           </div>
 
           <div className="rounded-[2.5rem] glass-panel p-6 md:p-10 space-y-10">
-            {/* Type Selector */}
+            {/* Removed PIE option as all pies are paid */}
             <div className="space-y-4">
               <label className="text-[10px] font-black uppercase tracking-widest text-white/20">Propósito del Abono</label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setPaymentType("INSTALLMENT")}
-                  className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${paymentType === "INSTALLMENT" ? "bg-accent text-[#061010] shadow-[0_10px_25px_rgba(212,168,75,0.3)]" : "bg-white/5 text-white/40 hover:bg-white/10"}`}
-                >
-                  Cuota Mensual
-                </button>
-                <button
-                  onClick={() => setPaymentType("PIE")}
-                  className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${paymentType === "PIE" ? "bg-accent text-[#061010] shadow-[0_10px_25px_rgba(212,168,75,0.3)]" : "bg-white/5 text-white/40 hover:bg-white/10"}`}
-                >
-                  Abono al Pie
-                </button>
+              <div className="bg-accent/10 border border-accent/20 p-4 rounded-2xl flex items-center gap-4">
+                <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
+                  <CreditCard className="w-4 h-4 text-[#061010]" />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-accent">Pago de Cuota Mensual</p>
               </div>
             </div>
 
@@ -292,15 +279,13 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               <div className="pt-3 border-t border-white/5 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">
-                    Abono Base ({paymentType === "PIE" ? "Pie" : `${installmentsCount}x Cuotas`})
+                    Abono Base ({installmentsCount}x Cuotas)
                   </span>
                   <span className="text-sm font-black text-white/60">
                     {formatCLP(
-                      paymentType === "PIE" 
-                        ? (lot.pieAmount || 0)
-                        : lot.upcomingInstallments
-                            .slice(0, installmentsCount)
-                            .reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0)
+                      lot.upcomingInstallments
+                        .slice(0, installmentsCount)
+                        .reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0)
                     )}
                   </span>
                 </div>
