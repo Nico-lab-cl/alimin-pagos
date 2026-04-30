@@ -519,7 +519,7 @@ export default function ClientsPage() {
                                   if (!prev) return prev;
                                   return {
                                     ...prev,
-                                    data: prev.data.map(item => 
+                                    data: prev.data.map((item: any) => 
                                       item.id === c.id ? { ...item, temp_password: res.tempPassword } : item
                                     )
                                   };
