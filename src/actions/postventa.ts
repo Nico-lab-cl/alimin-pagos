@@ -666,6 +666,72 @@ export async function getPendingReceipts(projectSlug: string) {
 }
 
 /**
+ * Gets all receipts (history) for a project.
+ */
+export async function getAllReceipts(projectSlug: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado", receipts: [] };
+  }
+
+  try {
+    const project = await prisma.project.findUnique({
+      where: { slug: projectSlug },
+    });
+    if (!project) return { error: "Proyecto no encontrado", receipts: [] };
+
+    const receipts = await prisma.paymentReceipt.findMany({
+      where: {
+        reservation: { project_id: project.id },
+      },
+      orderBy: { created_at: "desc" },
+      include: {
+        reservation: {
+          select: {
+            name: true,
+            last_name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        lot: {
+          select: { number: true, stage: true },
+        },
+      },
+    });
+
+    return { success: true, receipts };
+  } catch (error) {
+    console.error("Error getting all receipts:", error);
+    return { error: "Error al cargar historial de comprobantes", receipts: [] };
+  }
+}
+
+/**
+ * Gets financial history (ledger) for a specific reservation.
+ */
+export async function getFinancialHistory(reservationId: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado", history: [] };
+  }
+
+  try {
+    const history = await prisma.financialLedger.findMany({
+      where: { reservation_id: reservationId },
+      orderBy: { paid_at: "desc" },
+    });
+
+    return { success: true, history };
+  } catch (error) {
+    console.error("Error getting financial history:", error);
+    return { error: "Error al cargar historial financiero", history: [] };
+  }
+}
+
+/**
  * Gets all lots for a project (admin inventory view).
  */
 export async function getAdminLots(projectSlug: string) {

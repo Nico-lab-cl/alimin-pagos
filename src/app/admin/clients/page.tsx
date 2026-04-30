@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile, deletePaymentReceipt, updateMoraDates } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile, deletePaymentReceipt, updateMoraDates, getFinancialHistory } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import { formatCLP, formatDate } from "@/lib/utils";
@@ -83,6 +83,10 @@ export default function ClientsPage() {
   const [moraEndDate, setMoraEndDate] = useState<string | null>(null);
   const [isUpdatingMora, setIsUpdatingMora] = useState(false);
 
+  // Financial History State
+  const [financialHistory, setFinancialHistory] = useState<any[]>([]);
+  const [loadingFinHistory, setLoadingFinHistory] = useState(false);
+
   const itemsPerPage = 10;
 
   const refreshMainData = async () => {
@@ -141,11 +145,18 @@ export default function ClientsPage() {
     }
   };
 
-  // Fetch docs when client is selected
+  // Fetch docs and financial history when client is selected
   useEffect(() => {
     if (selectedClient) {
       setDocs([]);
+      setFinancialHistory([]);
       refreshDocs(selectedClient.id, selectedClient);
+      
+      setLoadingFinHistory(true);
+      getFinancialHistory(selectedClient.id).then(res => {
+        setFinancialHistory(res.history || []);
+        setLoadingFinHistory(false);
+      });
     }
   }, [selectedClient?.id]);
 
@@ -1255,6 +1266,59 @@ export default function ClientsPage() {
                           <p className="text-[8px] text-white/20 uppercase tracking-widest leading-relaxed text-center">
                             * Si dejas el fin vacío, la mora se calculará hasta el día de hoy. Si lo fijas, la deuda no aumentará después de esa fecha.
                           </p>
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN: Historial de Cuotas y Pagos Oficiales */}
+                    <div className="mt-8 pt-8 border-t border-white/5 space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-white/30">
+                            <DollarSign className="w-4 h-4 text-emerald-400" />
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400/60">Historial de Cuotas y Pagos Oficiales</h4>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        {loadingFinHistory ? (
+                          <div className="flex flex-col items-center justify-center py-10 gap-3 opacity-20">
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                            <p className="text-[8px] font-black uppercase tracking-widest">Consultando Libro Mayor...</p>
+                          </div>
+                        ) : financialHistory.length > 0 ? (
+                          financialHistory.map((entry: any) => (
+                            <div key={entry.id} className="group flex items-center justify-between p-4 bg-emerald-500/[0.03] border border-emerald-500/10 rounded-2xl hover:bg-emerald-500/[0.05] transition-all">
+                              <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                                  entry.category === 'PIE' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
+                                  entry.category === 'PENALTY' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                                  'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                }`}>
+                                  <CheckCircle2 className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-xs font-black text-white italic tracking-tighter uppercase">
+                                      {entry.category === 'PIE' ? 'ABONO CAPITAL (PIE)' : 
+                                       entry.category === 'PENALTY' ? 'PAGO INTERÉS / MORA' : 
+                                       'PAGO DE CUOTA'}
+                                    </p>
+                                  </div>
+                                  <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mt-0.5">
+                                    {entry.description || 'Sin descripción'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-black text-emerald-400 italic tracking-tighter">{formatCLP(entry.amount_clp)}</p>
+                                <p className="text-[8px] font-black uppercase tracking-widest text-white/10">{formatDate(entry.paid_at || entry.created_at)}</p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-10 bg-white/[0.01] border border-dashed border-white/5 rounded-2xl">
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 italic">No hay pagos conciliados aún</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 

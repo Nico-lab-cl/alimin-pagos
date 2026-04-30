@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getPendingReceipts, approveReceipt, rejectReceipt } from "@/actions/postventa";
+import { getAdminProjects, getPendingReceipts, approveReceipt, rejectReceipt, getAllReceipts } from "@/actions/postventa";
 import { formatCLP, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { 
@@ -18,7 +18,10 @@ import {
   ArrowRight, 
   Eye,
   CheckSquare,
-  ChevronRight
+  ChevronRight,
+  History,
+  Search,
+  Download
 } from "lucide-react";
 
 import { useSearch } from "@/context/SearchContext";
@@ -34,6 +37,12 @@ export default function ReceiptsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const itemsPerPage = 10;
+
+  // History State
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyReceipts, setHistoryReceipts] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
 
   useEffect(() => {
     getAdminProjects().then((result) => {
@@ -117,17 +126,33 @@ export default function ReceiptsPage() {
           </h1>
         </div>
 
-        <select
-          value={selectedProject}
-          onChange={(e) => setSelectedProject(e.target.value)}
-          className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[200px]"
-          style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1.5rem center", backgroundSize: "1rem" }}
-        >
-          {projects.map((p) => (
-            <option key={p.slug} value={p.slug} className="bg-[#0c1a1a]">{p.name}</option>
-          ))}
-        </select>
-      </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                setShowHistory(true);
+                setLoadingHistory(true);
+                getAllReceipts(selectedProject).then(res => {
+                  setHistoryReceipts(res.receipts || []);
+                  setLoadingHistory(false);
+                });
+              }}
+              className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all text-white/60 hover:text-white"
+            >
+              <History className="w-4 h-4" />
+              Ver Historial
+            </button>
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[200px]"
+              style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1.5rem center", backgroundSize: "1rem" }}
+            >
+              {projects.map((p) => (
+                <option key={p.slug} value={p.slug} className="bg-[#0c1a1a]">{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-40 gap-4">
@@ -278,7 +303,7 @@ export default function ReceiptsPage() {
       {/* Full Screen Preview Modal */}
       {previewUrl && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 animate-fade-in"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-10 animate-fade-in"
           onClick={() => setPreviewUrl(null)}
         >
           <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" />
@@ -307,6 +332,126 @@ export default function ReceiptsPage() {
                 alt="Full Preview"
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in" onClick={() => setShowHistory(false)}>
+          <div className="bg-[#050C0C] border border-white/10 rounded-[3rem] w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl animate-slide-up overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="px-10 py-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <History className="w-5 h-5 text-accent" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Auditoría Histórica</p>
+                </div>
+                <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase leading-none">Historial de <span className="text-white/20">Pagos</span></h2>
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div className="relative group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-accent transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="BUSCAR EN EL HISTORIAL..."
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="w-64 pl-12 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none focus:border-accent/40 transition-all"
+                  />
+                </div>
+                <button 
+                  onClick={() => setShowHistory(false)}
+                  className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-red-500/10 hover:text-red-400 transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+              {loadingHistory ? (
+                <div className="h-full flex flex-col items-center justify-center gap-4 opacity-20">
+                  <Loader2 className="w-10 h-10 animate-spin" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">Recuperando registros...</p>
+                </div>
+              ) : historyReceipts.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center gap-4 opacity-10">
+                  <History className="w-20 h-20" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">No hay registros históricos</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {historyReceipts
+                    .filter(r => 
+                      !historySearch || 
+                      r.reservation?.name?.toLowerCase().includes(historySearch.toLowerCase()) ||
+                      r.reservation?.last_name?.toLowerCase().includes(historySearch.toLowerCase()) ||
+                      r.lot?.number?.toString().includes(historySearch)
+                    )
+                    .map((receipt) => (
+                    <div 
+                      key={receipt.id}
+                      className="group flex items-center justify-between p-6 bg-white/[0.02] border border-white/5 rounded-[2rem] hover:bg-white/[0.04] transition-all"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${
+                          receipt.status === 'APPROVED' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                          receipt.status === 'REJECTED' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                          'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                        }`}>
+                          {receipt.status === 'APPROVED' ? <Check className="w-6 h-6" /> : 
+                           receipt.status === 'REJECTED' ? <X className="w-6 h-6" /> : 
+                           <Loader2 className="w-6 h-6" />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-3">
+                            <h4 className="text-xl font-black text-white italic tracking-tighter uppercase">{receipt.reservation?.name} {receipt.reservation?.last_name}</h4>
+                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
+                              receipt.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' :
+                              receipt.status === 'REJECTED' ? 'bg-red-500/20 text-red-400' :
+                              'bg-amber-500/20 text-amber-400'
+                            }`}>{receipt.status}</span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-accent">Lote {receipt.lot?.number}</span>
+                            <div className="w-1 h-1 rounded-full bg-white/10" />
+                            <span className="text-[9px] font-black uppercase tracking-widest text-white/30">
+                              {receipt.scope === 'PIE' ? 'INGRESO DE CAPITAL' : `ABONO DE CUOTAS (${receipt.installments_count})`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-10">
+                        <div className="text-right">
+                          <p className="text-xl font-black text-white italic tracking-tighter">{formatCLP(receipt.amount_clp)}</p>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-white/20">{formatDate(receipt.created_at)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => setPreviewUrl(receipt.receipt_url)}
+                            className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:bg-white/10 hover:text-white transition-all"
+                            title="Ver Detalle"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <a 
+                            href={receipt.receipt_url} 
+                            download 
+                            className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:bg-accent hover:text-black transition-all"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
