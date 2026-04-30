@@ -95,26 +95,24 @@ export async function getFullPostventaData({
             : res.installment_ranges)
         : [];
       for (let i = 1; i <= paidCuotas; i++) {
-        const range = (ranges as any[]).find(
-          (r: any) => i >= Number(r.from) && i <= Number(r.to)
-        );
+        const range = (ranges as any[]).find((r: any) => {
+          const from = Number(r.from ?? r.start ?? 0);
+          const to = Number(r.to ?? r.end ?? 0);
+          return i >= from && i <= to;
+        });
         calculatedCuotasTotal += range
-          ? Number(range.amount)
+          ? Number(range.amount ?? range.value ?? 0)
           : (lot.valor_cuota || 0);
       }
 
-      // Total Invertido includes nominal installments, pie, and any extra payments
-      const totalPaid =
-        actualPie + calculatedCuotasTotal + (res.extra_paid_amount || 0);
+      // Total Invertido includes nominal installments and pie
+      const totalPaid = actualPie + calculatedCuotasTotal;
       
       // Total Commitment is the total lot price
       const totalToPay = lot.price_total_clp || 0;
       
-      // Remaining Balance (Saldo Remanente) is the difference, adjusted by any pending amounts
-      let pendingBalance = Math.max(
-        0,
-        totalToPay - totalPaid + (res.pending_amount || 0)
-      );
+      // Saldo Remanente = Total Invertido - Compromiso Total (Literal requested formula)
+      let pendingBalance = totalPaid - totalToPay;
 
       // Due date & penalty
       let nextDueDate: Date | null = null;
@@ -1272,17 +1270,19 @@ export async function getClientPOV(reservationId: string) {
           : res.installment_ranges)
       : [];
     for (let i = 1; i <= paidCuotas; i++) {
-      const range = (ranges as any[]).find(
-        (r: any) => i >= Number(r.from) && i <= Number(r.to)
-      );
+      const range = (ranges as any[]).find((r: any) => {
+        const from = Number(r.from ?? r.start ?? 0);
+        const to = Number(r.to ?? r.end ?? 0);
+        return i >= from && i <= to;
+      });
       calculatedCuotasTotal += range
-        ? Number(range.amount)
+        ? Number(range.amount ?? range.value ?? 0)
         : (lot.valor_cuota || 0);
     }
 
-    const totalPaid = actualPie + calculatedCuotasTotal + (res.extra_paid_amount || 0);
+    const totalPaid = actualPie + calculatedCuotasTotal;
     const totalToPay = lot.price_total_clp || 0;
-    const pendingBalance = Math.max(0, totalToPay - totalPaid + (res.pending_amount || 0));
+    const pendingBalance = totalPaid - totalToPay;
 
     // Calculate Acquisition Progress based on milestones (Steps in the plan)
     // Milestone 1: PIE, Milestones 2..N: Installments
