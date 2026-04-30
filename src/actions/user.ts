@@ -55,8 +55,13 @@ export async function getUserLots() {
       const totalCuotas = lot.cuotas || 0;
 
       const pieAmount = res.pie || lot.pie || 0;
-      const actualPie = res.pie_status === "PAID" ? pieAmount : 0;
+      // Sum approved PIE receipts for more accuracy, or fallback to full pie if status is PAID
+      const piePaidFromReceipts = res.receipts
+        ?.filter((r) => r.scope === "PIE")
+        .reduce((acc, r) => acc + (r.amount_clp || 0), 0) || 0;
+      const actualPie = Math.max(piePaidFromReceipts, res.pie_status === "PAID" ? pieAmount : 0);
 
+      // Calculate installments total using ranges (Nominal Investment)
       let calculatedCuotasTotal = 0;
       const ranges = res.installment_ranges
         ? (typeof res.installment_ranges === "string"
@@ -72,9 +77,11 @@ export async function getUserLots() {
           : (lot.valor_cuota || 0);
       }
 
-      const totalPaid =
-        actualPie + calculatedCuotasTotal + (res.extra_paid_amount || 0);
+      // Total Invertido includes nominal installments, pie, and any extra payments
+      const totalPaid = actualPie + calculatedCuotasTotal + (res.extra_paid_amount || 0);
       const totalToPay = lot.price_total_clp || 0;
+      
+      // Saldo Remanente is the difference
       const pendingBalance = Math.max(
         0,
         totalToPay - totalPaid + (res.pending_amount || 0)
