@@ -560,9 +560,9 @@ export async function approveReceipt(receiptId: string) {
     try {
       const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
       
-      const clientName = receipt.reservation.user?.name || "Cliente Alimin";
-      const rut = receipt.reservation.user?.rut || "No registrado";
-      const email = receipt.reservation.user?.email || "No registrado";
+      const clientName = receipt.reservation.user?.name || receipt.reservation.name || "Cliente Alimin";
+      const rut = receipt.reservation.rut || "No registrado";
+      const email = receipt.reservation.user?.email || receipt.reservation.email || "No registrado";
       const projectName = receipt.reservation.project?.name || "Alimin SPA";
       const lotNumber = receipt.reservation.lot?.lot_number || receipt.lot_id.toString();
       const stage = receipt.reservation.lot?.stage || "";
