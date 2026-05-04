@@ -55,7 +55,6 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<string> {
     size: 8,
     font: helveticaBold,
     color: accentColor,
-    characterSpacing: 2,
   });
 
   // Folio Box
