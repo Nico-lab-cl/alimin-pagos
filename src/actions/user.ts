@@ -45,6 +45,9 @@ export async function getUserLots() {
       },
     });
 
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+
     const lots = (reservations as any[]).map((res) => {
       const lot = res.lot;
       const project = res.project;
