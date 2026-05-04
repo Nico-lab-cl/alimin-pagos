@@ -22,7 +22,7 @@ model Project {
   penalty_start_date   DateTime?     @db.Timestamptz(6)
   bank_name            String?       @default("Santander") @db.VarChar(100)
   bank_type            String?       @default("Corriente") @db.VarChar(50)
-  bank_account         String?       @default("") @db.VarChar(50)
+  bank_account         String?       @default("86876868") @db.VarChar(50)
   bank_holder          String?       @default("Alimin SPA") @db.VarChar(255)
   bank_rut             String?       @default("77.508.711-0") @db.VarChar(20)
   bank_email           String?       @default("inmobiliaria@aliminspa.cl") @db.VarChar(255)
