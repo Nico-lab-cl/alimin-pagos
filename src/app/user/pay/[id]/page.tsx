@@ -81,9 +81,33 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     }
   };
 
-  const handleCopy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copiado al portapapeles`);
+  const handleCopy = async (text: string, label: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand('copy');
+        } catch (err) {
+          console.error('Fallback copy failed', err);
+          throw new Error('Copy failed');
+        } finally {
+          textArea.remove();
+        }
+      }
+      toast.success(`${label} copiado al portapapeles`);
+    } catch (err) {
+      toast.error("No se pudo copiar al portapapeles");
+      console.error(err);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -185,8 +209,12 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             </div>
 
             {/* Installments List */}
-            {paymentType === "INSTALLMENT" && lot.upcomingInstallments && lot.upcomingInstallments.length > 0 && (
-              <div className="space-y-4">
+            {paymentType === "INSTALLMENT" && lot.upcomingInstallments && lot.upcomingInstallments.length > 0 && (() => {
+              const overdueCount = lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length;
+              const mandatoryCount = Math.max(1, overdueCount);
+              
+              return (
+                <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] font-black uppercase tracking-widest text-white/20">Selecciona las Cuotas a Pagar</label>
                   <span className="text-xl font-black text-white italic tracking-tighter">{installmentsCount} {installmentsCount === 1 ? 'Cuota' : 'Cuotas'}</span>
@@ -194,20 +222,27 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 <div className="grid gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                   {lot.upcomingInstallments.map((cuota: any, idx: number) => {
                     const isSelected = idx < installmentsCount;
+                    const isMandatory = idx < overdueCount;
+
                     return (
                       <button
                         key={cuota.number}
                         type="button"
                         onClick={() => {
-                          const mandatoryCount = Math.max(1, lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length);
+                          if (isMandatory && isSelected && installmentsCount === idx + 1) {
+                            toast.error("Las cuotas atrasadas son de pago obligatorio");
+                            return;
+                          }
                           let newCount = (idx + 1 === installmentsCount) ? idx : idx + 1;
                           if (newCount < mandatoryCount) {
-                            toast.error("Las cuotas con mora son obligatorias");
+                            toast.error("Las cuotas atrasadas son de pago obligatorio");
                             newCount = mandatoryCount;
                           }
                           setInstallmentsCount(newCount);
                         }}
-                        className={`flex items-center justify-between p-6 rounded-2xl border transition-all cursor-pointer ${
+                        className={`flex items-center justify-between p-6 rounded-2xl border transition-all ${
+                          isMandatory ? "cursor-not-allowed opacity-90" : "cursor-pointer"
+                        } ${
                           isSelected 
                             ? "bg-accent/10 border-accent/40 text-white shadow-[0_0_15px_rgba(212,168,75,0.1)]" 
                             : "bg-white/[0.02] border-white/5 text-white/50 hover:bg-white/[0.05]"
@@ -218,11 +253,18 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                             {isSelected && <CheckCircle className="w-4 h-4" />}
                           </div>
                           <div className="text-left">
-                            {cuota.number !== 0 && (
-                              <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-none mb-1 text-white/40">
-                                Cuota {cuota.number}
-                              </p>
-                            )}
+                            <div className="flex items-center gap-2 mb-1">
+                              {cuota.number !== 0 && (
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-none text-white/40">
+                                  Cuota {cuota.number}
+                                </p>
+                              )}
+                              {isMandatory && (
+                                <span className="text-[8px] font-black uppercase tracking-widest bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                  Obligatorio
+                                </span>
+                              )}
+                            </div>
                             <p className="text-sm font-black italic">{cuota.monthName}</p>
                           </div>
                         </div>
@@ -245,7 +287,8 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                   })}
                 </div>
               </div>
-            )}
+            );
+            })()}
 
             {/* Fallback Slider (If no upcomingInstallments for some reason) */}
             {paymentType === "INSTALLMENT" && (!lot.upcomingInstallments || lot.upcomingInstallments.length === 0) && (
@@ -329,8 +372,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 onClick={(e) => {
                   e.preventDefault();
                   const dataToCopy = `Institución: ${lot.bank?.name}\nTipo Cuenta: ${lot.bank?.type}\nNº Cuenta: ${lot.bank?.account}\nTitular: ${lot.bank?.holder}\nRUT Receptor: ${lot.bank?.rut}\nEmail Destino: ${lot.bank?.email}`;
-                  navigator.clipboard.writeText(dataToCopy);
-                  toast.success("Todos los datos bancarios copiados");
+                  handleCopy(dataToCopy, "Todos los datos bancarios");
                 }}
                 className="px-4 py-2.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[9px] uppercase font-black tracking-widest hover:bg-accent hover:text-black transition-all flex items-center gap-2 w-fit"
               >
