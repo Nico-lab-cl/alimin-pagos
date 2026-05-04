@@ -45,10 +45,11 @@ export async function getUserLots() {
       },
     });
 
-    const currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0);
-
-    const lots = reservations.map((res) => {
+    const lots = (reservations as any[]).map((res) => {
+      const documents = (res.documents || []).map((doc: any) => ({
+        ...doc,
+        url: `/api/documents/${doc.id}`
+      }));
       const lot = res.lot;
       const project = res.project;
       const paidCuotas = res.installments_paid || 0;

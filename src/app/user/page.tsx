@@ -243,6 +243,40 @@ export default function UserDashboard() {
                     <ArrowRight className="w-5 h-5 transition-transform group-hover/btn:translate-x-1" />
                   </Link>
                 </div>
+
+                {/* Documents Section */}
+                {lot.documents && lot.documents.length > 0 && (
+                  <div className="pt-10 border-t border-white/5 animate-slide-up">
+                    <div className="flex items-center gap-3 mb-6">
+                      <ShieldCheck className="w-4 h-4 text-accent" />
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Centro de Documentos</h4>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {lot.documents.map((doc: any, dIdx: number) => (
+                        <a 
+                          key={doc.id || dIdx}
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-accent/30 transition-all group/doc"
+                        >
+                          <div className="flex items-center gap-4 overflow-hidden">
+                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover/doc:bg-accent/10 transition-colors">
+                              <Building2 className="w-5 h-5 text-white/30 group-hover/doc:text-accent" />
+                            </div>
+                            <div className="overflow-hidden">
+                              <p className="text-[10px] font-black text-white uppercase tracking-wider truncate mb-0.5">{doc.name}</p>
+                              <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">
+                                {formatDate(doc.uploadedAt || doc.created_at)}
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-white/10 group-hover/doc:text-accent group-hover/doc:translate-x-1 transition-all" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
