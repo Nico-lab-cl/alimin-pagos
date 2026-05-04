@@ -328,7 +328,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
-                  const dataToCopy = `Institución: ${lot.bank?.name}\nTipo Cuenta: ${lot.bank?.type}\nNº Cuenta: ${lot.bank?.account}\nRUT Receptor: ${lot.bank?.rut}\nEmail Destino: ${lot.bank?.email}`;
+                  const dataToCopy = `Institución: ${lot.bank?.name}\nTipo Cuenta: ${lot.bank?.type}\nNº Cuenta: ${lot.bank?.account}\nTitular: ${lot.bank?.holder}\nRUT Receptor: ${lot.bank?.rut}\nEmail Destino: ${lot.bank?.email}`;
                   navigator.clipboard.writeText(dataToCopy);
                   toast.success("Todos los datos bancarios copiados");
                 }}
@@ -343,13 +343,14 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 { label: "Institución", value: lot.bank?.name, copy: true },
                 { label: "Tipo Cuenta", value: lot.bank?.type, copy: true },
                 { label: "Nº Cuenta", value: lot.bank?.account, copy: true },
+                { label: "Titular", value: lot.bank?.holder, copy: true },
                 { label: "RUT Receptor", value: lot.bank?.rut, copy: true },
                 { label: "Email Destino", value: lot.bank?.email, copy: true },
-              ].map((item, i) => item.value && (
+              ].map((item, i) => (
                 <div key={i} className="flex items-center justify-between p-4 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 group/row">
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 mb-1">{item.label}</p>
-                    <p className="text-sm font-black text-white italic group-hover/row:text-accent transition-colors">{item.value}</p>
+                    <p className="text-sm font-black text-white italic group-hover/row:text-accent transition-colors">{item.value || "No especificado"}</p>
                   </div>
                   {item.copy ? (
                     <button 
