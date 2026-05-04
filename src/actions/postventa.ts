@@ -404,7 +404,11 @@ export async function approveReceipt(receiptId: string) {
       where: { id: receiptId },
       include: { 
         reservation: {
-          include: { user: { select: { fcm_token: true } } }
+          include: { 
+            user: true,
+            project: true,
+            lot: true
+          }
         } 
       },
     });
@@ -444,10 +448,7 @@ export async function approveReceipt(receiptId: string) {
       ]);
     } else if (receipt.scope === "INSTALLMENT") {
       // Get reservation with lot to calculate expected amount
-      const res = await prisma.reservation.findUnique({
-        where: { id: receipt.reservation_id },
-        include: { lot: true, project: true }
-      });
+      const res = receipt.reservation;
 
       if (res) {
         // Calculate what should have been paid (cuota base + penalty)
@@ -553,6 +554,43 @@ export async function approveReceipt(receiptId: string) {
         ]);
       }
 
+    }
+
+    // Auto-generate Digital Payment Receipt PDF
+    try {
+      const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
+      
+      const clientName = receipt.reservation.user?.name || "Cliente Alimin";
+      const rut = receipt.reservation.user?.rut || "No registrado";
+      const email = receipt.reservation.user?.email || "No registrado";
+      const projectName = receipt.reservation.project?.name || "Alimin SPA";
+      const lotNumber = receipt.reservation.lot?.lot_number || receipt.lot_id.toString();
+      const stage = receipt.reservation.lot?.stage || "";
+      const concept = receipt.scope === "PIE" ? "Pago de Pie" : `Pago Cuota(s) x${receipt.installments_count || 1}`;
+      
+      const pdfBase64 = await generateReceiptPDF({
+        clientName,
+        rut,
+        email,
+        projectName,
+        lotNumber,
+        stage,
+        concept,
+        amount: receipt.amount_clp,
+        date: new Date(),
+        receiptId: receipt.id.substring(0, 8).toUpperCase(),
+      });
+
+      await prisma.reservationDocument.create({
+        data: {
+          reservation_id: receipt.reservation_id,
+          name: `Comprobante_Pago_${receipt.id.substring(0, 6)}.pdf`,
+          file_type: "application/pdf",
+          base64_content: `data:application/pdf;base64,${pdfBase64}`,
+        }
+      });
+    } catch (err) {
+      console.error("Failed to generate and save PDF receipt:", err);
     }
 
     memoryCache.deleteByPrefix("postventa_");
