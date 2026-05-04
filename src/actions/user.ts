@@ -46,10 +46,6 @@ export async function getUserLots() {
     });
 
     const lots = (reservations as any[]).map((res) => {
-      const documents = (res.documents || []).map((doc: any) => ({
-        ...doc,
-        url: `/api/documents/${doc.id}`
-      }));
       const lot = res.lot;
       const project = res.project;
       const paidCuotas = res.installments_paid || 0;
