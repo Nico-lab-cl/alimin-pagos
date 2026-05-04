@@ -54,8 +54,8 @@ export async function getUserLots() {
       const pieAmount = res.pie || lot.pie || 0;
       // Sum approved PIE receipts for more accuracy, or fallback to full pie if status is PAID
       const piePaidFromReceipts = res.receipts
-        ?.filter((r) => r.scope === "PIE")
-        .reduce((acc, r) => acc + (r.amount_clp || 0), 0) || 0;
+        ?.filter((r: any) => r.scope === "PIE")
+        .reduce((acc: number, r: any) => acc + (r.amount_clp || 0), 0) || 0;
       const actualPie = Math.max(piePaidFromReceipts, res.pie_status === "PAID" ? pieAmount : 0);
 
       // Calculate installments total using ranges (Nominal Investment)
