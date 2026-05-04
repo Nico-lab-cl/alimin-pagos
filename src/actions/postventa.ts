@@ -564,7 +564,7 @@ export async function approveReceipt(receiptId: string) {
       const rut = receipt.reservation.rut || "No registrado";
       const email = receipt.reservation.user?.email || receipt.reservation.email || "No registrado";
       const projectName = receipt.reservation.project?.name || "Alimin SPA";
-      const lotNumber = receipt.reservation.lot?.number || receipt.lot_id.toString();
+      const lotNumber = (receipt.reservation.lot as any)?.number || receipt.lot_id.toString();
       const stage = receipt.reservation.lot?.stage || "";
       const concept = receipt.scope === "PIE" ? "Pago de Pie" : `Pago Cuota(s) x${receipt.installments_count || 1}`;
       
