@@ -321,6 +321,36 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
     }
   }, [data.upcomingInstallments]);
 
+  const handleCopy = async (text: string, label: string) => {
+    if (!text) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand('copy');
+        } catch (err) {
+          console.error('Fallback copy failed', err);
+          throw new Error('Copy failed');
+        } finally {
+          textArea.remove();
+        }
+      }
+      toast.success(`${label} copiado`);
+    } catch (err) {
+      toast.error("No se pudo copiar al portapapeles");
+      console.error(err);
+    }
+  };
+
   const totalAmount = data.upcomingInstallments
     ? data.upcomingInstallments
         .filter((c: any) => selectedCuotas.includes(c.number))
@@ -500,35 +530,59 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
           <div className="rounded-[2rem] bg-white/[0.02] border border-white/5 p-8 space-y-6 relative overflow-hidden">
             <Building className="absolute -bottom-10 -right-10 w-40 h-40 opacity-5 text-white" />
 
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center border border-accent/20">
-                <Building2 className="w-5 h-5 text-accent" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center border border-accent/20">
+                  <Building2 className="w-5 h-5 text-accent" />
+                </div>
+                <h3 className="text-xl font-black italic tracking-tighter uppercase text-white/80">Datos de Transferencia</h3>
               </div>
-              <h3 className="text-lg font-black italic tracking-tighter uppercase text-white/80">Datos de Transferencia</h3>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const dataToCopy = `Institución: ${data.bank?.name}\nTipo Cuenta: ${data.bank?.type}\nNº Cuenta: ${data.bank?.account}\nTitular: ${data.bank?.holder}\nRUT Receptor: ${data.bank?.rut}\nEmail Destino: ${data.bank?.email}`;
+                  handleCopy(dataToCopy, "Todos los datos bancarios");
+                }}
+                className="px-4 py-2.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[9px] uppercase font-black tracking-widest hover:bg-accent hover:text-black transition-all flex items-center gap-2 w-fit"
+              >
+                <Copy className="w-3.5 h-3.5" /> Copiar Todo
+              </button>
             </div>
 
             <div className="grid gap-3 relative z-10">
               {[
-                { label: "Institución", value: data.bank?.name },
-                { label: "Tipo Cuenta", value: data.bank?.type },
-                { label: "Nº Cuenta", value: data.bank?.account },
-                { label: "Titular", value: data.bank?.holder },
-                { label: "RUT Receptor", value: data.bank?.rut },
-                { label: "Email Destino", value: data.bank?.email },
-              ].map(
-                (item, i) =>
-                  item.value && (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 group/row">
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 mb-0.5">{item.label}</p>
-                        <p className="text-sm font-black text-white italic group-hover/row:text-accent transition-colors">{item.value}</p>
-                      </div>
-                      <div className="p-2 rounded-lg bg-white/5 text-white/20 opacity-0 group-hover/row:opacity-100 transition-all">
-                        <Copy className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  )
-              )}
+                { label: "Institución", value: data.bank?.name, copy: true },
+                { label: "Tipo Cuenta", value: data.bank?.type, copy: true },
+                { label: "Nº Cuenta", value: data.bank?.account, copy: true },
+                { label: "Titular", value: data.bank?.holder, copy: true },
+                { label: "RUT Receptor", value: data.bank?.rut, copy: true },
+                { label: "Email Destino", value: data.bank?.email, copy: true },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 group/row">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 mb-0.5">{item.label}</p>
+                    <p className="text-sm font-black text-white italic group-hover/row:text-accent transition-colors">{item.value || "No especificado"}</p>
+                  </div>
+                  {item.copy ? (
+                    <button 
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); handleCopy(item.value || "", item.label); }}
+                      className="p-2 rounded-lg bg-white/5 text-white/30 hover:bg-accent hover:text-black transition-all"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button 
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); handleCopy(item.value || "", item.label); }}
+                      className="p-2 rounded-lg bg-white/5 text-white/30 hover:bg-white/10 hover:text-white transition-all opacity-0 group-hover/row:opacity-100 focus:opacity-100"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
