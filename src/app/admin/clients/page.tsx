@@ -996,6 +996,33 @@ export default function ClientsPage() {
                         </div>
                       </div>
 
+                      {/* Ajuste de Monto Extra Pagado */}
+                      <div className="border-t border-emerald-500/20 pt-4 mt-2">
+                        <p className="text-[10px] font-black uppercase text-emerald-400/60 tracking-widest mb-3 flex items-center gap-2">
+                          <DollarSign className="w-3 h-3" /> Ajuste Manual de Monto Pagado
+                        </p>
+                        <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-xl p-4 space-y-3">
+                          <div className="space-y-2">
+                            <label className="block text-[8px] text-emerald-400/60 uppercase font-black tracking-widest">Monto Extra Pagado ($)</label>
+                            <input 
+                              type="number" 
+                              value={finForm.extra_paid_amount} 
+                              onChange={e=>setFinForm({...finForm, extra_paid_amount: Number(e.target.value)})} 
+                              className="w-full bg-black/40 border border-emerald-500/20 rounded-xl px-3 py-3 text-lg text-emerald-400 focus:border-emerald-500 outline-none font-black" 
+                              placeholder="Ej: 500000"
+                            />
+                          </div>
+                          <p className="text-[8px] text-white/20 uppercase tracking-widest leading-relaxed">
+                            * Este monto se suma al Total Pagado (Pie + Cuotas + Extra). Úsalo para ajustar cuando el cliente ha pagado más de lo que el sistema calcula automáticamente por cuotas.
+                          </p>
+                          {finForm.extra_paid_amount > 0 && (
+                            <div className="flex items-center gap-2 text-[9px] font-black text-emerald-400 bg-emerald-500/10 px-3 py-2 rounded-lg border border-emerald-500/20">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Monto extra de {formatCLP(finForm.extra_paid_amount)} será incluido en el Total Pagado</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <div className="border-t border-white/10 pt-4 mt-2">
                         <p className="text-[10px] font-black uppercase text-white/40 tracking-widest mb-3">Progreso de Calendario</p>
                         <div className="grid grid-cols-2 gap-4">
@@ -1260,13 +1287,18 @@ export default function ClientsPage() {
                         <div className="h-2 rounded-full bg-white/5 overflow-hidden border border-white/5">
                           <div className="h-full bg-accent" style={{ width: `${(selectedClient.totalCuotas > 0) ? (selectedClient.paidCuotas / selectedClient.totalCuotas) * 100 : 0}%` }} />
                         </div>
-                        <div className="flex justify-between w-full pt-1">
+                        <div className="flex justify-between w-full pt-1 flex-wrap gap-x-4 gap-y-1">
                            <p className="text-[10px] text-white/30 uppercase font-black">
                             Pie: {formatCLP(selectedClient.pieAmount)}
                           </p>
                           <p className="text-[10px] text-white/30 uppercase font-black">
                             Cuota Base: {formatCLP(selectedClient.valor_cuota)}
                           </p>
+                          {selectedClient.extra_paid_amount > 0 && (
+                            <p className="text-[10px] text-emerald-400/60 uppercase font-black">
+                              Extra: {formatCLP(selectedClient.extra_paid_amount)}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>

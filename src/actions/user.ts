@@ -79,9 +79,10 @@ export async function getUserLots() {
           : (lot.valor_cuota || 0);
       }
 
-      // Total Invertido strictly follows (Cuotas + Pie)
+      // Total Invertido strictly follows (Cuotas + Pie + Extra)
       // As requested, we always include the full Pie amount.
-      const totalPaid = calculatedCuotasTotal + pieAmount;
+      const extraPaid = res.extra_paid_amount || 0;
+      const totalPaid = calculatedCuotasTotal + pieAmount + extraPaid;
       const totalToPay = lot.price_total_clp || 0;
       
       // Saldo Remanente = Compromiso Total - Total Invertido (Positive as requested)

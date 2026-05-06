@@ -105,9 +105,10 @@ export async function getFullPostventaData({
           : (lot.valor_cuota || 0);
       }
 
-      // Total Invertido strictly follows (Cuotas + Pie)
+      // Total Invertido strictly follows (Cuotas + Pie + Extra)
       // As requested, we always include the full Pie amount because if they are in the system, it's paid.
-      const totalPaid = calculatedCuotasTotal + pieAmount;
+      const extraPaid = res.extra_paid_amount || 0;
+      const totalPaid = calculatedCuotasTotal + pieAmount + extraPaid;
       
       // Total Commitment is the total lot price
       const totalToPay = lot.price_total_clp || 0;
@@ -1320,7 +1321,8 @@ export async function getClientPOV(reservationId: string) {
         : (lot.valor_cuota || 0);
     }
 
-    const totalPaid = calculatedCuotasTotal + pieAmount;
+    const extraPaid = res.extra_paid_amount || 0;
+    const totalPaid = calculatedCuotasTotal + pieAmount + extraPaid;
     const totalToPay = lot.price_total_clp || 0;
     const pendingBalance = totalToPay - totalPaid;
 
