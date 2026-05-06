@@ -1,7 +1,7 @@
 "use client";
 
 import { X, Loader2, Download, ExternalLink, FileText } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 interface PreviewModalProps {
   isOpen: boolean;
@@ -14,35 +14,57 @@ interface PreviewModalProps {
 export default function PreviewModal({ isOpen, onClose, url, title, fileType }: PreviewModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear safety timeout helper
+  const clearSafetyTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  // Handlers that also cancel the timeout
+  const handleLoadSuccess = useCallback(() => {
+    clearSafetyTimeout();
+    setLoading(false);
+    // Don't set error — the content loaded fine
+  }, [clearSafetyTimeout]);
+
+  const handleLoadError = useCallback(() => {
+    clearSafetyTimeout();
+    setLoading(false);
+    setError(true);
+  }, [clearSafetyTimeout]);
 
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
     if (isOpen) {
       setLoading(true);
       setError(false);
       document.body.style.overflow = "hidden";
-
-      // Timeout de seguridad: si en 10s no carga, mostrar error/descarga
-      timeout = setTimeout(() => {
-        setLoading(false);
-        setError(true);
-      }, 10000);
 
       // Si sabemos de antemano que no es previsualizable (ej: Word)
       const isOffice = fileType?.includes("officedocument") || fileType?.includes("msword");
       if (isOffice) {
         setLoading(false);
         setError(true);
-        clearTimeout(timeout);
+        return;
       }
+
+      // Timeout de seguridad: si en 25s no carga, mostrar error/descarga
+      // (los documentos de promesa pueden ser PDFs pesados)
+      timeoutRef.current = setTimeout(() => {
+        setLoading(false);
+        setError(true);
+      }, 25000);
     } else {
       document.body.style.overflow = "unset";
     }
     return () => {
       document.body.style.overflow = "unset";
-      if (timeout) clearTimeout(timeout);
+      clearSafetyTimeout();
     };
-  }, [isOpen, fileType]);
+  }, [isOpen, fileType, clearSafetyTimeout]);
 
   if (!isOpen) return null;
 
@@ -123,21 +145,15 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
                   src={url} 
                   alt={title} 
                   className="max-w-full max-h-full object-contain shadow-2xl rounded-lg animate-fade-in"
-                  onLoad={() => setLoading(false)}
-                  onError={() => {
-                    setLoading(false);
-                    setError(true);
-                  }}
+                  onLoad={handleLoadSuccess}
+                  onError={handleLoadError}
                 />
               ) : (
                 <iframe 
                   src={`${url}#toolbar=0`} 
                   className="w-full h-full border-none rounded-lg shadow-2xl animate-fade-in"
-                  onLoad={() => setLoading(false)}
-                  onError={() => {
-                    setLoading(false);
-                    setError(true);
-                  }}
+                  onLoad={handleLoadSuccess}
+                  onError={handleLoadError}
                 />
               )}
             </div>
