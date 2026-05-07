@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminProjects, getAdminLots } from "@/actions/postventa";
+import { getAdminProjects, getAdminLots, updateLot } from "@/actions/postventa";
 import { formatCLP } from "@/lib/utils";
-import { Loader2, Search, Map as MapIcon, Layers, ChevronRight, Zap, Filter, LayoutGrid, List } from "lucide-react";
+import { Loader2, Search, Map as MapIcon, Layers, ChevronRight, Zap, Filter, LayoutGrid, List, Plus, MoreVertical, UserPlus, ShieldAlert } from "lucide-react";
+import { toast } from "sonner";
 
 import { useSearch } from "@/context/SearchContext";
+import CreateLotModal from "@/components/admin/CreateLotModal";
+import AssignOwnerModal from "@/components/admin/AssignOwnerModal";
 
 export default function AdminLotsPage() {
   const { search, setSearch } = useSearch();
@@ -17,6 +20,19 @@ export default function AdminLotsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
+  // Modals
+  const [isCreateLotOpen, setIsCreateLotOpen] = useState(false);
+  const [assignOwnerLot, setAssignOwnerLot] = useState<any>(null);
+
+  const fetchLots = async () => {
+    if (!selectedProject) return;
+    setLoading(true);
+    getAdminLots(selectedProject).then((result: any) => {
+      setLots(result.lots || []);
+      setLoading(false);
+    });
+  };
+
   useEffect(() => {
     getAdminProjects().then((result) => {
       if (result.projects?.length) {
@@ -27,14 +43,18 @@ export default function AdminLotsPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedProject) {
-      setLoading(true);
-      getAdminLots(selectedProject).then((result: any) => {
-        setLots(result.lots || []);
-        setLoading(false);
-      });
-    }
+    fetchLots();
   }, [selectedProject]);
+
+  const handleStatusToggle = async (lot: any, newStatus: string) => {
+    const res = await updateLot(lot.id, { status: newStatus });
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success(`Estado del lote ${lot.number} actualizado a ${newStatus}`);
+      fetchLots();
+    }
+  };
 
   const filteredLots = lots.filter(l => 
     l.number.toLowerCase().includes(search.toLowerCase()) ||
@@ -48,7 +68,7 @@ export default function AdminLotsPage() {
   );
 
   return (
-    <div className="space-y-12 animate-fade-in px-4">
+    <div className="space-y-12 animate-fade-in px-4 relative">
       {/* Header Section */}
       <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8">
         <div>
@@ -74,21 +94,6 @@ export default function AdminLotsPage() {
               className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all"
             />
           </div>
-          
-          <div className="flex items-center p-1 rounded-2xl bg-white/5 border border-white/10">
-            <button 
-              onClick={() => setView("grid")}
-              className={`p-3 rounded-xl transition-all ${view === "grid" ? "bg-accent text-[#061010]" : "text-white/20 hover:text-white"}`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => setView("list")}
-              className={`p-3 rounded-xl transition-all ${view === "list" ? "bg-accent text-[#061010]" : "text-white/20 hover:text-white"}`}
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
 
           <select
             value={selectedProject}
@@ -100,6 +105,13 @@ export default function AdminLotsPage() {
               <option key={p.slug} value={p.slug} className="bg-[#0c1a1a]">{p.name}</option>
             ))}
           </select>
+
+          <button 
+            onClick={() => setIsCreateLotOpen(true)}
+            className="px-6 py-4 rounded-2xl btn-metallic-gold text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-[0_10px_30px_rgba(212,168,75,0.2)] hover:shadow-[0_10px_40px_rgba(212,168,75,0.4)] transition-all"
+          >
+            <Plus className="w-4 h-4" /> Nuevo Lote
+          </button>
         </div>
       </div>
 
@@ -113,23 +125,67 @@ export default function AdminLotsPage() {
           {paginatedLots.map((lot, i) => (
             <div
               key={lot.id}
-              className="group relative rounded-[2.5rem] p-8 glass-card animate-slide-up"
+              className="group relative rounded-[2.5rem] p-8 glass-card animate-slide-up hover:border-accent/30 transition-all duration-500 overflow-visible"
               style={{ 
                 animationDelay: `${i * 30}ms`,
                 animationFillMode: "both"
               }}
             >
               <div className="relative z-10">
-                <div className="flex items-start justify-between mb-8">
+                <div className="flex items-start justify-between mb-8 relative">
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-20">Unidad Catastral</p>
                     <h3 className="text-4xl font-black text-white group-hover:text-accent transition-colors tracking-tighter italic">#{lot.number}</h3>
                   </div>
+
+                  <div className="group/menu relative">
+                    <button className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
+                      <MoreVertical className="w-4 h-4 opacity-50" />
+                    </button>
+                    {/* Tooltip Menu */}
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-[#0c1a1a] border border-white/10 rounded-2xl p-2 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200 shadow-2xl z-50 origin-top-right scale-95 group-hover/menu:scale-100">
+                      {lot.status === 'available' && (
+                        <>
+                          <button 
+                            onClick={() => setAssignOwnerLot(lot)}
+                            className="w-full text-left px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-2 transition-colors"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" /> Asignar Dueño
+                          </button>
+                          <button 
+                            onClick={() => handleStatusToggle(lot, 'reserved')}
+                            className="w-full text-left px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-orange-400 hover:bg-orange-500/10 flex items-center gap-2 transition-colors mt-1"
+                          >
+                            <ShieldAlert className="w-3.5 h-3.5" /> Marcar Pacto
+                          </button>
+                        </>
+                      )}
+                      {lot.status !== 'available' && !lot.assignedClient && (
+                        <button 
+                          onClick={() => handleStatusToggle(lot, 'available')}
+                          className="w-full text-left px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/60 hover:bg-white/10 flex items-center gap-2 transition-colors"
+                        >
+                          <Zap className="w-3.5 h-3.5" /> Marcar Libre
+                        </button>
+                      )}
+                      {lot.assignedClient && (
+                        <div className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-white/30 text-center border-t border-white/5 mt-1">
+                          Posee Dueño Activo
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 mb-8">
                   <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                    lot.status === 'available' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
-                    lot.status === 'reserved' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 
-                    'bg-red-500/10 text-red-400 border-red-500/20'
+                    lot.status === 'available' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 
+                    lot.status === 'reserved' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20 shadow-[0_0_10px_rgba(249,115,22,0.2)]' : 
+                    'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
                   }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full inline-block mr-2 animate-pulse ${
+                      lot.status === 'available' ? 'bg-emerald-400' : lot.status === 'reserved' ? 'bg-orange-400' : 'bg-red-400'
+                    }`} />
                     {lot.status === 'available' ? 'Libre' : lot.status === 'reserved' ? 'Pacto' : 'Vendido'}
                   </span>
                 </div>
@@ -141,17 +197,22 @@ export default function AdminLotsPage() {
                   </div>
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-20 mb-1">Área</p>
-                    <p className="text-base font-black text-white/90">{lot.area_m2} m²</p>
+                    <p className="text-base font-black text-white/90">{lot.area_m2 ? `${lot.area_m2} m²` : "—"}</p>
                   </div>
                 </div>
 
-                {lot.assignedClient && (
+                {lot.assignedClient ? (
                   <div className="mb-8 p-4 rounded-2xl bg-white/5 border border-white/5">
                     <p className="text-[9px] font-black uppercase tracking-widest opacity-20 mb-2">Cliente Asignado</p>
                     <p className="text-sm font-black text-white uppercase tracking-tighter truncate">{lot.assignedClient}</p>
                     {lot.assignmentStatus === 'ARCHIVED' && (
                       <span className="text-[8px] font-black text-white/20 uppercase mt-1 block tracking-[0.2em]">Registro Histórico</span>
                     )}
+                  </div>
+                ) : (
+                  <div className="mb-8 p-4 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <UserPlus className="w-5 h-5 text-white/20" />
+                    <p className="text-[9px] font-black uppercase tracking-widest text-white/40">Sin Dueño Asignado</p>
                   </div>
                 )}
 
@@ -204,6 +265,31 @@ export default function AdminLotsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modals */}
+      {isCreateLotOpen && (
+        <CreateLotModal 
+          projectSlug={selectedProject} 
+          onClose={() => setIsCreateLotOpen(false)} 
+          onSuccess={() => {
+            setIsCreateLotOpen(false);
+            toast.success("Lote creado exitosamente");
+            fetchLots();
+          }} 
+        />
+      )}
+
+      {assignOwnerLot && (
+        <AssignOwnerModal 
+          lot={assignOwnerLot} 
+          projectSlug={selectedProject} 
+          onClose={() => setAssignOwnerLot(null)} 
+          onSuccess={() => {
+            setAssignOwnerLot(null);
+            fetchLots();
+          }} 
+        />
       )}
     </div>
   );

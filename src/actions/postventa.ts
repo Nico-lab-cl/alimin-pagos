@@ -2058,3 +2058,303 @@ export async function getIncomeAnalytics(projectSlug: string) {
     return { error: "Error interno al cargar analítica de ingresos" };
   }
 }
+
+/**
+ * Creates a new lot in a project (admin only).
+ */
+export async function createLot(data: {
+  projectSlug: string;
+  number: string;
+  stage?: string;
+  area_m2?: number;
+  price_total_clp: number;
+  reservation_amount_clp?: number;
+  pie?: number;
+  cuotas?: number;
+  valor_cuota?: number;
+  last_installment_amount?: number;
+}) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const project = await prisma.project.findUnique({
+      where: { slug: data.projectSlug },
+    });
+    if (!project) return { error: "Proyecto no encontrado" };
+
+    // Check if lot number already exists in this project (with same stage)
+    const existing = await prisma.lot.findFirst({
+      where: {
+        project_id: project.id,
+        number: data.number,
+        stage: data.stage || null,
+      },
+    });
+    if (existing) {
+      return { error: `El lote ${data.number} ya existe en este proyecto${data.stage ? ` (etapa ${data.stage})` : ""}.` };
+    }
+
+    const lot = await prisma.lot.create({
+      data: {
+        project_id: project.id,
+        number: data.number,
+        stage: data.stage || null,
+        area_m2: data.area_m2 || null,
+        price_total_clp: data.price_total_clp,
+        reservation_amount_clp: data.reservation_amount_clp || 0,
+        pie: data.pie || 0,
+        cuotas: data.cuotas || null,
+        valor_cuota: data.valor_cuota || null,
+        last_installment_amount: data.last_installment_amount || null,
+        status: "available",
+      },
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: "CREATE",
+        entity: "Lot",
+        entity_id: lot.id.toString(),
+        details: `Lote ${data.number} creado en proyecto ${project.name}`,
+        user_id: user.id,
+        user_email: user.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    revalidatePath("/admin/lots");
+
+    return { success: true, lot };
+  } catch (error) {
+    console.error("Error creating lot:", error);
+    return { error: "Error al crear el lote" };
+  }
+}
+
+/**
+ * Updates a lot's status and basic financial data (admin only).
+ */
+export async function updateLot(
+  lotId: number,
+  data: {
+    status?: string;
+    price_total_clp?: number;
+    reservation_amount_clp?: number;
+    pie?: number;
+    cuotas?: number;
+    valor_cuota?: number;
+    last_installment_amount?: number;
+    area_m2?: number;
+    stage?: string;
+  }
+) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const lot = await prisma.lot.findUnique({ where: { id: lotId } });
+    if (!lot) return { error: "Lote no encontrado" };
+
+    await prisma.lot.update({
+      where: { id: lotId },
+      data: {
+        ...(data.status !== undefined && { status: data.status }),
+        ...(data.price_total_clp !== undefined && { price_total_clp: data.price_total_clp }),
+        ...(data.reservation_amount_clp !== undefined && { reservation_amount_clp: data.reservation_amount_clp }),
+        ...(data.pie !== undefined && { pie: data.pie }),
+        ...(data.cuotas !== undefined && { cuotas: data.cuotas }),
+        ...(data.valor_cuota !== undefined && { valor_cuota: data.valor_cuota }),
+        ...(data.last_installment_amount !== undefined && { last_installment_amount: data.last_installment_amount }),
+        ...(data.area_m2 !== undefined && { area_m2: data.area_m2 }),
+        ...(data.stage !== undefined && { stage: data.stage || null }),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "Lot",
+        entity_id: lotId.toString(),
+        details: `Lote ${lot.number} actualizado: ${JSON.stringify(data)}`,
+        user_id: user.id,
+        user_email: user.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    revalidatePath("/admin/lots");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating lot:", error);
+    return { error: "Error al actualizar el lote" };
+  }
+}
+
+/**
+ * Assigns an owner to a lot — creates a User (or reuses existing) and a Reservation.
+ */
+export async function assignLotOwner(data: {
+  lotId: number;
+  projectSlug: string;
+  // Client personal info
+  name: string;
+  lastName?: string;
+  email: string;
+  phone: string;
+  rut?: string;
+  // Address
+  address_street?: string;
+  address_number?: string;
+  address_commune?: string;
+  address_region?: string;
+  // Personal details
+  marital_status?: string;
+  profession?: string;
+  nationality?: string;
+  // Financial
+  pie: number;
+  pie_status?: string;
+  reservation_price?: number;
+  cuotas?: number;
+  valor_cuota?: number;
+  last_installment_value?: number;
+  installments_paid?: number;
+  installment_start_date?: string;
+  daily_penalty?: number;
+  due_day?: number;
+  grace_days?: number;
+  advisor?: string;
+  observation?: string;
+}) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const project = await prisma.project.findUnique({
+      where: { slug: data.projectSlug },
+    });
+    if (!project) return { error: "Proyecto no encontrado" };
+
+    const lot = await prisma.lot.findUnique({ where: { id: data.lotId } });
+    if (!lot) return { error: "Lote no encontrado" };
+
+    // Check if lot already has an active reservation
+    const existingReservation = await prisma.reservation.findFirst({
+      where: { lot_id: lot.id, project_id: project.id, status: "active" },
+    });
+    if (existingReservation) {
+      return { error: "Este lote ya tiene un cliente asignado activo." };
+    }
+
+    // Find or create User
+    let user = await prisma.user.findUnique({ where: { email: data.email } });
+    if (!user) {
+      const hashedPassword = await hash("alimin123", 10);
+      user = await prisma.user.create({
+        data: {
+          email: data.email,
+          name: `${data.name}${data.lastName ? ` ${data.lastName}` : ""}`.trim(),
+          password: hashedPassword,
+          role: "USER",
+        },
+      });
+    }
+
+    // Parse installment start date
+    let installmentStartDate: Date | null = null;
+    if (data.installment_start_date) {
+      installmentStartDate = new Date(data.installment_start_date + "T12:00:00Z");
+    }
+
+    // Create reservation
+    const reservation = await prisma.reservation.create({
+      data: {
+        project_id: project.id,
+        lot_id: lot.id,
+        user_id: user.id,
+        name: data.name,
+        last_name: data.lastName || null,
+        email: data.email,
+        phone: data.phone,
+        rut: data.rut || null,
+        status: "active",
+        pie: data.pie,
+        pie_status: data.pie_status || "APPROVED",
+        reservation_price: data.reservation_price || 0,
+        installments_paid: data.installments_paid || 0,
+        installment_start_date: installmentStartDate,
+        debt_start_date: installmentStartDate,
+        daily_penalty: data.daily_penalty ?? project.daily_penalty_amount ?? 10000,
+        due_day: data.due_day ?? project.due_day_of_month ?? 5,
+        grace_days: data.grace_days ?? project.grace_period_days ?? 5,
+        last_installment_value: data.last_installment_value || null,
+        advisor: data.advisor || null,
+        observation: data.observation || null,
+        address_street: data.address_street || null,
+        address_number: data.address_number || null,
+        address_commune: data.address_commune || null,
+        address_region: data.address_region || null,
+        marital_status: data.marital_status || null,
+        profession: data.profession || null,
+        nationality: data.nationality || "Chilena",
+      },
+    });
+
+    // Update lot status to sold and sync financial data
+    await prisma.lot.update({
+      where: { id: lot.id },
+      data: {
+        status: "sold",
+        ...(data.cuotas !== undefined && { cuotas: data.cuotas }),
+        ...(data.valor_cuota !== undefined && { valor_cuota: data.valor_cuota }),
+        ...(data.last_installment_amount !== undefined && { last_installment_amount: data.last_installment_value }),
+      },
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: "CREATE",
+        entity: "Reservation",
+        entity_id: reservation.id,
+        details: `Dueño asignado a Lote ${lot.number}: ${data.name} ${data.lastName || ""} (${data.email})`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    // Create PIE entry in financial ledger if pie is paid
+    if (data.pie > 0 && (data.pie_status === "PAID" || data.pie_status === "APPROVED")) {
+      await prisma.financialLedger.create({
+        data: {
+          reservation_id: reservation.id,
+          amount_clp: data.pie,
+          category: "PIE",
+          description: "Pie registrado al asignar dueño",
+        },
+      });
+    }
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/lots");
+    revalidatePath("/admin/clients");
+
+    return { success: true, reservation };
+  } catch (error) {
+    console.error("Error assigning lot owner:", error);
+    return { error: "Error al asignar dueño al lote" };
+  }
+}
