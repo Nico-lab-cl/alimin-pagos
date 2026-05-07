@@ -22,7 +22,14 @@ import {
 import { signOut, useSession } from "next-auth/react";
 
 const menuItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { 
+    href: "/admin", 
+    label: "Dashboard", 
+    icon: LayoutDashboard,
+    subItems: [
+      { href: "/admin/income", label: "Ingresos", icon: TrendingUp }
+    ]
+  },
   { href: "/admin/lots", label: "Inventario", icon: Map },
   { href: "/admin/alerts", label: "Alertas", icon: AlertCircle },
   { href: "/admin/clients", label: "Clientes", icon: Users },
@@ -31,6 +38,7 @@ const menuItems = [
 ];
 
 import { SearchProvider, useSearch } from "@/context/SearchContext";
+import { TrendingUp } from "lucide-react";
 
 function HeaderSearch() {
   const { search, setSearch } = useSearch();
@@ -98,24 +106,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Navigation */}
             <nav className="flex-1 space-y-4">
               {menuItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || (item.subItems?.some(s => pathname === s.href));
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`
-                      group flex items-center justify-between px-6 py-5 rounded-[1.5rem] transition-all duration-500
-                      ${isActive 
-                        ? "btn-metallic-gold shadow-[0_15px_35px_rgba(212,168,75,0.3)]" 
-                        : "text-white/30 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/5"}
-                    `}
-                  >
-                    <div className="flex items-center gap-5">
-                      <item.icon className={`w-5 h-5 transition-all duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:text-accent'}`} />
-                      <span className="text-[11px] font-black lowercase tracking-[0.1em] uppercase">{item.label}</span>
-                    </div>
-                    {isActive && <ChevronRight className="w-4 h-4 opacity-50" />}
-                  </Link>
+                  <div key={item.href} className="space-y-2">
+                    <Link
+                      href={item.href}
+                      className={`
+                        group flex items-center justify-between px-6 py-5 rounded-[1.5rem] transition-all duration-500
+                        ${isActive 
+                          ? "btn-metallic-gold shadow-[0_15px_35px_rgba(212,168,75,0.3)]" 
+                          : "text-white/30 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/5"}
+                      `}
+                    >
+                      <div className="flex items-center gap-5">
+                        <item.icon className={`w-5 h-5 transition-all duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:text-accent'}`} />
+                        <span className="text-[11px] font-black lowercase tracking-[0.1em] uppercase">{item.label}</span>
+                      </div>
+                      {isActive && <ChevronRight className="w-4 h-4 opacity-50" />}
+                    </Link>
+                    
+                    {item.subItems && isActive && (
+                      <div className="pl-8 space-y-2 animate-slide-down">
+                        {item.subItems.map((sub) => {
+                          const isSubActive = pathname === sub.href;
+                          return (
+                            <Link
+                              key={sub.href}
+                              href={sub.href}
+                              className={`
+                                flex items-center gap-4 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                                ${isSubActive ? "text-accent bg-accent/10" : "text-white/20 hover:text-white/60 hover:bg-white/5"}
+                              `}
+                            >
+                              <sub.icon className="w-3.5 h-3.5" />
+                              {sub.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>

@@ -1909,3 +1909,152 @@ export async function updateMoraDates(
     return { error: "Error al actualizar fechas de mora" };
   }
 }
+
+/**
+ * Gets income analytics data for the dashboard income page.
+ * Groups FinancialLedger entries by month, providing totals for cuotas, PIE, and penalties.
+ * Uses cash-basis accounting: the paid_at date determines which month a payment belongs to.
+ */
+export async function getIncomeAnalytics(projectSlug: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const project = await prisma.project.findUnique({
+      where: { slug: projectSlug },
+      select: { id: true, name: true },
+    });
+
+    if (!project) return { error: "Proyecto no encontrado" };
+
+    // Get all ledger entries for this project with reservation+user info
+    // Filter: From May 1st, 2026 onwards
+    const filterDate = new Date(2026, 4, 1); // May 1st, 2026
+
+    const ledgerEntries = await prisma.financialLedger.findMany({
+      where: {
+        reservation: { project_id: project.id },
+        OR: [
+          { paid_at: { gte: filterDate } },
+          { 
+            AND: [
+              { paid_at: null },
+              { created_at: { gte: filterDate } }
+            ]
+          }
+        ]
+      },
+      include: {
+        reservation: {
+          select: {
+            name: true,
+            last_name: true,
+            lot: { select: { number: true, stage: true } },
+          },
+        },
+      },
+      orderBy: { paid_at: "desc" },
+    });
+
+    // Build monthly aggregation
+    const monthlyMap = new Map<string, {
+      key: string;
+      year: number;
+      month: number;
+      label: string;
+      cuotas: number;
+      pie: number;
+      penalty: number;
+      total: number;
+      paymentCount: number;
+    }>();
+
+    const monthNames = [
+      "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+      "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
+    ];
+
+    // Detailed records for the table
+    const detailedRecords: any[] = [];
+
+    for (const entry of ledgerEntries) {
+      const paidAt = entry.paid_at ? new Date(entry.paid_at) : new Date(entry.created_at!);
+      const year = paidAt.getFullYear();
+      const month = paidAt.getMonth(); // 0-indexed
+      const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+      const label = `${monthNames[month]} ${year}`;
+
+      if (!monthlyMap.has(key)) {
+        monthlyMap.set(key, {
+          key,
+          year,
+          month: month + 1,
+          label,
+          cuotas: 0,
+          pie: 0,
+          penalty: 0,
+          total: 0,
+          paymentCount: 0,
+        });
+      }
+
+      const bucket = monthlyMap.get(key)!;
+      const amount = entry.amount_clp;
+
+      if (entry.category === "CUOTA") {
+        bucket.cuotas += amount;
+      } else if (entry.category === "PIE") {
+        bucket.pie += amount;
+      } else if (entry.category === "PENALTY") {
+        bucket.penalty += amount;
+      }
+      bucket.total += amount;
+      bucket.paymentCount += 1;
+
+      // Build detailed record
+      const clientName = entry.reservation.last_name
+        ? `${entry.reservation.name} ${entry.reservation.last_name}`.trim()
+        : entry.reservation.name;
+
+      detailedRecords.push({
+        id: entry.id,
+        clientName,
+        lotNumber: entry.reservation.lot.number,
+        lotStage: entry.reservation.lot.stage,
+        amount: entry.amount_clp,
+        category: entry.category,
+        description: entry.description,
+        paidAt: paidAt.toISOString(),
+        monthKey: key,
+      });
+    }
+
+    // Convert map to sorted array (chronological)
+    const monthlyData = Array.from(monthlyMap.values()).sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+
+    // Calculate grand totals
+    const grandTotal = {
+      cuotas: monthlyData.reduce((s, m) => s + m.cuotas, 0),
+      pie: monthlyData.reduce((s, m) => s + m.pie, 0),
+      penalty: monthlyData.reduce((s, m) => s + m.penalty, 0),
+      total: monthlyData.reduce((s, m) => s + m.total, 0),
+      paymentCount: monthlyData.reduce((s, m) => s + m.paymentCount, 0),
+    };
+
+    return {
+      projectName: project.name,
+      monthlyData,
+      detailedRecords,
+      grandTotal,
+    };
+  } catch (error) {
+    console.error("Error getting income analytics:", error);
+    return { error: "Error interno al cargar analítica de ingresos" };
+  }
+}
