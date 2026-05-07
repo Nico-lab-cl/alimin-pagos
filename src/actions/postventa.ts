@@ -2319,7 +2319,7 @@ export async function assignLotOwner(data: {
         status: "sold",
         ...(data.cuotas !== undefined && { cuotas: data.cuotas }),
         ...(data.valor_cuota !== undefined && { valor_cuota: data.valor_cuota }),
-        ...(data.last_installment_amount !== undefined && { last_installment_amount: data.last_installment_value }),
+        ...(data.last_installment_value !== undefined && { last_installment_amount: data.last_installment_value }),
       },
     });
 
