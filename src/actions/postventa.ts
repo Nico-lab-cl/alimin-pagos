@@ -1937,6 +1937,7 @@ export async function getIncomeAnalytics(projectSlug: string) {
     const ledgerEntries = await prisma.financialLedger.findMany({
       where: {
         reservation: { project_id: project.id },
+        category: { not: "PIE" },
         OR: [
           { paid_at: { gte: filterDate } },
           { 

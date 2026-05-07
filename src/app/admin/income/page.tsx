@@ -81,7 +81,6 @@ export default function IncomeAnalyticsPage() {
     { label: "Recaudación Total", value: formatCLP(data?.grandTotal?.total || 0), icon: TrendingUp, color: "text-emerald-400", glow: "shadow-emerald-500/20" },
     { label: "Total Cuotas", value: formatCLP(data?.grandTotal?.cuotas || 0), icon: Wallet, color: "text-blue-400", glow: "shadow-blue-500/20" },
     { label: "Intereses (Mora)", value: formatCLP(data?.grandTotal?.penalty || 0), icon: Zap, color: "text-red-400", glow: "shadow-red-500/20" },
-    { label: "Total PIE", value: formatCLP(data?.grandTotal?.pie || 0), icon: BarChart3, color: "text-accent", glow: "shadow-accent/20" },
   ];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -94,7 +93,7 @@ export default function IncomeAnalyticsPage() {
               <div key={p.name} className="flex items-center justify-between gap-8">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-                  <span className="text-[10px] font-bold uppercase text-white/60">{p.name === "cuotas" ? "Cuotas" : p.name === "penalty" ? "Intereses" : "PIE"}:</span>
+                  <span className="text-[10px] font-bold uppercase text-white/60">{p.name === "cuotas" ? "Cuotas" : "Intereses"}:</span>
                 </div>
                 <span className="text-[11px] font-black text-white">{formatCLP(p.value)}</span>
               </div>
@@ -141,7 +140,7 @@ export default function IncomeAnalyticsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-8">
         {stats.map((s, i) => (
           <div
             key={s.label}
@@ -177,10 +176,6 @@ export default function IncomeAnalyticsPage() {
                   <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
                   <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Intereses</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-accent shadow-[0_0_10px_rgba(212,168,75,0.5)]" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40">PIE</span>
-                </div>
              </div>
           </div>
         </div>
@@ -204,8 +199,7 @@ export default function IncomeAnalyticsPage() {
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
               <Bar dataKey="cuotas" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={40} />
-              <Bar dataKey="penalty" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="pie" stackId="a" fill="#d4a84b" radius={[10, 10, 0, 0]} />
+              <Bar dataKey="penalty" stackId="a" fill="#ef4444" radius={[10, 10, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -281,10 +275,9 @@ export default function IncomeAnalyticsPage() {
                     <div className={`
                       inline-flex px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border
                       ${rec.category === 'CUOTA' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
-                        rec.category === 'PENALTY' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
-                        'bg-accent/10 text-accent border-accent/20'}
+                        'bg-red-500/10 text-red-400 border-red-500/20'}
                     `}>
-                      {rec.category === 'CUOTA' ? 'Cuota' : rec.category === 'PENALTY' ? 'Interés' : 'Pie'}
+                      {rec.category === 'CUOTA' ? 'Cuota' : 'Interés'}
                     </div>
                   </td>
                   <td className="px-8 py-6 text-right">
