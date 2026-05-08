@@ -109,33 +109,55 @@ export default function IncomeAnalyticsPage() {
     let totalCuotas = 0;
     let totalPenalty = 0;
     
-    // Compute chart data (monthly buckets based on filtered records)
-    const monthlyMap = new Map<string, any>();
+    // Determine grouping logic: by day or by month
+    let groupBy = "day";
+    if (dateFilter === "all") {
+      groupBy = "month";
+    } else if (dateFilter === "custom" && cStart && cEnd) {
+      const diffTime = Math.abs(cEnd.getTime() - cStart.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      if (diffDays > 60) groupBy = "month";
+    }
+
+    const chartMap = new Map<string, any>();
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
     records.forEach((rec: any) => {
       const paidAt = new Date(rec.paidAt);
       const year = paidAt.getFullYear();
       const month = paidAt.getMonth();
-      const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+      const day = paidAt.getDate();
+      
+      let key = "";
+      let label = "";
+
+      if (groupBy === "month") {
+        key = `${year}-${String(month + 1).padStart(2, "0")}`;
+        label = `${monthNames[month]} ${year}`;
+      } else {
+        key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        label = `${day} ${monthNames[month]}`;
+      }
       
       if (rec.category === "CUOTA") totalCuotas += rec.amount;
       if (rec.category === "PENALTY") totalPenalty += rec.amount;
 
-      if (!monthlyMap.has(key)) {
-        monthlyMap.set(key, {
-          key, year, month: month + 1, label: `${monthNames[month]} ${year}`,
+      if (!chartMap.has(key)) {
+        chartMap.set(key, {
+          key, year, month: month + 1, day, label,
           cuotas: 0, penalty: 0
         });
       }
-      const bucket = monthlyMap.get(key)!;
+      const bucket = chartMap.get(key)!;
       if (rec.category === "CUOTA") bucket.cuotas += rec.amount;
       if (rec.category === "PENALTY") bucket.penalty += rec.amount;
     });
 
-    const chart = Array.from(monthlyMap.values()).sort((a, b) => {
+    const chart = Array.from(chartMap.values()).sort((a, b) => {
       if (a.year !== b.year) return a.year - b.year;
-      return a.month - b.month;
+      if (a.month !== b.month) return a.month - b.month;
+      if (groupBy === "day") return a.day - b.day;
+      return 0;
     });
 
     return {
