@@ -14,6 +14,7 @@ import {
   Download,
   Filter
 } from "lucide-react";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { 
   BarChart, 
   Bar, 
@@ -237,21 +238,19 @@ export default function IncomeAnalyticsPage() {
       {dateFilter === "custom" && (
         <div className="flex flex-col sm:flex-row items-center justify-end gap-4 animate-fade-in -mt-6">
           <div className="flex items-center gap-3">
-             <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Desde:</span>
-             <input 
-               type="date" 
-               value={customStart}
-               onChange={e => setCustomStart(e.target.value)}
-               className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:border-accent outline-none font-bold"
+             <span className="text-[10px] font-black uppercase tracking-widest text-white/40 mt-2">Desde:</span>
+             <DatePicker 
+               date={customStart}
+               onChange={setCustomStart}
+               className="w-[160px]"
              />
           </div>
           <div className="flex items-center gap-3">
-             <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Hasta:</span>
-             <input 
-               type="date" 
-               value={customEnd}
-               onChange={e => setCustomEnd(e.target.value)}
-               className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:border-accent outline-none font-bold"
+             <span className="text-[10px] font-black uppercase tracking-widest text-white/40 mt-2">Hasta:</span>
+             <DatePicker 
+               date={customEnd}
+               onChange={setCustomEnd}
+               className="w-[160px]"
              />
           </div>
         </div>
