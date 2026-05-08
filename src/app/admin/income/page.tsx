@@ -10,10 +10,9 @@ import {
   Calendar,
   Wallet,
   Zap,
-  BarChart3,
   Search,
-  Filter,
-  Download
+  Download,
+  Filter
 } from "lucide-react";
 import { 
   BarChart, 
@@ -23,9 +22,9 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Legend,
-  Cell
 } from "recharts";
+
+type DateFilter = "all" | "today" | "yesterday" | "this_week" | "this_month" | "custom";
 
 export default function IncomeAnalyticsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -33,9 +32,11 @@ export default function IncomeAnalyticsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // Filters for detailed view
+  // Filters
   const [search, setSearch] = useState("");
-  const [filterMonth, setFilterMonth] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
 
   useEffect(() => {
     getAdminProjects().then((result) => {
@@ -58,15 +59,90 @@ export default function IncomeAnalyticsPage() {
     }
   }, [selectedProject]);
 
-  const filteredRecords = useMemo(() => {
-    if (!data?.detailedRecords) return [];
-    return data.detailedRecords.filter((rec: any) => {
+  const filteredData = useMemo(() => {
+    if (!data?.detailedRecords) return { records: [], stats: null, chart: [] };
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)); // Monday
+    
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const cStart = customStart ? new Date(customStart + "T00:00:00") : null;
+    const cEnd = customEnd ? new Date(customEnd + "T23:59:59") : null;
+
+    let records = data.detailedRecords.filter((rec: any) => {
+      // 1. Text search
       const matchesSearch = rec.clientName.toLowerCase().includes(search.toLowerCase()) || 
                            rec.lotNumber.toLowerCase().includes(search.toLowerCase());
-      const matchesMonth = filterMonth === "all" || rec.monthKey === filterMonth;
-      return matchesSearch && matchesMonth;
+      if (!matchesSearch) return false;
+
+      // 2. Date filter
+      const paidAt = new Date(rec.paidAt);
+      const paidDate = new Date(paidAt.getFullYear(), paidAt.getMonth(), paidAt.getDate());
+
+      switch (dateFilter) {
+        case "today":
+          return paidDate.getTime() === today.getTime();
+        case "yesterday":
+          return paidDate.getTime() === yesterday.getTime();
+        case "this_week":
+          return paidDate.getTime() >= startOfWeek.getTime();
+        case "this_month":
+          return paidDate.getTime() >= startOfMonth.getTime();
+        case "custom":
+          if (cStart && paidDate.getTime() < cStart.getTime()) return false;
+          if (cEnd && paidDate.getTime() > cEnd.getTime()) return false;
+          return true;
+        default:
+          return true; // "all"
+      }
     });
-  }, [data, search, filterMonth]);
+
+    // Compute stats
+    let totalCuotas = 0;
+    let totalPenalty = 0;
+    
+    // Compute chart data (monthly buckets based on filtered records)
+    const monthlyMap = new Map<string, any>();
+    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+    records.forEach((rec: any) => {
+      const paidAt = new Date(rec.paidAt);
+      const year = paidAt.getFullYear();
+      const month = paidAt.getMonth();
+      const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+      
+      if (rec.category === "CUOTA") totalCuotas += rec.amount;
+      if (rec.category === "PENALTY") totalPenalty += rec.amount;
+
+      if (!monthlyMap.has(key)) {
+        monthlyMap.set(key, {
+          key, year, month: month + 1, label: `${monthNames[month]} ${year}`,
+          cuotas: 0, penalty: 0
+        });
+      }
+      const bucket = monthlyMap.get(key)!;
+      if (rec.category === "CUOTA") bucket.cuotas += rec.amount;
+      if (rec.category === "PENALTY") bucket.penalty += rec.amount;
+    });
+
+    const chart = Array.from(monthlyMap.values()).sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+
+    return {
+      records,
+      stats: { total: totalCuotas + totalPenalty, cuotas: totalCuotas, penalty: totalPenalty },
+      chart
+    };
+  }, [data, search, dateFilter, customStart, customEnd]);
 
   if (loading && !data) {
     return (
@@ -77,10 +153,10 @@ export default function IncomeAnalyticsPage() {
     );
   }
 
-  const stats = [
-    { label: "Recaudación Total", value: formatCLP(data?.grandTotal?.total || 0), icon: TrendingUp, color: "text-emerald-400", glow: "shadow-emerald-500/20" },
-    { label: "Total Cuotas", value: formatCLP(data?.grandTotal?.cuotas || 0), icon: Wallet, color: "text-blue-400", glow: "shadow-blue-500/20" },
-    { label: "Intereses (Mora)", value: formatCLP(data?.grandTotal?.penalty || 0), icon: Zap, color: "text-red-400", glow: "shadow-red-500/20" },
+  const statsList = [
+    { label: "Recaudación Total", value: formatCLP(filteredData.stats?.total || 0), icon: TrendingUp, color: "text-emerald-400", glow: "shadow-emerald-500/20" },
+    { label: "Total Cuotas", value: formatCLP(filteredData.stats?.cuotas || 0), icon: Wallet, color: "text-blue-400", glow: "shadow-blue-500/20" },
+    { label: "Intereses (Mora)", value: formatCLP(filteredData.stats?.penalty || 0), icon: Zap, color: "text-red-400", glow: "shadow-red-500/20" },
   ];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -110,7 +186,7 @@ export default function IncomeAnalyticsPage() {
   };
 
   return (
-    <div className="space-y-12 animate-fade-in px-4">
+    <div className="space-y-12 animate-fade-in px-4 relative">
       {/* Header */}
       <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8">
         <div>
@@ -126,10 +202,28 @@ export default function IncomeAnalyticsPage() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4">
+          {/* Date Filter (HubSpot Style) */}
+          <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 relative group h-14">
+            <Calendar className="w-4 h-4 text-accent/60" />
+            <select 
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as DateFilter)}
+              className="flex-1 bg-transparent border-none text-white font-black text-[10px] outline-none uppercase tracking-widest cursor-pointer appearance-none pr-8 h-full"
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right center", backgroundSize: "1rem" }}
+            >
+              <option value="all" className="bg-[#0c1a1a]">Todo el tiempo</option>
+              <option value="today" className="bg-[#0c1a1a]">Hoy</option>
+              <option value="yesterday" className="bg-[#0c1a1a]">Ayer</option>
+              <option value="this_week" className="bg-[#0c1a1a]">Esta semana</option>
+              <option value="this_month" className="bg-[#0c1a1a]">Este mes</option>
+              <option value="custom" className="bg-[#0c1a1a]">Personalizado</option>
+            </select>
+          </div>
+
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[240px] shadow-2xl focus:border-accent/50"
+            className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[240px] shadow-2xl focus:border-accent/50 h-14"
             style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23d4a84b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1.5rem center", backgroundSize: "0.8rem" }}
           >
             {projects.map((p) => (
@@ -139,9 +233,33 @@ export default function IncomeAnalyticsPage() {
         </div>
       </div>
 
+      {/* Custom Date Range Picker (Visible only if 'custom' is selected) */}
+      {dateFilter === "custom" && (
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-4 animate-fade-in -mt-6">
+          <div className="flex items-center gap-3">
+             <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Desde:</span>
+             <input 
+               type="date" 
+               value={customStart}
+               onChange={e => setCustomStart(e.target.value)}
+               className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:border-accent outline-none font-bold"
+             />
+          </div>
+          <div className="flex items-center gap-3">
+             <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Hasta:</span>
+             <input 
+               type="date" 
+               value={customEnd}
+               onChange={e => setCustomEnd(e.target.value)}
+               className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:border-accent outline-none font-bold"
+             />
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-8">
-        {stats.map((s, i) => (
+        {statsList.map((s, i) => (
           <div
             key={s.label}
             className="group relative rounded-[3rem] p-10 glass-card animate-slide-up"
@@ -163,8 +281,8 @@ export default function IncomeAnalyticsPage() {
       <div className="rounded-[3.5rem] p-12 glass-card overflow-hidden">
         <div className="flex flex-col md:flex-row items-center justify-between mb-16 gap-6">
           <div>
-            <h3 className="text-3xl font-black tracking-tighter uppercase italic text-glow">Evolución Mensual</h3>
-            <p className="label-premium mt-2">Comparativa de Cuotas vs Intereses</p>
+            <h3 className="text-3xl font-black tracking-tighter uppercase italic text-glow">Evolución en el tiempo</h3>
+            <p className="label-premium mt-2">Comparativa según filtro aplicado</p>
           </div>
           <div className="flex items-center gap-4">
              <div className="flex items-center gap-6 px-8 py-4 rounded-2xl bg-white/5 border border-white/10">
@@ -181,27 +299,34 @@ export default function IncomeAnalyticsPage() {
         </div>
 
         <div className="h-[400px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data?.monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-              <XAxis 
-                dataKey="label" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fill: '#ffffff30', fontSize: 10, fontWeight: 900 }}
-                dy={15}
-              />
-              <YAxis 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fill: '#ffffff30', fontSize: 10, fontWeight: 900 }}
-                tickFormatter={(val) => `$${(val / 1000000).toFixed(0)}M`}
-              />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-              <Bar dataKey="cuotas" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={40} />
-              <Bar dataKey="penalty" stackId="a" fill="#ef4444" radius={[10, 10, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {filteredData.chart.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={filteredData.chart} margin={{ top: 20, right: 30, left: 20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                <XAxis 
+                  dataKey="label" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#ffffff30', fontSize: 10, fontWeight: 900 }}
+                  dy={15}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#ffffff30', fontSize: 10, fontWeight: 900 }}
+                  tickFormatter={(val) => `$${(val / 1000000).toFixed(0)}M`}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                <Bar dataKey="cuotas" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={40} />
+                <Bar dataKey="penalty" stackId="a" fill="#ef4444" radius={[10, 10, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center text-center opacity-30">
+              <Filter className="w-12 h-12 mb-4" />
+              <p className="text-[10px] font-black uppercase tracking-widest">No hay datos en este rango</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -210,7 +335,7 @@ export default function IncomeAnalyticsPage() {
         <div className="flex flex-col lg:flex-row items-center justify-between mb-12 gap-8">
           <div>
             <h3 className="text-3xl font-black tracking-tighter uppercase italic text-glow">Libro de Ingresos</h3>
-            <p className="label-premium mt-2">Detalle cronológico de todos los pagos recibidos</p>
+            <p className="label-premium mt-2">Detalle cronológico de los pagos</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
@@ -223,20 +348,6 @@ export default function IncomeAnalyticsPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-14 pr-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all"
               />
-            </div>
-
-            <div className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-white/5 border border-white/10 min-w-[200px]">
-              <Calendar className="w-4 h-4 text-accent/60" />
-              <select 
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-                className="flex-1 bg-transparent border-none text-white font-black text-[10px] outline-none uppercase tracking-widest"
-              >
-                <option value="all" className="bg-[#0c1a1a]">TODOS LOS MESES</option>
-                {data?.monthlyData?.map((m: any) => (
-                  <option key={m.key} value={m.key} className="bg-[#0c1a1a]">{m.label.toUpperCase()}</option>
-                ))}
-              </select>
             </div>
           </div>
         </div>
@@ -253,7 +364,7 @@ export default function IncomeAnalyticsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.02]">
-              {filteredRecords.length > 0 ? filteredRecords.map((rec: any) => (
+              {filteredData.records.length > 0 ? filteredData.records.map((rec: any) => (
                 <tr key={rec.id} className="group hover:bg-white/[0.02] transition-colors">
                   <td className="px-8 py-6">
                     <span className="text-[10px] font-black uppercase tracking-widest text-white/40 group-hover:text-white transition-colors">
@@ -268,7 +379,7 @@ export default function IncomeAnalyticsPage() {
                   </td>
                   <td className="px-8 py-6">
                     <div className="inline-flex px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/60">
-                      {rec.lotStage} {rec.lotNumber}
+                      {rec.lotStage ? `${rec.lotStage} ` : ''}{rec.lotNumber}
                     </div>
                   </td>
                   <td className="px-8 py-6">
@@ -296,11 +407,8 @@ export default function IncomeAnalyticsPage() {
         </div>
         
         <div className="mt-10 flex items-center justify-between px-8">
-           <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Mostrando {filteredRecords.length} transacciones</p>
+           <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Mostrando {filteredData.records.length} transacciones</p>
            <button 
-             onClick={() => {
-                // Future CSV export logic
-             }}
              className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white hover:bg-accent hover:border-accent hover:text-[#061010] transition-all"
            >
              <Download className="w-4 h-4" />
