@@ -756,6 +756,51 @@ export async function getAllReceipts(projectSlug: string) {
 }
 
 /**
+ * Gets all reservations for a project (admin reservas view).
+ */
+export async function getProjectReservations(projectSlug: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado", reservations: [] };
+  }
+  if (user.allowedProjects && !user.allowedProjects.includes(projectSlug)) {
+    return { error: "No tienes acceso a este proyecto", reservations: [] };
+  }
+  try {
+    const project = await prisma.project.findUnique({ where: { slug: projectSlug } });
+    if (!project) return { error: "Proyecto no encontrado", reservations: [] };
+    const reservations = await prisma.reservation.findMany({
+      where: { project_id: project.id },
+      orderBy: { created_at: "desc" },
+      include: {
+        lot: { select: { id: true, number: true, stage: true, price_total_clp: true, reservation_amount_clp: true } },
+        user: { select: { id: true, name: true, email: true, portal_active: true } },
+        project: { select: { name: true, slug: true } },
+      },
+    });
+    const mapped = reservations.map((res) => ({
+      id: res.id, name: res.name, last_name: res.last_name,
+      fullName: res.last_name ? `${res.name} ${res.last_name}`.trim() : res.name,
+      email: res.email, phone: res.phone, rut: res.rut, advisor: res.advisor,
+      observation: res.observation, notes: res.notes, status: res.status,
+      pie_status: res.pie_status, pie: res.pie, reservation_price: res.reservation_price,
+      installments_paid: res.installments_paid || 0, created_at: res.created_at,
+      lotNumber: res.lot.number, lotStage: res.lot.stage, lotId: res.lot.id,
+      lotPrice: res.lot.price_total_clp, projectName: res.project.name,
+      portalActive: res.user?.portal_active || false,
+      marital_status: res.marital_status, profession: res.profession,
+      nationality: res.nationality, address_street: res.address_street,
+      address_commune: res.address_commune, address_region: res.address_region,
+    }));
+    return { success: true, reservations: mapped, projectName: project.name };
+  } catch (error) {
+    console.error("Error getting project reservations:", error);
+    return { error: "Error al cargar reservas", reservations: [] };
+  }
+}
+
+/**
  * Gets financial history (ledger) for a specific reservation.
  */
 export async function getFinancialHistory(reservationId: string) {

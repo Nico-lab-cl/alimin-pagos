@@ -17,7 +17,8 @@ import {
   Globe,
   Bell,
   Search,
-  Mail
+  Mail,
+  BookOpen
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
@@ -33,7 +34,14 @@ const menuItems = [
   { href: "/admin/lots", label: "Inventario", icon: Map },
   { href: "/admin/alerts", label: "Alertas", icon: AlertCircle },
   { href: "/admin/clients", label: "Clientes", icon: Users },
-  { href: "/admin/receipts", label: "Comprobantes", icon: CheckSquare },
+  { 
+    href: "/admin/receipts", 
+    label: "Comprobantes", 
+    icon: CheckSquare,
+    subItems: [
+      { href: "/admin/receipts/reservas", label: "Reservas", icon: BookOpen }
+    ]
+  },
   { href: "/admin/email-marketing", label: "Email Marketing", icon: Mail },
 ];
 
