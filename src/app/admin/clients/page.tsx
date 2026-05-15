@@ -1514,6 +1514,15 @@ export default function ClientsPage() {
                           <>
                             <p className="text-[9px] text-red-300/60 font-black uppercase tracking-widest mb-2">Cuotas en Mora</p>
                             <div className="space-y-1.5">
+                              {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED") && selectedClient.manual_penalty > 0 && (
+                                <div className="flex items-center justify-between bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400 shadow-[0_0_4px_rgba(251,146,60,0.5)]" />
+                                    <span className="text-[10px] font-black text-orange-300 uppercase tracking-wider">Mora Histórica (Fija)</span>
+                                  </div>
+                                  <span className="text-[10px] font-black text-orange-400 tracking-widest">{formatCLP(selectedClient.manual_penalty)}</span>
+                                </div>
+                              )}
                               {selectedClient.overdueInstallments.map((inst: any) => (
                                 <div key={inst.number} className="flex items-center justify-between bg-red-500/5 border border-red-500/10 rounded-lg px-3 py-2">
                                   <div className="flex items-center gap-2">
@@ -1527,7 +1536,20 @@ export default function ClientsPage() {
                             </div>
                           </>
                         ) : (
-                          <p className="text-xs text-red-300 font-bold mb-1">Atraso Contable: {selectedClient.lateDays} Días</p>
+                          <div className="space-y-1.5">
+                            {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED") && selectedClient.manual_penalty > 0 && (
+                              <div className="flex items-center justify-between bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-orange-400 shadow-[0_0_4px_rgba(251,146,60,0.5)]" />
+                                  <span className="text-[10px] font-black text-orange-300 uppercase tracking-wider">Mora Histórica (Fija)</span>
+                                </div>
+                                <span className="text-[10px] font-black text-orange-400 tracking-widest">{formatCLP(selectedClient.manual_penalty)}</span>
+                              </div>
+                            )}
+                            {selectedClient.lateDays > 0 && (
+                              <p className="text-xs text-red-300 font-bold">Atraso Contable: {selectedClient.lateDays} Días</p>
+                            )}
+                          </div>
                         )}
                         <p className="text-[10px] uppercase text-red-400/80 font-black tracking-widest pt-1 border-t border-red-500/10">Multa Vigente: {formatCLP(selectedClient.penaltyAmount)}</p>
                       </div>
