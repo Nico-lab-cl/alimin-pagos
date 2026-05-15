@@ -882,7 +882,7 @@ export async function getAdminLots(projectSlug: string) {
 /**
  * Updates a client's profile data, updating both Reservation and underlying User login email.
  */
-export async function updateClientProfile(reservationId: string, data: { name: string, email: string, rut: string, phone: string, observation?: string }) {
+export async function updateClientProfile(reservationId: string, data: { name: string, email: string, rut: string, phone: string, observation?: string, marital_status?: string, profession?: string, nationality?: string, address_street?: string, address_number?: string, address_region?: string, address_commune?: string }) {
   const session = await auth();
   const adminUser = session?.user as any;
   if (!session?.user || adminUser?.role !== "ADMIN") {
@@ -946,7 +946,14 @@ export async function updateClientProfile(reservationId: string, data: { name: s
           email: data.email,
           rut: data.rut,
           phone: data.phone,
-          observation: data.observation
+          observation: data.observation,
+          marital_status: data.marital_status,
+          profession: data.profession,
+          nationality: data.nationality,
+          address_street: data.address_street,
+          address_number: data.address_number,
+          address_region: data.address_region,
+          address_commune: data.address_commune
         }
       });
     } else {
@@ -966,7 +973,14 @@ export async function updateClientProfile(reservationId: string, data: { name: s
             email: data.email,
             rut: data.rut,
             phone: data.phone,
-            observation: data.observation
+            observation: data.observation,
+            marital_status: data.marital_status,
+            profession: data.profession,
+            nationality: data.nationality,
+            address_street: data.address_street,
+            address_number: data.address_number,
+            address_region: data.address_region,
+            address_commune: data.address_commune
           }
         })
       ]);
