@@ -1509,9 +1509,27 @@ export default function ClientsPage() {
                     </div>
 
                     {selectedClient.status === "LATE" && (
-                      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mt-2">
-                        <p className="text-xs text-red-300 font-bold mb-1">Atraso Contable: {selectedClient.lateDays} Días</p>
-                        <p className="text-[10px] uppercase text-red-400/80 font-black tracking-widest">Multa Vigente: {formatCLP(selectedClient.penaltyAmount)}</p>
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mt-2 space-y-3">
+                        {selectedClient.overdueInstallments && selectedClient.overdueInstallments.length > 0 ? (
+                          <>
+                            <p className="text-[9px] text-red-300/60 font-black uppercase tracking-widest mb-2">Cuotas en Mora</p>
+                            <div className="space-y-1.5">
+                              {selectedClient.overdueInstallments.map((inst: any) => (
+                                <div key={inst.number} className="flex items-center justify-between bg-red-500/5 border border-red-500/10 rounded-lg px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-red-400 shadow-[0_0_4px_rgba(248,113,113,0.5)]" />
+                                    <span className="text-[10px] font-black text-red-300 uppercase tracking-wider">Cuota {inst.number}</span>
+                                    <span className="text-[8px] font-bold text-white/20 uppercase tracking-widest">{inst.monthName}</span>
+                                  </div>
+                                  <span className="text-[10px] font-black text-red-400 tracking-widest">{inst.lateDays} {inst.lateDays === 1 ? 'día' : 'días'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-xs text-red-300 font-bold mb-1">Atraso Contable: {selectedClient.lateDays} Días</p>
+                        )}
+                        <p className="text-[10px] uppercase text-red-400/80 font-black tracking-widest pt-1 border-t border-red-500/10">Multa Vigente: {formatCLP(selectedClient.penaltyAmount)}</p>
                       </div>
                     )}
                     {selectedClient.nextDueDate && (

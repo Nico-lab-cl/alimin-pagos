@@ -120,6 +120,7 @@ export async function getFullPostventaData({
       let nextDueDate: Date | null = null;
       let lateDays = 0;
       let penaltyAmount = 0;
+      let overdueInstallments: { number: number; dueDate: string; monthName: string; lateDays: number; penaltyAmount: number }[] = [];
       const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
@@ -176,6 +177,53 @@ export async function getFullPostventaData({
           );
           penaltyAmount = autoPenalty;
           lateDays = autoLateDays;
+        }
+
+        // Build per-installment overdue breakdown for admin display
+        const formatMonthAdmin = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'America/Santiago' });
+        const totalPendingRemaining = totalCuotas - paidCuotas;
+        for (let i = 0; i < totalPendingRemaining; i++) {
+          const installmentNumber = paidCuotas + 1 + i;
+          let currentDue: Date;
+          if (i === 0 && res.next_payment_date) {
+            currentDue = new Date(res.next_payment_date);
+          } else {
+            currentDue = getInstallmentDueDate(
+              res.installment_start_date,
+              installmentNumber,
+              res.due_day ?? project.due_day_of_month ?? 5
+            );
+          }
+
+          // Only auto penalty per installment
+          let autoPenaltyForThis = 0;
+          if (res.mora_status !== "CONGELADO" && res.mora_status !== "AL_DIA" && !res.mora_frozen) {
+            autoPenaltyForThis = calculateTotalInterest(
+              currentDue,
+              currentDate,
+              false,
+              res.grace_days ?? project.grace_period_days ?? 5,
+              activeDailyPenalty,
+              (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+              project.penalty_start_date,
+              res.debt_end_date
+            );
+          }
+
+          if (autoPenaltyForThis > 0) {
+            const days = Math.round(autoPenaltyForThis / activeDailyPenalty);
+            const monthRaw = formatMonthAdmin.format(currentDue);
+            overdueInstallments.push({
+              number: installmentNumber,
+              dueDate: currentDue.toISOString(),
+              monthName: monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1),
+              lateDays: days,
+              penaltyAmount: autoPenaltyForThis,
+            });
+          } else {
+            // Stop once we hit installments that are not overdue
+            break;
+          }
         }
       }
 
@@ -264,6 +312,7 @@ export async function getFullPostventaData({
         nextDueDate,
         lateDays,
         penaltyAmount,
+        overdueInstallments,
         isGracePeriod,
         isUpcoming,
         isLate: penaltyAmount > 0,
