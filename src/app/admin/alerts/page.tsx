@@ -26,6 +26,7 @@ export default function AlertsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterStatus>("ALL");
   const [search, setSearch] = useState("");
+  const [selectedAlertClient, setSelectedAlertClient] = useState<any>(null);
   
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -226,7 +227,15 @@ export default function AlertsPage() {
                     : "AL DÍA"}
                 </div>
 
-                <button className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-accent hover:text-[#061010] transition-all">
+                <button 
+                  onClick={() => {
+                    if (client.status === "LATE") {
+                      setSelectedAlertClient(client);
+                    }
+                  }}
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-accent hover:text-[#061010] transition-all"
+                  title={client.status === "LATE" ? "Ver Desglose de Mora" : "Ver Cliente"}
+                >
                   <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
@@ -264,6 +273,99 @@ export default function AlertsPage() {
             >
               <ChevronRight className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {selectedAlertClient && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#0c1a1a] border border-white/10 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between sticky top-0 bg-[#0c1a1a] z-10">
+              <div>
+                <h3 className="text-lg font-black text-white uppercase tracking-tighter italic">Desglose de Mora</h3>
+                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mt-1">{selectedAlertClient.clientName}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedAlertClient(null)}
+                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
+              {/* Resumen Total */}
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] text-red-300/60 font-black uppercase tracking-widest mb-1">Total Multa Vigente</p>
+                  <p className="text-2xl font-black text-red-400">{formatCLP(selectedAlertClient.penaltyAmount)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] text-red-300/60 font-black uppercase tracking-widest mb-1">Atraso Contable</p>
+                  <p className="text-lg font-bold text-red-300">{selectedAlertClient.lateDays} Días</p>
+                </div>
+              </div>
+
+              {/* Mora Histórica Fija */}
+              {(selectedAlertClient.penalty_mode === "FIXED" || selectedAlertClient.penalty_mode === "MIXED") && selectedAlertClient.manual_penalty > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-orange-400">
+                    <ShieldAlert className="w-4 h-4" />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest">Mora Histórica (Acuerdo Fijo)</h4>
+                  </div>
+                  <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-4">
+                    <p className="text-[10px] font-bold text-orange-200/80 mb-3 leading-relaxed uppercase tracking-wider">
+                      El cliente tiene un monto fijo de penalización configurado manualmente en su estado financiero. Este monto se suma al total de la deuda.
+                    </p>
+                    <div className="flex items-center justify-between bg-orange-500/10 rounded-xl px-4 py-3 border border-orange-500/20">
+                      <span className="text-[10px] font-black text-orange-300 uppercase tracking-widest">Monto Fijo Pactado</span>
+                      <span className="text-sm font-black text-orange-400">{formatCLP(selectedAlertClient.manual_penalty)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Desglose Cuotas */}
+              {selectedAlertClient.overdueInstallments && selectedAlertClient.overdueInstallments.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-red-400">
+                    <AlertTriangle className="w-4 h-4" />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest">Cuotas Vencidas (Mora Diaria)</h4>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedAlertClient.overdueInstallments.map((inst: any) => (
+                      <div key={inst.number} className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex items-center justify-between hover:bg-white/[0.04] transition-colors">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-black text-white uppercase tracking-wider">Cuota {inst.number}</span>
+                            <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded-md border border-white/5">{inst.monthName}</span>
+                          </div>
+                          <p className="text-[10px] text-red-400/80 font-bold uppercase tracking-widest">
+                            Venció el {formatDate(inst.dueDate)}
+                          </p>
+                        </div>
+                        <div className="text-right flex flex-col items-end gap-1.5">
+                          <span className="text-sm font-black text-red-400">{formatCLP(inst.penaltyAmount)}</span>
+                          <span className="text-[8px] font-black text-red-300/60 uppercase tracking-widest bg-red-500/10 px-2 py-0.5 rounded-md border border-red-500/10">
+                            {inst.lateDays} {inst.lateDays === 1 ? 'día' : 'días'} de atraso
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-white/5 bg-black/20">
+              <button 
+                onClick={() => setSelectedAlertClient(null)}
+                className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 transition-colors"
+              >
+                Cerrar Detalle
+              </button>
+            </div>
           </div>
         </div>
       )}
