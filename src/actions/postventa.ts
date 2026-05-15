@@ -136,13 +136,11 @@ export async function getFullPostventaData({
           nextDueDate = calculatedDueDate;
         }
 
-        // Determine penalty: FIXED (manual), MIXED (manual + auto) or AUTO (date-based)
-        if (res.penalty_mode === "FIXED" && res.manual_penalty != null && res.manual_penalty > 0) {
-          penaltyAmount = res.manual_penalty;
-          if (activeDailyPenalty > 0) {
-            lateDays = Math.round(penaltyAmount / activeDailyPenalty);
-          }
-        } else if (res.penalty_mode === "MIXED") {
+        // Determine penalty: FIXED/MIXED (manual + auto) or AUTO (date-based)
+        if (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") {
+          // Both FIXED and MIXED: fixed penalty + auto penalty for currently-late installments
+          // Pass null for debt_start_date so auto calc uses normal grace period,
+          // because the fixed amount already covers historical debt.
           const { totalPenaltyAmount: autoPenalty, totalLateDays: autoLateDays } = calculateAggregatedAutoPenalty(
             totalCuotas - paidCuotas,
             paidCuotas,
@@ -152,19 +150,16 @@ export async function getFullPostventaData({
             res.mora_frozen || false,
             res.grace_days ?? project.grace_period_days ?? 5,
             activeDailyPenalty,
-            res.debt_start_date,
+            null, // Don't use debt_start_date — fixed penalty covers historical debt
             project.penalty_start_date,
             res.debt_end_date,
             res.next_payment_date
           );
-          
           const fixedPenalty = (res.manual_penalty != null && res.manual_penalty > 0) ? res.manual_penalty : 0;
           penaltyAmount = autoPenalty + fixedPenalty;
-
-          if (penaltyAmount > 0 && activeDailyPenalty > 0) {
-            lateDays = Math.round(penaltyAmount / activeDailyPenalty);
-          }
+          lateDays = autoLateDays;
         } else {
+          // AUTO: pure automatic penalty based on dates
           const { totalPenaltyAmount: autoPenalty, totalLateDays: autoLateDays } = calculateAggregatedAutoPenalty(
             totalCuotas - paidCuotas,
             paidCuotas,
@@ -1368,13 +1363,8 @@ export async function getClientPOV(reservationId: string) {
         nextDueDate = calculatedDueDate;
       }
 
-      // Penalty calculation
-      if (res.penalty_mode === "FIXED" && res.manual_penalty != null && res.manual_penalty > 0) {
-        penaltyAmount = res.manual_penalty;
-        if (activeDailyPenalty > 0) {
-          lateDays = Math.round(penaltyAmount / activeDailyPenalty);
-        }
-      } else if (res.penalty_mode === "MIXED") {
+      // Penalty calculation: FIXED/MIXED (manual + auto) or AUTO (date-based)
+      if (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") {
         const { totalPenaltyAmount: autoPenalty, totalLateDays: autoLateDays } = calculateAggregatedAutoPenalty(
           totalCuotas - paidCuotas,
           paidCuotas,
@@ -1384,18 +1374,16 @@ export async function getClientPOV(reservationId: string) {
           res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
           res.grace_days ?? project.grace_period_days ?? 5,
           activeDailyPenalty,
-          res.debt_start_date,
+          null, // Don't use debt_start_date — fixed penalty covers historical debt
           project.penalty_start_date,
           res.debt_end_date,
           res.next_payment_date
         );
         const fixedPenalty = (res.manual_penalty != null && res.manual_penalty > 0) ? res.manual_penalty : 0;
         penaltyAmount = autoPenalty + fixedPenalty;
-
-        if (penaltyAmount > 0 && activeDailyPenalty > 0) {
-          lateDays = Math.round(penaltyAmount / activeDailyPenalty);
-        }
+        lateDays = autoLateDays;
       } else {
+        // AUTO: pure automatic penalty based on dates
         const { totalPenaltyAmount: autoPenalty, totalLateDays: autoLateDays } = calculateAggregatedAutoPenalty(
           totalCuotas - paidCuotas,
           paidCuotas,
@@ -1461,16 +1449,17 @@ export async function getClientPOV(reservationId: string) {
         let installmentPenaltyAmount = 0;
         let installmentLateDays = 0;
 
-        // Calculate auto penalty for this specific installment
+        // Calculate auto penalty for this specific installment (always, regardless of penalty_mode)
         let autoPenaltyForThis = 0;
-        if (res.penalty_mode !== "FIXED" && res.mora_status === "ACTIVO") {
+        if (res.mora_status === "ACTIVO") {
           autoPenaltyForThis = calculateTotalInterest(
             currentDue,
             currentDate,
             res.mora_frozen || false,
             res.grace_days ?? project.grace_period_days ?? 5,
             activeDailyPenalty,
-            i === 0 ? res.debt_start_date : null,
+            // For FIXED/MIXED, don't use debt_start_date (fixed penalty covers history)
+            (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
             project.penalty_start_date,
             res.debt_end_date
           );
