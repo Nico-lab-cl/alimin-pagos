@@ -48,21 +48,7 @@ const menuItems = [
 import { SearchProvider, useSearch } from "@/context/SearchContext";
 import { TrendingUp } from "lucide-react";
 
-function HeaderSearch() {
-  const { search, setSearch } = useSearch();
-  return (
-    <div className="relative group">
-      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-accent transition-colors" />
-      <input 
-        type="text" 
-        placeholder="BUSCAR..." 
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="pl-12 pr-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black tracking-widest uppercase outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all w-64"
-      />
-    </div>
-  );
-}
+
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -208,10 +194,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </header>
 
           {/* Top Internal Header (Desktop Only) */}
-          <header className="hidden lg:flex items-center justify-between px-12 py-8 bg-transparent">
-            <div className="flex items-center gap-6">
-              <HeaderSearch />
-            </div>
+          <header className="hidden lg:flex items-center justify-end px-12 py-8 bg-transparent">
             <div className="flex items-center gap-6">
               <button className="relative p-3 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all">
                 <Bell className="w-5 h-5" />
