@@ -92,20 +92,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[150px]" />
         </div>
 
-        {/* Sidebar - Desktop */}
+        {/* Sidebar Placeholder - Desktop Only */}
+        <div className="hidden lg:block lg:w-24 flex-shrink-0 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]" />
+
+        {/* Sidebar - Desktop & Mobile */}
         <aside className={`
-          fixed lg:static inset-y-0 left-0 z-50
-          w-80 glass-panel border-r border-white/5
-          transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]
-          ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          fixed inset-y-0 left-0 z-50
+          glass-panel border-r border-white/5
+          transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]
+          ${isOpen ? "translate-x-0 w-80" : "-translate-x-full lg:translate-x-0 lg:w-24 lg:hover:w-80"}
+          group/sidebar
         `}>
-          <div className="h-full flex flex-col p-10">
+          <div className="h-full flex flex-col p-10 px-5 lg:px-5 lg:group-hover/sidebar:px-10 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]">
             {/* Logo Section */}
-            <div className="flex items-center gap-5 mb-16 group cursor-pointer">
-              <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-[0_10px_40px_rgba(212,168,75,0.2)] transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 p-2">
+            <div className="flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start mb-16 cursor-pointer gap-5 lg:gap-0 lg:group-hover/sidebar:gap-5 transition-all duration-500">
+              <div className="w-14 h-14 lg:w-12 lg:h-12 lg:group-hover/sidebar:w-14 lg:group-hover/sidebar:h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-[0_10px_40px_rgba(212,168,75,0.2)] transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 p-2 flex-shrink-0">
                 <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
               </div>
-              <div>
+              <div className="transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs flex flex-col justify-center">
                 <h1 className="text-3xl font-black tracking-tighter uppercase leading-none italic text-glow">Alimin</h1>
                 <p className="text-[10px] font-black text-accent tracking-[0.4em] uppercase mt-1.5 opacity-60">Consola Central</p>
               </div>
@@ -120,21 +124,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <Link
                       href={item.href}
                       className={`
-                        group flex items-center justify-between px-6 py-5 rounded-[1.5rem] transition-all duration-500
+                        group flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start px-6 lg:px-4 lg:group-hover/sidebar:px-6 py-5 rounded-[1.5rem] transition-all duration-500
                         ${isActive 
                           ? "btn-metallic-gold shadow-[0_15px_35px_rgba(212,168,75,0.3)]" 
                           : "text-white/30 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/5"}
                       `}
                     >
-                      <div className="flex items-center gap-5">
-                        <item.icon className={`w-5 h-5 transition-all duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:text-accent'}`} />
-                        <span className="text-[11px] font-black lowercase tracking-[0.1em] uppercase">{item.label}</span>
+                      <div className="flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start transition-all duration-500 w-full">
+                        <item.icon className={`w-5 h-5 flex-shrink-0 transition-all duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:text-accent'}`} />
+                        <span className="text-[11px] font-black lowercase tracking-[0.1em] uppercase transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs ml-5 lg:ml-0 lg:group-hover/sidebar:ml-5">{item.label}</span>
                       </div>
-                      {isActive && <ChevronRight className="w-4 h-4 opacity-50" />}
+                      {isActive && <ChevronRight className="w-4 h-4 opacity-50 flex-shrink-0 transition-all duration-500 lg:opacity-0 lg:group-hover/sidebar:opacity-50" />}
                     </Link>
                     
                     {item.subItems && isActive && (
-                      <div className="pl-8 space-y-2 animate-slide-down">
+                      <div className="pl-8 space-y-2 animate-slide-down transition-all duration-500 lg:max-h-0 lg:opacity-0 lg:overflow-hidden lg:group-hover/sidebar:max-h-40 lg:group-hover/sidebar:opacity-100">
                         {item.subItems.map((sub) => {
                           const isSubActive = pathname === sub.href;
                           return (
@@ -142,12 +146,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                               key={sub.href}
                               href={sub.href}
                               className={`
-                                flex items-center gap-4 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                                flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
                                 ${isSubActive ? "text-accent bg-accent/10" : "text-white/20 hover:text-white/60 hover:bg-white/5"}
                               `}
                             >
-                              <sub.icon className="w-3.5 h-3.5" />
-                              {sub.label}
+                              <sub.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span className="transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs ml-4 lg:ml-0 lg:group-hover/sidebar:ml-4">{sub.label}</span>
                             </Link>
                           );
                         })}
@@ -160,12 +164,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             {/* User Section & Logout */}
             <div className="mt-auto pt-10 border-t border-white/5 space-y-6">
-              <div className="flex items-center gap-5 px-3">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group overflow-hidden relative shadow-inner">
+              <div className="flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start gap-5 lg:gap-0 lg:group-hover/sidebar:gap-5 px-3 lg:px-1 lg:group-hover/sidebar:px-3 transition-all duration-500">
+                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group overflow-hidden relative shadow-inner flex-shrink-0">
                   <div className="absolute inset-0 bg-accent transition-transform duration-700 translate-y-full group-hover:translate-y-0 opacity-20" />
                   <span className="text-sm font-black text-accent relative z-10">AD</span>
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs">
                   <p className="text-xs font-black truncate uppercase tracking-[0.15em] leading-none mb-1.5">{session?.user?.name || "Administrador"}</p>
                   <div className="flex items-center gap-2 text-[9px] text-emerald-400 font-black uppercase tracking-widest">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-glow" />
@@ -176,10 +180,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center gap-4 px-6 py-5 rounded-2xl text-white/20 hover:text-red-400 hover:bg-red-400/5 border border-transparent hover:border-red-400/10 transition-all duration-500"
+                className="w-full flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start gap-4 lg:gap-0 lg:group-hover/sidebar:gap-4 px-6 lg:px-4 lg:group-hover/sidebar:px-6 py-5 rounded-2xl text-white/20 hover:text-red-400 hover:bg-red-400/5 border border-transparent hover:border-red-400/10 transition-all duration-500"
               >
-                <LogOut className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Cerrar Sesión</span>
+                <LogOut className="w-5 h-5 flex-shrink-0 transition-transform group-hover:-translate-x-1" />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs">Cerrar Sesión</span>
               </button>
             </div>
           </div>
