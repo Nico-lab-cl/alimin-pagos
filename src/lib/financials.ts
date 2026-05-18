@@ -57,7 +57,25 @@ export function calculateTotalInterest(
 
   if (debtStartDate) {
     // Manual debt start date overrides grace period calculation
-    gDate = new Date(debtStartDate);
+    const dStart = new Date(debtStartDate);
+    dStart.setHours(0, 0, 0, 0);
+    
+    // Only apply manual start date if it is greater than or equal to the due date of the current installment
+    if (dStart >= dueDate) {
+      gDate = dStart;
+    } else {
+      // If it is before the current due date, it's obsolete historical data, so use normal grace calculation
+      const gracePeriodEnd = new Date(dueDate);
+      gracePeriodEnd.setDate(dueDate.getDate() + gracePeriodDays);
+      gracePeriodEnd.setHours(23, 59, 59, 999);
+      
+      if (paymentDate <= gracePeriodEnd) {
+        return 0;
+      }
+
+      gDate = new Date(gracePeriodEnd);
+      gDate.setDate(gDate.getDate() + 1);
+    }
   } else {
     // Grace period ends X days after due date
     const gracePeriodEnd = new Date(dueDate);

@@ -128,7 +128,7 @@ export async function getUserLots() {
             res.installment_start_date,
             res.due_day ?? project.due_day_of_month ?? 5,
             currentDate,
-            res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
+            res.mora_status === "CONGELADO" || (res.mora_frozen || false),
             res.grace_days ?? project.grace_period_days ?? 5,
             activeDailyPenalty,
             null, // Don't use debt_start_date — fixed penalty covers historical debt
@@ -147,7 +147,7 @@ export async function getUserLots() {
             res.installment_start_date,
             res.due_day ?? project.due_day_of_month ?? 5,
             currentDate,
-            res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
+            res.mora_status === "CONGELADO" || (res.mora_frozen || false),
             res.grace_days ?? project.grace_period_days ?? 5,
             activeDailyPenalty,
             res.debt_start_date,
@@ -210,7 +210,7 @@ export async function getUserLots() {
           
           // Calculate auto penalty for this specific installment (always, regardless of penalty_mode)
           let autoPenaltyForThis = 0;
-          if (res.mora_status === "ACTIVO") {
+          if (res.mora_status !== "CONGELADO" && !res.mora_frozen) {
             autoPenaltyForThis = calculateTotalInterest(
               currentDue,
               currentDate,
@@ -314,9 +314,9 @@ export async function getUserLots() {
         nextDueDate,
         penaltyAmount,
         lateDays,
-        isLate: penaltyAmount > 0 && res.mora_status === "ACTIVO",
+        isLate: penaltyAmount > 0,
         isMoraFrozen: res.mora_status === "CONGELADO" || res.mora_frozen,
-        isUpToDate: res.mora_status === "AL_DIA",
+        isUpToDate: penaltyAmount === 0 && !res.mora_frozen && res.mora_status !== "CONGELADO",
         dailyPenalty: res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
         upcomingInstallments,
         documents,

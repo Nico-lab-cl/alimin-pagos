@@ -197,7 +197,7 @@ export async function getFullPostventaData({
 
           // Only auto penalty per installment
           let autoPenaltyForThis = 0;
-          if (res.mora_status !== "CONGELADO" && res.mora_status !== "AL_DIA" && !res.mora_frozen) {
+          if (res.mora_status !== "CONGELADO" && !res.mora_frozen) {
             autoPenaltyForThis = calculateTotalInterest(
               currentDue,
               currentDate,
@@ -249,14 +249,11 @@ export async function getFullPostventaData({
 
       let status = "OK";
       
-      // Override logic for COMPLETED, AL_DIA and CONGELADO
+      // Override logic for COMPLETED and CONGELADO
       if (res.status === "COMPLETED") {
         status = "COMPLETED";
         penaltyAmount = 0;
         pendingBalance = 0; // Ensure balance is 0 for paid in full
-      } else if (res.mora_status === "AL_DIA") {
-        status = "OK";
-        penaltyAmount = 0;
       } else if (res.mora_status === "CONGELADO" || res.mora_frozen) {
         status = "FROZEN";
         penaltyAmount = 0;
@@ -355,9 +352,9 @@ export async function getFullPostventaData({
 
     const stats = {
       total: processedData.length,
-      late: processedData.filter((d) => d.isLate && d.mora_status === "ACTIVO").length,
-      grace: processedData.filter((d) => d.isGracePeriod && d.mora_status === "ACTIVO").length,
-      upcoming: processedData.filter((d) => d.isUpcoming && d.mora_status === "ACTIVO").length,
+      late: processedData.filter((d) => d.status === "LATE").length,
+      grace: processedData.filter((d) => d.status === "GRACE").length,
+      upcoming: processedData.filter((d) => d.status === "UPCOMING").length,
       ok: processedData.filter((d) => d.status === "OK").length,
     };
 
@@ -1434,7 +1431,7 @@ export async function getClientPOV(reservationId: string) {
           res.installment_start_date,
           res.due_day ?? project.due_day_of_month ?? 5,
           currentDate,
-          res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
+          res.mora_status === "CONGELADO" || (res.mora_frozen || false),
           res.grace_days ?? project.grace_period_days ?? 5,
           activeDailyPenalty,
           null, // Don't use debt_start_date — fixed penalty covers historical debt
@@ -1453,7 +1450,7 @@ export async function getClientPOV(reservationId: string) {
           res.installment_start_date,
           res.due_day ?? project.due_day_of_month ?? 5,
           currentDate,
-          res.mora_status === "CONGELADO" || res.mora_status === "AL_DIA" || (res.mora_frozen || false),
+          res.mora_status === "CONGELADO" || (res.mora_frozen || false),
           res.grace_days ?? project.grace_period_days ?? 5,
           activeDailyPenalty,
           res.debt_start_date,
@@ -1617,9 +1614,9 @@ export async function getClientPOV(reservationId: string) {
         nextDueDate,
         penaltyAmount,
         lateDays,
-        isLate: penaltyAmount > 0 && res.mora_status === "ACTIVO",
+        isLate: penaltyAmount > 0,
         isMoraFrozen: res.mora_status === "CONGELADO" || res.mora_frozen,
-        isUpToDate: res.mora_status === "AL_DIA",
+        isUpToDate: penaltyAmount === 0 && !res.mora_frozen && res.mora_status !== "CONGELADO",
         dailyPenalty: activeDailyPenalty,
         upcomingInstallments,
         documents,
