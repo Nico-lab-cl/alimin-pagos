@@ -25,7 +25,10 @@ export async function getUserLots() {
 
   try {
     const reservations = await prisma.reservation.findMany({
-      where: { user_id: userId, status: "active" },
+      where: {
+        user_id: userId,
+        status: { in: ["active", "COMPLETED"] },
+      },
       include: {
         project: true,
         lot: true,

@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { memoryCache } from "@/lib/cache";
 
 /**
  * Uploads a document associated with a reservation.
@@ -39,6 +40,9 @@ export async function uploadDocument({
     });
 
     console.log(`[ACTION] uploadDocument SUCCESS: ${document.id}`);
+
+    // Invalidate user data cache so user sees new document instantly
+    memoryCache.deleteByPrefix("user_data_");
 
     // Force revalidation for both views
     revalidatePath("/admin/clients");
@@ -95,6 +99,9 @@ export async function deleteDocument(documentId: string) {
     });
 
     console.log(`[ACTION] deleteDocument SUCCESS for: ${doc.id}`);
+
+    // Invalidate user data cache so deleted document disappears instantly
+    memoryCache.deleteByPrefix("user_data_");
 
     revalidatePath("/admin/clients");
     revalidatePath("/user/documents");
