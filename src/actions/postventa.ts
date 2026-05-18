@@ -1511,7 +1511,7 @@ export async function getClientPOV(reservationId: string) {
 
         // Calculate auto penalty for this specific installment (always, regardless of penalty_mode)
         let autoPenaltyForThis = 0;
-        if (res.mora_status === "ACTIVO") {
+        if (res.mora_status !== "CONGELADO" && !res.mora_frozen) {
           autoPenaltyForThis = calculateTotalInterest(
             currentDue,
             currentDate,
