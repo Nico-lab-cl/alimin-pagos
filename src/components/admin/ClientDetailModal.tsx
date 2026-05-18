@@ -95,14 +95,33 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
   const [financialHistory, setFinancialHistory] = useState<any[]>([]);
   const [loadingFinHistory, setLoadingFinHistory] = useState(false);
 
+  // Manual Payment State
+  const [isRegisteringPayment, setIsRegisteringPayment] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: 0,
+    installmentsCount: 1,
+    paidAt: new Date().toISOString().split("T")[0],
+    isPie: false
+  });
+  const [manualPaymentFile, setManualPaymentFile] = useState<File | null>(null);
+
+  const refreshFinancialHistory = async () => {
+    if (!selectedClient) return;
+    setLoadingFinHistory(true);
+    try {
+      const res = await getFinancialHistory(selectedClient.id);
+      setFinancialHistory(res.history || []);
+    } catch (err) {
+      console.error("Error fetching financial history:", err);
+    } finally {
+      setLoadingFinHistory(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedClient) {
       refreshDocs();
-      setLoadingFinHistory(true);
-      getFinancialHistory(selectedClient.id).then(res => {
-        setFinancialHistory(res.history || []);
-        setLoadingFinHistory(false);
-      });
+      refreshFinancialHistory();
     }
   }, [selectedClient?.id]);
 
@@ -184,6 +203,68 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
       setEditFinMsg({ text: "Error de conexión.", type: "error" });
     }
     setIsSavingFin(false);
+  };
+
+  const handleManualPayment = async () => {
+    if (!selectedClient || isRegisteringPayment) return;
+    if (paymentForm.amount <= 0 || paymentForm.installmentsCount <= 0) {
+      toast.error("Por favor ingresa un monto y número de cuotas válidos.");
+      return;
+    }
+    if (!manualPaymentFile) {
+      toast.error("Por favor selecciona y adjunta el comprobante de pago del cliente.");
+      return;
+    }
+    
+    setIsRegisteringPayment(true);
+    toast.loading("Registrando pago manual...", { id: "manual-payment-toast" });
+    try {
+      let receiptUrl: string | undefined;
+
+      if (manualPaymentFile) {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("Error al leer el archivo"));
+          reader.readAsDataURL(manualPaymentFile);
+        });
+        receiptUrl = await base64Promise;
+      }
+
+      const res = await registerManualPayment(selectedClient.id, {
+        amount: paymentForm.amount,
+        installmentsCount: paymentForm.installmentsCount,
+        paidAt: paymentForm.paidAt,
+        isPie: paymentForm.isPie,
+        receiptUrl
+      });
+      
+      if (res.error) {
+        toast.error(res.error, { id: "manual-payment-toast" });
+      } else {
+        toast.success("Pago manual registrado exitosamente.", { id: "manual-payment-toast" });
+        setPaymentForm({
+          amount: 0,
+          installmentsCount: 1,
+          paidAt: new Date().toISOString().split("T")[0],
+          isPie: false
+        });
+        setManualPaymentFile(null);
+        
+        // Refresh document list if a receipt was uploaded
+        if (manualPaymentFile) {
+          refreshDocs();
+        }
+        
+        // Refresh financial history and parent client data
+        await refreshFinancialHistory();
+        onUpdate();
+      }
+    } catch (e) {
+      toast.error("Error al procesar pago", { id: "manual-payment-toast" });
+    } finally {
+      setIsRegisteringPayment(false);
+    }
   };
 
   return (
@@ -596,7 +677,8 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
                     <div className="bg-white/5 p-4 sm:p-5 rounded-2xl border border-white/10 flex flex-col justify-center">
                       <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Valor Terreno Total</p>
                       <p className="text-lg sm:text-xl font-bold text-white">{formatCLP(selectedClient.totalToPay)}</p>
@@ -643,7 +725,152 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                       <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mt-2 text-right">Progreso: {Math.round((selectedClient.paidCuotas / Math.max(selectedClient.totalCuotas, 1)) * 100)}%</p>
                     </div>
                   </div>
-                )}
+
+                  {/* Cargar Pago Manual Section */}
+                  <div className="mt-8 border-t border-white/5 pt-8">
+                    <div className="border border-emerald-500/20 bg-emerald-500/[0.02] p-5 sm:p-6 rounded-3xl space-y-6">
+                      <div>
+                        <h4 className="text-sm sm:text-base font-black text-emerald-400 italic tracking-tighter uppercase leading-none mb-1.5 flex items-center gap-2">
+                          <DollarSign className="w-4 h-4" /> Registrar Pago Manual (Post-Venta)
+                        </h4>
+                        <p className="text-xs text-white/40 leading-relaxed">
+                          Usa este formulario para registrar un pago recibido directamente de forma manual (transferencia, depósito, etc.). El sistema procesará el pago, actualizará el ledger y registrará el comprobante correspondiente en el expediente.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Monto del Pago (CLP)</label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-emerald-400">$</span>
+                            <input
+                              type="number"
+                              value={paymentForm.amount || ""}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })}
+                              placeholder="0"
+                              className="w-full bg-black/40 border border-white/10 rounded-xl pl-8 pr-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Fecha del Pago</label>
+                          <input
+                            type="date"
+                            value={paymentForm.paidAt}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, paidAt: e.target.value })}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Tipo de Pago</label>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPaymentForm({ ...paymentForm, isPie: false })}
+                              className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${!paymentForm.isPie ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "bg-black/20 border-white/10 text-white/40 hover:bg-white/5"}`}
+                            >
+                              Cuotas
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPaymentForm({ ...paymentForm, isPie: true })}
+                              className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${paymentForm.isPie ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "bg-black/20 border-white/10 text-white/40 hover:bg-white/5"}`}
+                            >
+                              Pie
+                            </button>
+                          </div>
+                        </div>
+
+                        {!paymentForm.isPie ? (
+                          <div className="space-y-1.5">
+                            <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Cantidad de Cuotas a Cubrir</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={paymentForm.installmentsCount}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, installmentsCount: Math.max(1, Number(e.target.value)) })}
+                              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold"
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5 opacity-40">
+                            <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Cantidad de Cuotas (Bloqueado)</label>
+                            <input
+                              type="text"
+                              disabled
+                              value="No aplica para Pie"
+                              className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white/40 cursor-not-allowed font-bold"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">
+                          Comprobante de Pago <span className="text-emerald-400 font-bold">* Obligatorio</span>
+                        </label>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <input
+                            type="file"
+                            id="manual-receipt"
+                            className="hidden"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              if (file && file.size > 8 * 1024 * 1024) {
+                                toast.error("El archivo es demasiado grande. Máximo 8MB.");
+                                e.target.value = "";
+                                return;
+                              }
+                              setManualPaymentFile(file);
+                            }}
+                          />
+                          <label
+                            htmlFor="manual-receipt"
+                            className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-white/80 cursor-pointer flex items-center gap-2 transition-all"
+                          >
+                            <Upload className="w-4 h-4 text-emerald-400" />
+                            {manualPaymentFile ? "Cambiar Archivo" : "Seleccionar Comprobante"}
+                          </label>
+                          {manualPaymentFile && (
+                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white/80 font-semibold max-w-xs truncate">
+                              <span className="truncate">{manualPaymentFile.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => setManualPaymentFile(null)}
+                                className="text-red-400 hover:text-red-300 ml-1 p-0.5 rounded hover:bg-white/5"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleManualPayment}
+                        disabled={isRegisteringPayment || paymentForm.amount <= 0}
+                        className="w-full py-3 rounded-xl bg-emerald-500 disabled:bg-emerald-500/20 disabled:text-white/20 text-black text-xs font-black uppercase tracking-widest hover:bg-emerald-400 disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:shadow-none transition-all mt-4"
+                      >
+                        {isRegisteringPayment ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Registrando Pago...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            Registrar Pago Manual
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
               </div>
             )}
 
