@@ -391,64 +391,91 @@ export default function ReceiptsPage() {
                       r.reservation?.last_name?.toLowerCase().includes(historySearch.toLowerCase()) ||
                       r.lot?.number?.toString().includes(historySearch)
                     )
-                    .map((receipt) => (
-                    <div 
-                      key={receipt.id}
-                      className="group flex items-center justify-between p-6 bg-white/[0.02] border border-white/5 rounded-[2rem] hover:bg-white/[0.04] transition-all"
-                    >
-                      <div className="flex items-center gap-6">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${
-                          receipt.status === 'APPROVED' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                          receipt.status === 'REJECTED' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
-                          'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                        }`}>
-                          {receipt.status === 'APPROVED' ? <Check className="w-6 h-6" /> : 
-                           receipt.status === 'REJECTED' ? <X className="w-6 h-6" /> : 
-                           <Loader2 className="w-6 h-6" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-3">
-                            <h4 className="text-xl font-black text-white italic tracking-tighter uppercase">{receipt.reservation?.name} {receipt.reservation?.last_name}</h4>
-                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
-                              receipt.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' :
-                              receipt.status === 'REJECTED' ? 'bg-red-500/20 text-red-400' :
-                              'bg-amber-500/20 text-amber-400'
-                            }`}>{receipt.status}</span>
-                          </div>
-                          <div className="flex items-center gap-3 mt-1.5">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-accent">Lote {receipt.lot?.number}</span>
-                            <div className="w-1 h-1 rounded-full bg-white/10" />
-                            <span className="text-[9px] font-black uppercase tracking-widest text-white/30">
-                              {receipt.scope === 'PIE' ? 'INGRESO DE CAPITAL' : `ABONO DE CUOTAS (${receipt.installments_count})`}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                    .map((receipt) => {
+                      const generatedDoc = receipt.reservation?.documents?.find(
+                        (d: any) => d.name === `Comprobante_Pago_${receipt.id.substring(0, 6)}.pdf`
+                      );
+                      const generatedDocUrl = generatedDoc ? `/api/documents/${generatedDoc.id}` : null;
 
-                      <div className="flex items-center gap-10">
-                        <div className="text-right">
-                          <p className="text-xl font-black text-white italic tracking-tighter">{formatCLP(receipt.amount_clp)}</p>
-                          <p className="text-[9px] font-black uppercase tracking-widest text-white/20">{formatDate(receipt.created_at)}</p>
+                      return (
+                        <div 
+                          key={receipt.id}
+                          className="group flex items-center justify-between p-6 bg-white/[0.02] border border-white/5 rounded-[2rem] hover:bg-white/[0.04] transition-all"
+                        >
+                          <div className="flex items-center gap-6">
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${
+                              receipt.status === 'APPROVED' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                              receipt.status === 'REJECTED' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                              'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                            }`}>
+                              {receipt.status === 'APPROVED' ? <Check className="w-6 h-6" /> : 
+                               receipt.status === 'REJECTED' ? <X className="w-6 h-6" /> : 
+                               <Loader2 className="w-6 h-6" />}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-3">
+                                <h4 className="text-xl font-black text-white italic tracking-tighter uppercase">{receipt.reservation?.name} {receipt.reservation?.last_name}</h4>
+                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
+                                  receipt.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' :
+                                  receipt.status === 'REJECTED' ? 'bg-red-500/20 text-red-400' :
+                                  'bg-amber-500/20 text-amber-400'
+                                }`}>{receipt.status}</span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-accent">Lote {receipt.lot?.number}</span>
+                                <div className="w-1 h-1 rounded-full bg-white/10" />
+                                <span className="text-[9px] font-black uppercase tracking-widest text-white/30">
+                                  {receipt.scope === 'PIE' ? 'INGRESO DE CAPITAL' : `ABONO DE CUOTAS (${receipt.installments_count})`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-10">
+                            <div className="text-right">
+                              <p className="text-xl font-black text-white italic tracking-tighter">{formatCLP(receipt.amount_clp)}</p>
+                              <p className="text-[9px] font-black uppercase tracking-widest text-white/20">{formatDate(receipt.created_at)}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {generatedDocUrl && (
+                                <>
+                                  <button 
+                                    onClick={() => setPreviewUrl(generatedDocUrl)}
+                                    className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-black transition-all"
+                                    title="Ver Comprobante Digital"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                  </button>
+                                  <a 
+                                    href={generatedDocUrl} 
+                                    download={`Comprobante_Pago_${receipt.id.substring(0, 6)}.pdf`}
+                                    className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-accent hover:text-black transition-all"
+                                    title="Descargar Comprobante Digital"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </a>
+                                </>
+                              )}
+                              <button 
+                                onClick={() => setPreviewUrl(receipt.receipt_url)}
+                                className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:bg-white/10 hover:text-white transition-all"
+                                title="Ver Respaldo Depósito"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <a 
+                                href={receipt.receipt_url} 
+                                download 
+                                className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:bg-accent hover:text-black transition-all"
+                                title="Descargar Respaldo"
+                              >
+                                <Download className="w-4 h-4" />
+                              </a>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => setPreviewUrl(receipt.receipt_url)}
-                            className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:bg-white/10 hover:text-white transition-all"
-                            title="Ver Detalle"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <a 
-                            href={receipt.receipt_url} 
-                            download 
-                            className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:bg-accent hover:text-black transition-all"
-                          >
-                            <Download className="w-4 h-4" />
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    })}
                 </div>
               )}
             </div>

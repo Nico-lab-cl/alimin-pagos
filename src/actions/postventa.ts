@@ -11,6 +11,7 @@ import {
 import { memoryCache } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
 import { hash } from "bcryptjs";
+import crypto from "crypto";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -602,7 +603,9 @@ export async function approveReceipt(receiptId: string) {
     try {
       const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
       
-      const clientName = receipt.reservation.user?.name || receipt.reservation.name || "Cliente Alimin";
+      const clientName = receipt.reservation.last_name 
+        ? `${receipt.reservation.name} ${receipt.reservation.last_name}`.trim()
+        : (receipt.reservation.user?.name || receipt.reservation.name || "Cliente Alimin");
       const rut = receipt.reservation.rut || "No registrado";
       const email = receipt.reservation.user?.email || receipt.reservation.email || "No registrado";
       const projectName = receipt.reservation.project?.name || "Alimin SPA";
@@ -738,6 +741,12 @@ export async function getPendingReceipts(projectSlug: string) {
             last_name: true,
             email: true,
             phone: true,
+            documents: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         lot: {
@@ -781,6 +790,12 @@ export async function getAllReceipts(projectSlug: string) {
             last_name: true,
             email: true,
             phone: true,
+            documents: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         lot: {
@@ -1177,12 +1192,13 @@ export async function registerManualPayment(
   try {
     const res = await prisma.reservation.findUnique({
       where: { id: reservationId },
-      include: { lot: true },
+      include: { lot: true, user: true, project: true },
     });
 
     if (!res) return { error: "Reserva no encontrada" };
 
     const paymentDate = new Date(data.paidAt + "T12:00:00");
+    const receiptId = crypto.randomUUID();
 
     if (data.isPie) {
       const operations: any[] = [
@@ -1205,6 +1221,7 @@ export async function registerManualPayment(
         operations.push(
           prisma.paymentReceipt.create({
             data: {
+              id: receiptId,
               reservation_id: reservationId,
               lot_id: res.lot_id,
               amount_clp: data.amount,
@@ -1290,6 +1307,7 @@ export async function registerManualPayment(
         operations.push(
           prisma.paymentReceipt.create({
             data: {
+              id: receiptId,
               reservation_id: reservationId,
               lot_id: res.lot_id,
               amount_clp: data.amount,
@@ -1309,6 +1327,48 @@ export async function registerManualPayment(
       }
 
       await prisma.$transaction(operations);
+    }
+
+    // Auto-generate Digital Payment Receipt PDF for Manual Payment
+    if (data.receiptUrl) {
+      try {
+        const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
+        
+        const clientName = res.last_name 
+          ? `${res.name} ${res.last_name}`.trim()
+          : (res.user?.name || res.name || "Cliente Alimin");
+        const rut = res.rut || "No registrado";
+        const email = res.user?.email || res.email || "No registrado";
+        const projectName = res.project?.name || "Alimin SPA";
+        const lotNumber = (res.lot as any)?.number || res.lot_id.toString();
+        const stage = res.lot?.stage || "";
+        const concept = data.isPie ? "Pago de Pie" : `Pago Cuota(s) x${data.installmentsCount || 1}`;
+        
+        const pdfBase64 = await generateReceiptPDF({
+          clientName,
+          rut,
+          email,
+          projectName,
+          lotNumber,
+          stage,
+          concept,
+          amount: data.amount,
+          date: paymentDate,
+          receiptId: receiptId.substring(0, 8).toUpperCase(),
+        });
+
+        await prisma.reservationDocument.create({
+          data: {
+            reservation_id: reservationId,
+            name: `Comprobante_Pago_${receiptId.substring(0, 6)}.pdf`,
+            file_type: "application/pdf",
+            base64_content: `data:application/pdf;base64,${pdfBase64}`,
+            created_at: paymentDate,
+          }
+        });
+      } catch (err) {
+        console.error("Failed to generate and save PDF receipt for manual payment:", err);
+      }
     }
 
     memoryCache.deleteByPrefix("postventa_");
