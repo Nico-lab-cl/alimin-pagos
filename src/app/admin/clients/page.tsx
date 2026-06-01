@@ -455,7 +455,10 @@ export default function ClientsPage() {
                           <Hash className="w-3.5 h-3.5 text-accent" />
                           <span className="text-xs font-black text-white">Lote {c.lotNumber}</span>
                         </div>
-                        {c.lotStage && <p className="text-[9px] font-black text-white/20 mt-2 uppercase tracking-widest">Etapa {c.lotStage}</p>}
+                        <div className="flex flex-col items-center mt-2 gap-1">
+                          {c.lotStage && <p className="text-[9px] font-black text-white/20 uppercase tracking-widest">Etapa {c.lotStage}</p>}
+                          <p className="text-[9px] font-black text-accent uppercase tracking-widest">Día Pago: {c.due_day || 5}</p>
+                        </div>
                       </div>
                     </td>
                     <td className="px-8 py-7">

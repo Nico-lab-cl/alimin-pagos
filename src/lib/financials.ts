@@ -8,12 +8,15 @@ import { prisma } from "./prisma";
 export function getInstallmentDueDate(
   installmentStartDate: Date | string,
   installmentNumber: number,
-  _dueDayOfMonth?: number // kept for backward compat, but ignored
+  dueDayOfMonth?: number
 ): Date {
   const base = new Date(installmentStartDate);
   
   // Use UTC methods to prevent local timezone shift (critical for midnight UTC dates)
-  const payDay = base.getUTCDate();
+  // Use the provided dueDayOfMonth if valid, otherwise default to the day of installmentStartDate
+  const payDay = dueDayOfMonth && dueDayOfMonth >= 1 && dueDayOfMonth <= 31
+    ? dueDayOfMonth 
+    : base.getUTCDate();
   
   // Construct the new date directly in UTC at 12:00:00 UTC to safely avoid boundary issues
   const due = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), payDay, 12, 0, 0, 0));

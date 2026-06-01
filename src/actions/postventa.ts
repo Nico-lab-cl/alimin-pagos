@@ -1054,6 +1054,15 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
     
     if (data.installment_start_date) {
         const enteredDate = new Date(data.installment_start_date + "T12:00:00");
+        
+        // If due_day is provided, align the day of the next installment date with it
+        if (data.due_day) {
+          const targetDay = Number(data.due_day);
+          if (targetDay >= 1 && targetDay <= 31) {
+            enteredDate.setDate(targetDay);
+          }
+        }
+        
         const paidCount = Number(data.installments_paid) || 0;
         
         // We want: AnchorDate + PaidCount = EnteredDate
@@ -1082,9 +1091,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
           pie: Number(data.pie) || 0,
           last_installment_value: Number(data.last_installment_value) || 0,
           daily_penalty: Number(data.daily_penalty) || 0,
-          due_day: (data.next_payment_date && data.next_payment_date.trim() !== "") 
-            ? new Date(data.next_payment_date + "T12:00:00").getDate() 
-            : (Number(data.due_day) || 5),
+          due_day: Number(data.due_day) || 5,
           grace_days: Number(data.grace_days) || 0,
           mora_frozen: data.mora_status === "CONGELADO",
           mora_status: data.mora_status,

@@ -87,8 +87,16 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
   const [isActivating, setIsActivating] = useState(false);
 
   // Manual Mora State
-  const [moraStartDate, setMoraStartDate] = useState<string | null>(selectedClient?.debt_start_date || null);
-  const [moraEndDate, setMoraEndDate] = useState<string | null>(selectedClient?.debt_end_date || null);
+  const [moraStartDate, setMoraStartDate] = useState<string | null>(
+    selectedClient?.debt_start_date 
+      ? new Date(selectedClient.debt_start_date).toISOString().split('T')[0] 
+      : null
+  );
+  const [moraEndDate, setMoraEndDate] = useState<string | null>(
+    selectedClient?.debt_end_date 
+      ? new Date(selectedClient.debt_end_date).toISOString().split('T')[0] 
+      : null
+  );
   const [isUpdatingMora, setIsUpdatingMora] = useState(false);
 
   // Financial History State
@@ -124,6 +132,52 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
       refreshFinancialHistory();
     }
   }, [selectedClient?.id]);
+
+  useEffect(() => {
+    if (selectedClient) {
+      setMoraStartDate(selectedClient.debt_start_date ? new Date(selectedClient.debt_start_date).toISOString().split('T')[0] : null);
+      setMoraEndDate(selectedClient.debt_end_date ? new Date(selectedClient.debt_end_date).toISOString().split('T')[0] : null);
+      setEditForm({ 
+        name: selectedClient.clientName || "", 
+        email: selectedClient.clientEmail || "", 
+        rut: selectedClient.rut || "", 
+        phone: selectedClient.clientPhone || "", 
+        observation: selectedClient.observation || "",
+        marital_status: selectedClient.marital_status || "",
+        profession: selectedClient.profession || "",
+        nationality: selectedClient.nationality || "",
+        address_street: selectedClient.address_street || "",
+        address_number: selectedClient.address_number || "",
+        address_region: selectedClient.address_region || "",
+        address_commune: selectedClient.address_commune || ""
+      });
+      setFinForm(prev => ({
+        ...prev,
+        price_total_clp: selectedClient.totalToPay || 0,
+        reservation_price: selectedClient.reservation_price || 0,
+        pie: selectedClient.pie || 0,
+        cuotas: selectedClient.totalCuotas || 0,
+        valor_cuota: selectedClient.valor_cuota || 0,
+        last_installment_value: selectedClient.last_installment_value || selectedClient.valor_cuota || 0,
+        installments_paid: selectedClient.paidCuotas || 0,
+        daily_penalty: selectedClient.daily_penalty || 10000,
+        due_day: selectedClient.due_day || 5,
+        grace_days: selectedClient.grace_days || 5,
+        mora_frozen: selectedClient.mora_frozen || false,
+        mora_status: selectedClient.mora_status || (selectedClient.mora_frozen ? "CONGELADO" : "ACTIVO"),
+        penalty_mode: selectedClient.penalty_mode || "AUTO",
+        manual_penalty: selectedClient.manual_penalty || 0,
+        extra_paid_amount: selectedClient.extra_paid_amount || 0,
+        installment_ranges: selectedClient.installment_ranges 
+          ? (typeof selectedClient.installment_ranges === 'string' ? JSON.parse(selectedClient.installment_ranges) : selectedClient.installment_ranges)
+          : [],
+        debt_start_date: selectedClient.debt_start_date ? new Date(selectedClient.debt_start_date).toISOString().split('T')[0] : "",
+        debt_end_date: selectedClient.debt_end_date ? new Date(selectedClient.debt_end_date).toISOString().split('T')[0] : "",
+        next_payment_date: selectedClient.next_payment_date ? new Date(selectedClient.next_payment_date).toISOString().split('T')[0] : "",
+        installment_start_date: selectedClient.nextDueDate ? new Date(selectedClient.nextDueDate).toISOString().split('T')[0] : ""
+      }));
+    }
+  }, [selectedClient]);
 
   const refreshDocs = async () => {
     setLoadingDocs(true);
@@ -717,6 +771,10 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                       <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Días de Gracia</p>
                       <p className="text-lg sm:text-xl font-bold text-white">{selectedClient.grace_days} Días</p>
                     </div>
+                    <div className="bg-white/5 p-4 sm:p-5 rounded-2xl border border-white/10 flex flex-col justify-center">
+                      <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Día de Pago Mes</p>
+                      <p className="text-lg sm:text-xl font-bold text-white">Día {selectedClient.due_day || 5}</p>
+                    </div>
 
                     <div className="col-span-1 sm:col-span-2 lg:col-span-3 mt-2 sm:mt-0">
                       <div className="h-3 sm:h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 flex">
@@ -932,13 +990,30 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                     
                     <button 
                       onClick={async () => {
-                        await handleSaveFinancials();
-                        await handleUpdateMoraRange();
+                        setIsUpdatingMora(true);
+                        try {
+                          const updatedFinForm = {
+                            ...finForm,
+                            debt_start_date: moraStartDate,
+                            debt_end_date: moraEndDate
+                          };
+                          const res = await updateClientFinancials(selectedClient.id, selectedClient.lotId, updatedFinForm);
+                          if (res.error) {
+                            toast.error(res.error);
+                          } else {
+                            toast.success("Configuración de mora aplicada correctamente.");
+                            onUpdate();
+                          }
+                        } catch (e) {
+                          toast.error("Error de conexión al aplicar configuración.");
+                        } finally {
+                          setIsUpdatingMora(false);
+                        }
                       }}
-                      disabled={isUpdatingMora || isSavingFin}
+                      disabled={isUpdatingMora}
                       className="w-full py-3.5 sm:py-4 rounded-xl bg-red-500 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-red-400 flex justify-center items-center gap-2 mt-6 sm:mt-8 shadow-[0_0_20px_rgba(239,68,68,0.2)] transition-all"
                     >
-                      {isUpdatingMora || isSavingFin ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      {isUpdatingMora ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                       Aplicar Configuración de Mora
                     </button>
                   </div>

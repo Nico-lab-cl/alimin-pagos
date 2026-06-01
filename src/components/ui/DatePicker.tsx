@@ -3,7 +3,7 @@
 import * as React from "react";
 import { format, addMonths, subMonths, addYears, subYears, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { cn } from "@/lib/utils";
 
@@ -72,15 +72,34 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
       
       <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
         <Popover.Trigger asChild>
-          <button
-            className={cn(
-              "w-full flex items-center justify-between bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none font-bold transition-all hover:bg-white/5",
-              !date && "text-white/20"
-            )}
-          >
-            <span>{date ? format(parseLocalDate(date), "PPP", { locale: es }) : "Seleccionar fecha"}</span>
-            <CalendarIcon className="w-4 h-4 text-accent/60" />
-          </button>
+          <div className="relative w-full">
+            <button
+              type="button"
+              className={cn(
+                "w-full flex items-center justify-between bg-black/40 border border-white/10 rounded-xl pl-4 pr-10 py-2.5 text-sm text-white focus:border-accent outline-none font-bold transition-all hover:bg-white/5 text-left",
+                !date && "text-white/20"
+              )}
+            >
+              <span>{date ? format(parseLocalDate(date), "PPP", { locale: es }) : "Seleccionar fecha"}</span>
+            </button>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+              {date && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onChange("");
+                  }}
+                  className="p-1 rounded-lg text-white/40 hover:text-red-400 hover:bg-white/10 transition-all cursor-pointer flex items-center justify-center"
+                  title="Limpiar fecha"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <CalendarIcon className="w-4 h-4 text-accent/60 pointer-events-none" />
+            </div>
+          </div>
         </Popover.Trigger>
         
         <Popover.Portal>
