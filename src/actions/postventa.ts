@@ -546,6 +546,7 @@ export async function approveReceipt(receiptId: string) {
             manual_penalty: shortfall > 0 ? shortfall : null,
             penalty_mode: nextPenaltyMode,
             debt_start_date: null,
+            debt_end_date: null,
           },
         }));
 
@@ -584,6 +585,8 @@ export async function approveReceipt(receiptId: string) {
               next_payment_date: null,
               manual_penalty: null,
               penalty_mode: "AUTO",
+              debt_start_date: null,
+              debt_end_date: null,
             },
           }),
           prisma.financialLedger.create({
@@ -1269,6 +1272,7 @@ export async function registerManualPayment(
             manual_penalty: shortfall > 0 ? shortfall : null,
             penalty_mode: shortfall > 0 ? "FIXED" : "AUTO",
             debt_start_date: null,
+            debt_end_date: null,
           },
         })
       );
