@@ -1052,38 +1052,14 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
     let startDateObj: Date | null = null;
     let nextDateObj: Date | null = null;
     
-    if (reservation.installment_start_date) {
-      const anchor = new Date(reservation.installment_start_date);
-      const targetDay = Number(data.due_day) || reservation.due_day || 5;
-      
-      // Construct UTC dates to avoid any local timezone offsets/shifts
-      const year = anchor.getUTCFullYear();
-      const month = anchor.getUTCMonth();
-      const cleanAnchor = new Date(Date.UTC(year, month, targetDay, 12, 0, 0, 0));
-      
-      const paidCount = data.installments_paid !== undefined ? Number(data.installments_paid) : (reservation.installments_paid || 0);
-      const nextPayment = new Date(cleanAnchor);
-      nextPayment.setUTCMonth(nextPayment.getUTCMonth() + paidCount);
-      
-      startDateObj = cleanAnchor;
-      nextDateObj = nextPayment;
-    } else if (data.installment_start_date) {
-      const enteredDate = new Date(data.installment_start_date + "T12:00:00");
-      
-      // If due_day is provided, align the day of the next installment date with it
-      if (data.due_day) {
-        const targetDay = Number(data.due_day);
-        if (targetDay >= 1 && targetDay <= 31) {
-          enteredDate.setDate(targetDay);
-        }
-      }
+    if (data.installment_start_date) {
+      const [y, m, d] = data.installment_start_date.split("-").map(Number);
+      const targetDay = Number(data.due_day) || d || 5;
+      const enteredDate = new Date(Date.UTC(y, m - 1, targetDay, 12, 0, 0, 0));
       
       const paidCount = Number(data.installments_paid) || 0;
-      
-      // We want: AnchorDate + PaidCount = EnteredDate
-      // Therefore: AnchorDate = EnteredDate - PaidCount
       const calculatedAnchor = new Date(enteredDate);
-      calculatedAnchor.setMonth(calculatedAnchor.getMonth() - paidCount);
+      calculatedAnchor.setUTCMonth(calculatedAnchor.getUTCMonth() - paidCount);
       
       startDateObj = calculatedAnchor;
       nextDateObj = enteredDate;

@@ -678,7 +678,34 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                       </div>
                       <div className="space-y-1.5">
                         <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Total Cuotas Pagadas</label>
-                        <input type="number" value={finForm.installments_paid} onChange={e=>setFinForm({...finForm, installments_paid: Number(e.target.value)})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold" />
+                        <input 
+                          type="number" 
+                          value={finForm.installments_paid} 
+                          onChange={e => {
+                            const newVal = Number(e.target.value);
+                            const oldVal = finForm.installments_paid;
+                            const diff = newVal - oldVal;
+                            let newStartDate = finForm.installment_start_date;
+                            if (newStartDate && !isNaN(Date.parse(newStartDate))) {
+                              const d = new Date(newStartDate + "T12:00:00");
+                              d.setMonth(d.getMonth() + diff);
+                              newStartDate = d.toISOString().split('T')[0];
+                            }
+                            setFinForm({
+                              ...finForm,
+                              installments_paid: newVal,
+                              installment_start_date: newStartDate
+                            });
+                          }} 
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold" 
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Próximo Vencimiento (Cuota Actual)</label>
+                        <DatePicker 
+                          date={finForm.installment_start_date} 
+                          onChange={date => setFinForm({...finForm, installment_start_date: date})} 
+                        />
                       </div>
                       <div className="space-y-1.5">
                         <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Interés Multa x Día ($)</label>
