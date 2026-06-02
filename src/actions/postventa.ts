@@ -914,9 +914,11 @@ export async function updateClientProfile(reservationId: string, data: { name: s
       return { error: "Reserva no encontrada" };
     }
 
+    const sanitizedEmail = data.email.toLowerCase().trim();
+
     // Check if new email conflicts with another user (excluding the current one)
-    if (data.email !== reservation.user.email) {
-      const existingUserWithNewEmail = await prisma.user.findUnique({ where: { email: data.email } });
+    if (sanitizedEmail !== reservation.user.email) {
+      const existingUserWithNewEmail = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
       if (existingUserWithNewEmail) {
         return { error: "Ese correo electrónico ya está registrado por otro usuario en la plataforma." };
       }
@@ -934,7 +936,7 @@ export async function updateClientProfile(reservationId: string, data: { name: s
     
     // We decouple if it's shared AND (email is changing OR names are different)
     const shouldDecouple = isSharedUser && (
-      data.email !== reservation.user.email || 
+      sanitizedEmail !== reservation.user.email || 
       data.name.toLowerCase() !== reservation.user.name.toLowerCase()
     );
 
@@ -944,7 +946,7 @@ export async function updateClientProfile(reservationId: string, data: { name: s
       // Create a NEW user for this reservation
       const newUser = await prisma.user.create({
         data: {
-          email: data.email,
+          email: sanitizedEmail,
           name: data.name,
           password: reservation.user.password, // Inherit password
           role: "USER",
@@ -958,7 +960,7 @@ export async function updateClientProfile(reservationId: string, data: { name: s
         data: {
           user_id: newUser.id,
           name: data.name,
-          email: data.email,
+          email: sanitizedEmail,
           rut: data.rut,
           phone: data.phone,
           observation: data.observation,
@@ -977,7 +979,7 @@ export async function updateClientProfile(reservationId: string, data: { name: s
         prisma.user.update({
           where: { id: reservation.user_id },
           data: {
-            email: data.email,
+            email: sanitizedEmail,
             name: data.name
           }
         }),
@@ -985,7 +987,7 @@ export async function updateClientProfile(reservationId: string, data: { name: s
           where: { id: reservationId },
           data: {
             name: data.name,
-            email: data.email,
+            email: sanitizedEmail,
             rut: data.rut,
             phone: data.phone,
             observation: data.observation,
@@ -1785,7 +1787,7 @@ export async function activateClientProfile(reservationId: string) {
     }
 
     // Generate random 8-character temporary password
-    const tempPassword = Math.random().toString(36).slice(-8);
+    const tempPassword = crypto.randomBytes(4).toString("hex");
     const hashedPassword = await hash(tempPassword, 10);
 
     // Update user record
@@ -1920,7 +1922,7 @@ export async function generateTemporaryPassword(reservationId: string) {
 
     if (!reservation) return { error: "Reserva no encontrada" };
 
-    const tempPassword = Math.random().toString(36).slice(-8);
+    const tempPassword = crypto.randomBytes(4).toString("hex");
     const hashedPassword = await hash(tempPassword, 10);
 
     await prisma.user.update({
@@ -2384,13 +2386,14 @@ export async function assignLotOwner(data: {
       return { error: "Este lote ya tiene un cliente asignado activo." };
     }
 
+    const sanitizedEmail = data.email.toLowerCase().trim();
     // Find or create User
-    let user = await prisma.user.findUnique({ where: { email: data.email } });
+    let user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
     if (!user) {
       const hashedPassword = await hash("alimin123", 10);
       user = await prisma.user.create({
         data: {
-          email: data.email,
+          email: sanitizedEmail,
           name: `${data.name}${data.lastName ? ` ${data.lastName}` : ""}`.trim(),
           password: hashedPassword,
           role: "USER",
@@ -2412,7 +2415,7 @@ export async function assignLotOwner(data: {
         user_id: user.id,
         name: data.name,
         last_name: data.lastName || null,
-        email: data.email,
+        email: sanitizedEmail,
         phone: data.phone,
         rut: data.rut || null,
         status: "active",
