@@ -282,6 +282,21 @@ export default function LegalDashboardPage() {
                         <span>{formatCLP(client.valor_cuota)}/m</span>
                       </div>
                     </div>
+                    {/* Overdue Installments Breakdown Row */}
+                    {client.overdueInstallments?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {(client.penalty_mode === "FIXED" || client.penalty_mode === "MIXED") && client.manual_penalty > 0 && (
+                          <span className="text-[8px] font-black uppercase tracking-widest bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-md border border-orange-500/20">
+                            Fija: {formatCLP(client.manual_penalty)}
+                          </span>
+                        )}
+                        {client.overdueInstallments.map((inst: any) => (
+                          <span key={inst.number} className="text-[8px] font-black uppercase tracking-widest bg-red-500/10 text-red-400/80 px-2 py-0.5 rounded-md border border-red-500/10">
+                            C{inst.number}: {inst.lateDays}d
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -291,24 +306,9 @@ export default function LegalDashboardPage() {
                     <p className="text-lg sm:text-xl font-black tracking-tight text-red-400">
                       +{formatCLP(client.penaltyAmount)}
                     </p>
-                    {client.overdueInstallments?.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 justify-start sm:justify-end">
-                        {(client.penalty_mode === "FIXED" || client.penalty_mode === "MIXED") && client.manual_penalty > 0 && (
-                          <span className="text-[7px] font-black uppercase tracking-widest bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-md border border-orange-500/20">
-                            Fija: {formatCLP(client.manual_penalty)}
-                          </span>
-                        )}
-                        {client.overdueInstallments.map((inst: any) => (
-                          <span key={inst.number} className="text-[7px] font-black uppercase tracking-widest bg-red-500/10 text-red-400/80 px-2 py-0.5 rounded-md border border-red-500/10">
-                            C{inst.number}: {inst.lateDays}d
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] opacity-20">
-                        {client.lateDays} Días Mora
-                      </p>
-                    )}
+                    <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] opacity-20">
+                      {client.lateDays} Días Mora
+                    </p>
                   </div>
 
                   <div className="w-px h-10 bg-white/5 hidden lg:block" />
