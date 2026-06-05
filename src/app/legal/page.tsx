@@ -136,7 +136,7 @@ export default function LegalDashboardPage() {
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
                 <p className="text-xs font-black truncate uppercase tracking-[0.15em] leading-none mb-1">
-                  {session?.user?.name || "Abogado Legal"}
+                  Alimin legal
                 </p>
                 <p className="text-[9px] text-white/40 font-bold uppercase tracking-widest">
                   Acceso Restringido
