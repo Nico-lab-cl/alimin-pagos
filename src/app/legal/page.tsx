@@ -17,7 +17,8 @@ import {
   LogOut,
   Bell,
   Activity,
-  ShieldAlert
+  ShieldAlert,
+  Download
 } from "lucide-react";
 
 export default function LegalDashboardPage() {
@@ -33,6 +34,76 @@ export default function LegalDashboardPage() {
   const itemsPerPage = 5;
 
   const handleSignOut = () => signOut({ callbackUrl: "/login" });
+
+  const exportAllToExcel = (clientsList: any[]) => {
+    const headers = [
+      "Nombre Cliente",
+      "Proyecto",
+      "Lote",
+      "RUT",
+      "Email",
+      "Telefono",
+      "Mora Total",
+      "Cuotas Pagadas",
+      "Cuotas Totales",
+      "Proximo Vencimiento"
+    ];
+    
+    const rows = clientsList.map(c => [
+      c.clientName || "",
+      c.projectName || "",
+      c.lotNumber || "",
+      c.rut || "",
+      c.clientEmail || "",
+      c.clientPhone || "",
+      c.penaltyAmount || 0,
+      c.paidCuotas || 0,
+      c.totalCuotas || 0,
+      c.nextDueDate ? new Date(c.nextDueDate).toLocaleDateString("es-CL") : "No Definido"
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(";"))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Morosos_Contactos_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportIndividualToExcel = (client: any) => {
+    const headers = ["Campo", "Valor"];
+    const rows = [
+      ["Nombre Completo", client.clientName || ""],
+      ["RUT", client.rut || ""],
+      ["Email", client.clientEmail || ""],
+      ["Telefono", client.clientPhone || ""],
+      ["Proyecto", client.projectName || ""],
+      ["Lote", client.lotNumber || ""],
+      ["Etapa", client.lotStage || ""],
+      ["Mora Total", client.penaltyAmount || 0],
+      ["Cuotas Pagadas", `${client.paidCuotas} de ${client.totalCuotas}`],
+      ["Valor Cuota", client.valor_cuota || 0],
+      ["Proxima Fecha de Vencimiento", client.nextDueDate ? new Date(client.nextDueDate).toLocaleDateString("es-CL") : "No Definido"],
+      ["Nacionalidad", client.nationality || ""],
+      ["Estado Civil", client.marital_status || ""],
+      ["Profesion", client.profession || ""],
+      ["Direccion", `${client.address_street || ""} ${client.address_number || ""}, ${client.address_commune || ""}, ${client.address_region || ""}`.trim()],
+      ["Observacion", client.observation || ""]
+    ];
+
+    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(";"))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Ficha_${client.clientName?.replace(/\s+/g, '_')}_${client.lotNumber}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -173,6 +244,14 @@ export default function LegalDashboardPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
+            <button
+              onClick={() => exportAllToExcel(filteredClients)}
+              className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20 shadow-2xl transition-all w-full sm:w-auto justify-center"
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              Exportar Contactos (Excel)
+            </button>
+
             <div className="relative group w-full sm:w-80">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-accent transition-colors" />
               <input
@@ -252,7 +331,8 @@ export default function LegalDashboardPage() {
             {paginatedClients.map((client: any, idx: number) => (
               <div
                 key={client.id}
-                className="group relative rounded-[2rem] p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center gap-6 sm:gap-8 glass-card animate-slide-up"
+                onClick={() => setSelectedClient(client)}
+                className="group relative rounded-[2rem] p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center gap-6 sm:gap-8 glass-card animate-slide-up cursor-pointer hover:bg-white/[0.04] transition-all duration-300 border border-white/5 hover:border-white/10"
                 style={{ 
                   animationDelay: `${idx * 40}ms`,
                   animationFillMode: "both"
@@ -327,7 +407,21 @@ export default function LegalDashboardPage() {
                   </div>
 
                   <button 
-                    onClick={() => setSelectedClient(client)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      exportIndividualToExcel(client);
+                    }}
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-emerald-500/10 hover:text-emerald-400 text-white/40 transition-all"
+                    title="Exportar Ficha (Excel)"
+                  >
+                    <Download className="w-5 h-5" />
+                  </button>
+
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedClient(client);
+                    }}
                     className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-accent hover:text-[#061010] transition-all"
                     title="Ver Expediente Completo (Solo Lectura)"
                   >
