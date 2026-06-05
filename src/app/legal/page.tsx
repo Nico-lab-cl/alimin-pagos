@@ -165,7 +165,7 @@ export default function LegalDashboardPage() {
               <p className="text-[11px] font-black uppercase tracking-[0.3em] text-red-400">Riesgo & Mora Legal</p>
             </div>
             <h1 className="text-5xl font-black text-white tracking-tighter uppercase leading-none">
-              Centro de <span className="text-white/20">Alertas Legales</span>
+              Centro de <span className="text-white/20">alertas</span>
             </h1>
             <p className="text-xs text-white/40 mt-3 max-w-xl font-medium uppercase tracking-wide leading-relaxed">
               Esta consola muestra a los clientes con mora crítica de los proyectos **Arena y Sol** y **Libertad y Alegría**. La información es estrictamente confidencial y de solo lectura.
