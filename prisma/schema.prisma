@@ -246,6 +246,7 @@ model FinancialLedger {
 enum UserRole {
   ADMIN
   USER
+  LEGAL
 
   @@map("user_role")
   @@schema("pagos")

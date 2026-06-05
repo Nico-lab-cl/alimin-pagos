@@ -21,7 +21,7 @@ import PreviewModal from "@/components/shared/PreviewModal";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
 import { Loader2 } from "lucide-react";
 
-export default function ClientDetailModal({ selectedClient, onClose, onUpdate, projectSlug }: any) {
+export default function ClientDetailModal({ selectedClient, onClose, onUpdate, projectSlug, isReadOnly = false }: any) {
   const [activeTab, setActiveTab] = useState("PROFILE");
 
   // Edit State
@@ -354,59 +354,65 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
           </div>
           
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
-            <button
-              onClick={async () => {
-                setIsTogglingMultiLot(true);
-                try {
-                  const newStatus = !selectedClient.isMultiLot;
-                  const res = await toggleMultiLot(selectedClient.id, newStatus);
-                  if (!res.error) onUpdate();
-                } catch (e) {}
-                setIsTogglingMultiLot(false);
-              }}
-              disabled={isTogglingMultiLot}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap ${
-                selectedClient.isMultiLot 
-                  ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20" 
-                  : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              {isTogglingMultiLot ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Target className="w-3.5 h-3.5 shrink-0" />}
-              MULTI-LOTE: {selectedClient.isMultiLot ? "SI" : "NO"}
-            </button>
+            {!isReadOnly && (
+              <button
+                onClick={async () => {
+                  setIsTogglingMultiLot(true);
+                  try {
+                    const newStatus = !selectedClient.isMultiLot;
+                    const res = await toggleMultiLot(selectedClient.id, newStatus);
+                    if (!res.error) onUpdate();
+                  } catch (e) {}
+                  setIsTogglingMultiLot(false);
+                }}
+                disabled={isTogglingMultiLot}
+                className={`px-3 sm:px-4 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap ${
+                  selectedClient.isMultiLot 
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20" 
+                    : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {isTogglingMultiLot ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Target className="w-3.5 h-3.5 shrink-0" />}
+                MULTI-LOTE: {selectedClient.isMultiLot ? "SI" : "NO"}
+              </button>
+            )}
 
-            <button
-              onClick={async () => {
-                setIsTogglingAlContado(true);
-                try {
-                  const isCurrentlyContado = selectedClient.status === "COMPLETED";
-                  const newStatus = !isCurrentlyContado;
-                  const res = await toggleAlContado(selectedClient.id, newStatus);
-                  if (!res.error) onUpdate();
-                } catch (e) {}
-                setIsTogglingAlContado(false);
-              }}
-              disabled={isTogglingAlContado}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap ${
-                selectedClient.status === "COMPLETED" 
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20" 
-                  : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              {isTogglingAlContado ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <DollarSign className="w-3.5 h-3.5 shrink-0" />}
-              AL CONTADO: {selectedClient.status === "COMPLETED" ? "SI" : "NO"}
-            </button>
+            {!isReadOnly && (
+              <button
+                onClick={async () => {
+                  setIsTogglingAlContado(true);
+                  try {
+                    const isCurrentlyContado = selectedClient.status === "COMPLETED";
+                    const newStatus = !isCurrentlyContado;
+                    const res = await toggleAlContado(selectedClient.id, newStatus);
+                    if (!res.error) onUpdate();
+                  } catch (e) {}
+                  setIsTogglingAlContado(false);
+                }}
+                disabled={isTogglingAlContado}
+                className={`px-3 sm:px-4 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap ${
+                  selectedClient.status === "COMPLETED" 
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20" 
+                    : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {isTogglingAlContado ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <DollarSign className="w-3.5 h-3.5 shrink-0" />}
+                AL CONTADO: {selectedClient.status === "COMPLETED" ? "SI" : "NO"}
+              </button>
+            )}
 
-            <button
-              onClick={() => setShowPOV(true)}
-              className="px-3 sm:px-4 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-1.5 sm:gap-2 bg-violet-500/10 border-violet-500/30 text-violet-400 hover:bg-violet-500/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] whitespace-nowrap"
-            >
-              <Eye className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Vista Cliente</span>
-              <span className="sm:hidden">POV</span>
-            </button>
+            {!isReadOnly && (
+              <button
+                onClick={() => setShowPOV(true)}
+                className="px-3 sm:px-4 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-1.5 sm:gap-2 bg-violet-500/10 border-violet-500/30 text-violet-400 hover:bg-violet-500/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] whitespace-nowrap"
+              >
+                <Eye className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Vista Cliente</span>
+                <span className="sm:hidden">POV</span>
+              </button>
+            )}
 
-            {(!selectedClient.portal_active || selectedClient.clientName?.toLowerCase().includes("nicolas cabrera") || selectedClient.clientEmail?.toLowerCase().includes("nicolas")) && (
+            {!isReadOnly && (!selectedClient.portal_active || selectedClient.clientName?.toLowerCase().includes("nicolas cabrera") || selectedClient.clientEmail?.toLowerCase().includes("nicolas")) && (
               <button
                 onClick={async () => {
                   if (!confirm("¿Seguro que deseas activar este cliente y enviar sus credenciales?")) return;
@@ -496,7 +502,7 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
               <div className="max-w-4xl animate-fade-in mx-auto md:mx-0">
                 <div className="flex items-center justify-between mb-6 sm:mb-8">
                   <h3 className="text-lg sm:text-xl font-black text-white italic tracking-tighter uppercase leading-none">Información de Contacto</h3>
-                  {!isEditing && (
+                  {!isEditing && !isReadOnly && (
                     <button onClick={() => setIsEditing(true)} className="text-[9px] sm:text-[10px] uppercase font-black tracking-widest text-accent hover:text-white transition-colors flex items-center gap-1.5 bg-accent/20 px-3 py-2 rounded-xl border border-accent/30 shrink-0">
                       <Edit3 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Editar Datos</span><span className="sm:hidden">Editar</span>
                     </button>
@@ -642,7 +648,7 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
               <div className="max-w-4xl animate-fade-in mx-auto md:mx-0">
                 <div className="flex items-center justify-between mb-6 sm:mb-8">
                   <h3 className="text-lg sm:text-xl font-black text-emerald-400 italic tracking-tighter uppercase leading-none">Finanzas y Saldos</h3>
-                  {!isEditingFin && (
+                  {!isEditingFin && !isReadOnly && (
                     <button onClick={() => setIsEditingFin(true)} className="text-[9px] sm:text-[10px] uppercase font-black tracking-widest text-emerald-400 hover:text-white transition-colors flex items-center gap-1.5 bg-emerald-500/10 px-3 py-2 rounded-xl border border-emerald-500/30 shrink-0">
                       <Edit3 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Editar Finanzas</span><span className="sm:hidden">Editar</span>
                     </button>
@@ -812,148 +818,150 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                   </div>
 
                   {/* Cargar Pago Manual Section */}
-                  <div className="mt-8 border-t border-white/5 pt-8">
-                    <div className="border border-emerald-500/20 bg-emerald-500/[0.02] p-5 sm:p-6 rounded-3xl space-y-6">
-                      <div>
-                        <h4 className="text-sm sm:text-base font-black text-emerald-400 italic tracking-tighter uppercase leading-none mb-1.5 flex items-center gap-2">
-                          <DollarSign className="w-4 h-4" /> Registrar Pago Manual (Post-Venta)
-                        </h4>
-                        <p className="text-xs text-white/40 leading-relaxed">
-                          Usa este formulario para registrar un pago recibido directamente de forma manual (transferencia, depósito, etc.). El sistema procesará el pago, actualizará el ledger y registrará el comprobante correspondiente en el expediente.
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Monto del Pago (CLP)</label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-emerald-400">$</span>
-                            <input
-                              type="number"
-                              value={paymentForm.amount || ""}
-                              onChange={(e) => setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })}
-                              placeholder="0"
-                              className="w-full bg-black/40 border border-white/10 rounded-xl pl-8 pr-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold"
-                            />
-                          </div>
+                  {!isReadOnly && (
+                    <div className="mt-8 border-t border-white/5 pt-8">
+                      <div className="border border-emerald-500/20 bg-emerald-500/[0.02] p-5 sm:p-6 rounded-3xl space-y-6">
+                        <div>
+                          <h4 className="text-sm sm:text-base font-black text-emerald-400 italic tracking-tighter uppercase leading-none mb-1.5 flex items-center gap-2">
+                            <DollarSign className="w-4 h-4" /> Registrar Pago Manual (Post-Venta)
+                          </h4>
+                          <p className="text-xs text-white/40 leading-relaxed">
+                            Usa este formulario para registrar un pago recibido directamente de forma manual (transferencia, depósito, etc.). El sistema procesará el pago, actualizará el ledger y registrará el comprobante correspondiente en el expediente.
+                          </p>
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Fecha del Pago</label>
-                          <input
-                            type="date"
-                            value={paymentForm.paidAt}
-                            onChange={(e) => setPaymentForm({ ...paymentForm, paidAt: e.target.value })}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Tipo de Pago</label>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setPaymentForm({ ...paymentForm, isPie: false })}
-                              className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${!paymentForm.isPie ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "bg-black/20 border-white/10 text-white/40 hover:bg-white/5"}`}
-                            >
-                              Cuotas
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setPaymentForm({ ...paymentForm, isPie: true })}
-                              className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${paymentForm.isPie ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "bg-black/20 border-white/10 text-white/40 hover:bg-white/5"}`}
-                            >
-                              Pie
-                            </button>
-                          </div>
-                        </div>
-
-                        {!paymentForm.isPie ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-1.5">
-                            <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Cantidad de Cuotas a Cubrir</label>
+                            <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Monto del Pago (CLP)</label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-emerald-400">$</span>
+                              <input
+                                type="number"
+                                value={paymentForm.amount || ""}
+                                onChange={(e) => setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })}
+                                placeholder="0"
+                                className="w-full bg-black/40 border border-white/10 rounded-xl pl-8 pr-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Fecha del Pago</label>
                             <input
-                              type="number"
-                              min="1"
-                              value={paymentForm.installmentsCount}
-                              onChange={(e) => setPaymentForm({ ...paymentForm, installmentsCount: Math.max(1, Number(e.target.value)) })}
+                              type="date"
+                              value={paymentForm.paidAt}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, paidAt: e.target.value })}
                               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold"
                             />
                           </div>
-                        ) : (
-                          <div className="space-y-1.5 opacity-40">
-                            <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Cantidad de Cuotas (Bloqueado)</label>
-                            <input
-                              type="text"
-                              disabled
-                              value="No aplica para Pie"
-                              className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white/40 cursor-not-allowed font-bold"
-                            />
-                          </div>
-                        )}
-                      </div>
 
-                      <div className="space-y-2">
-                        <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">
-                          Comprobante de Pago <span className="text-emerald-400 font-bold">* Obligatorio</span>
-                        </label>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <input
-                            type="file"
-                            id="manual-receipt"
-                            className="hidden"
-                            accept="image/*,application/pdf"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
-                              if (file && file.size > 8 * 1024 * 1024) {
-                                toast.error("El archivo es demasiado grande. Máximo 8MB.");
-                                e.target.value = "";
-                                return;
-                              }
-                              setManualPaymentFile(file);
-                            }}
-                          />
-                          <label
-                            htmlFor="manual-receipt"
-                            className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-white/80 cursor-pointer flex items-center gap-2 transition-all"
-                          >
-                            <Upload className="w-4 h-4 text-emerald-400" />
-                            {manualPaymentFile ? "Cambiar Archivo" : "Seleccionar Comprobante"}
-                          </label>
-                          {manualPaymentFile && (
-                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white/80 font-semibold max-w-xs truncate">
-                              <span className="truncate">{manualPaymentFile.name}</span>
+                          <div className="space-y-1.5">
+                            <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Tipo de Pago</label>
+                            <div className="flex gap-2">
                               <button
                                 type="button"
-                                onClick={() => setManualPaymentFile(null)}
-                                className="text-red-400 hover:text-red-300 ml-1 p-0.5 rounded hover:bg-white/5"
+                                onClick={() => setPaymentForm({ ...paymentForm, isPie: false })}
+                                className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${!paymentForm.isPie ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "bg-black/20 border-white/10 text-white/40 hover:bg-white/5"}`}
                               >
-                                <X className="w-3.5 h-3.5" />
+                                Cuotas
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => setPaymentForm({ ...paymentForm, isPie: true })}
+                                className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${paymentForm.isPie ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "bg-black/20 border-white/10 text-white/40 hover:bg-white/5"}`}
+                              >
+                                Pie
+                              </button>
+                            </div>
+                          </div>
+
+                          {!paymentForm.isPie ? (
+                            <div className="space-y-1.5">
+                              <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Cantidad de Cuotas a Cubrir</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={paymentForm.installmentsCount}
+                                onChange={(e) => setPaymentForm({ ...paymentForm, installmentsCount: Math.max(1, Number(e.target.value)) })}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none font-bold"
+                              />
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5 opacity-40">
+                              <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Cantidad de Cuotas (Bloqueado)</label>
+                              <input
+                                type="text"
+                                disabled
+                                value="No aplica para Pie"
+                                className="w-full bg-black/20 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white/40 cursor-not-allowed font-bold"
+                              />
                             </div>
                           )}
                         </div>
-                      </div>
 
-                      <button
-                        type="button"
-                        onClick={handleManualPayment}
-                        disabled={isRegisteringPayment || paymentForm.amount <= 0}
-                        className="w-full py-3 rounded-xl bg-emerald-500 disabled:bg-emerald-500/20 disabled:text-white/20 text-black text-xs font-black uppercase tracking-widest hover:bg-emerald-400 disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:shadow-none transition-all mt-4"
-                      >
-                        {isRegisteringPayment ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Registrando Pago...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-4 h-4" />
-                            Registrar Pago Manual
-                          </>
-                        )}
-                      </button>
+                        <div className="space-y-2">
+                          <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">
+                            Comprobante de Pago <span className="text-emerald-400 font-bold">* Obligatorio</span>
+                          </label>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <input
+                              type="file"
+                              id="manual-receipt"
+                              className="hidden"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                if (file && file.size > 8 * 1024 * 1024) {
+                                  toast.error("El archivo es demasiado grande. Máximo 8MB.");
+                                  e.target.value = "";
+                                  return;
+                                }
+                                setManualPaymentFile(file);
+                              }}
+                            />
+                            <label
+                              htmlFor="manual-receipt"
+                              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider text-white/80 cursor-pointer flex items-center gap-2 transition-all"
+                            >
+                              <Upload className="w-4 h-4 text-emerald-400" />
+                              {manualPaymentFile ? "Cambiar Archivo" : "Seleccionar Comprobante"}
+                            </label>
+                            {manualPaymentFile && (
+                              <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white/80 font-semibold max-w-xs truncate">
+                                <span className="truncate">{manualPaymentFile.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setManualPaymentFile(null)}
+                                  className="text-red-400 hover:text-red-300 ml-1 p-0.5 rounded hover:bg-white/5"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleManualPayment}
+                          disabled={isRegisteringPayment || paymentForm.amount <= 0}
+                          className="w-full py-3 rounded-xl bg-emerald-500 disabled:bg-emerald-500/20 disabled:text-white/20 text-black text-xs font-black uppercase tracking-widest hover:bg-emerald-400 disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:shadow-none transition-all mt-4"
+                        >
+                          {isRegisteringPayment ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Registrando Pago...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-4 h-4" />
+                              Registrar Pago Manual
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
               </div>
@@ -963,88 +971,159 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
               <div className="max-w-4xl animate-fade-in mx-auto md:mx-0">
                 <h3 className="text-lg sm:text-xl font-black text-red-400 italic tracking-tighter uppercase leading-none mb-6 sm:mb-8">Cálculo de Multas</h3>
                 
-                <div className="space-y-4 sm:space-y-6">
-                  <div className="bg-red-500/5 border border-red-500/20 p-4 sm:p-6 rounded-2xl space-y-4 sm:space-y-6">
-                    <h4 className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-red-400">Estado Financiero Manual</h4>
-                    
-                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                      <button onClick={() => setFinForm({...finForm, mora_status: "ACTIVO"})} className={`flex-1 py-3 sm:py-4 px-4 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all ${finForm.mora_status === "ACTIVO" ? "bg-red-500/20 border-red-500/40 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}>
-                        Activo Con Mora
-                      </button>
-                      <button onClick={() => setFinForm({...finForm, mora_status: "AL_DIA"})} className={`flex-1 py-3 sm:py-4 px-4 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all ${finForm.mora_status === "AL_DIA" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}>
-                        Al Día Sin Mora
-                      </button>
-                      <button onClick={() => setFinForm({...finForm, mora_status: "CONGELADO"})} className={`flex-1 py-3 sm:py-4 px-4 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all ${finForm.mora_status === "CONGELADO" ? "bg-blue-500/20 border-blue-500/40 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}>
-                        Congelado <span className="hidden sm:inline">(Pausado)</span>
-                      </button>
+                {isReadOnly ? (
+                  <div className="space-y-6">
+                    {/* Resumen Total */}
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5 flex items-center justify-between">
+                      <div>
+                        <p className="text-[9px] text-red-300/60 font-black uppercase tracking-widest mb-1">Total Multa Vigente</p>
+                        <p className="text-2xl font-black text-red-400">{formatCLP(selectedClient.penaltyAmount)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] text-red-300/60 font-black uppercase tracking-widest mb-1">Atraso Contable</p>
+                        <p className="text-lg font-bold text-red-300">{selectedClient.lateDays} Días</p>
+                      </div>
                     </div>
 
-                    {finForm.mora_status === "ACTIVO" && (
-                      <div className="p-4 sm:p-5 bg-black/40 rounded-xl border border-white/5 space-y-4">
-                        <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-white/60">Modo de Cálculo de Penalización</p>
-                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                          <button onClick={() => setFinForm({...finForm, penalty_mode: "AUTO"})} className={`flex-1 py-2.5 sm:py-3 px-3 rounded-xl text-[9px] font-bold tracking-widest transition-all border ${finForm.penalty_mode === "AUTO" ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/40 hover:bg-white/5"}`}>Por Fecha (Auto)</button>
-                          <button onClick={() => setFinForm({...finForm, penalty_mode: "MIXED"})} className={`flex-1 py-2.5 sm:py-3 px-3 rounded-xl text-[9px] font-bold tracking-widest transition-all border ${finForm.penalty_mode === "MIXED" ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/40 hover:bg-white/5"}`}>Mixto (Fijo+Auto)</button>
-                          <button onClick={() => setFinForm({...finForm, penalty_mode: "FIXED"})} className={`flex-1 py-2.5 sm:py-3 px-3 rounded-xl text-[9px] font-bold tracking-widest transition-all border ${finForm.penalty_mode === "FIXED" ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/40 hover:bg-white/5"}`}>Monto Fijo</button>
+                    {/* Mora Histórica Fija */}
+                    {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED") && selectedClient.manual_penalty > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-orange-400">
+                          <ShieldAlert className="w-4 h-4" />
+                          <h4 className="text-[10px] font-black uppercase tracking-widest">Mora Histórica (Acuerdo Fijo)</h4>
                         </div>
-                        <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3">
-                          <p className="text-xs text-blue-200/60 leading-relaxed">
-                            {finForm.penalty_mode === "AUTO" && "La multa se calcula automáticamente multiplicando los días de atraso por el interés diario configurado."}
-                            {finForm.penalty_mode === "MIXED" && "Se cobra un monto fijo histórico, más el cálculo automático para cuotas nuevas que vayan venciendo."}
-                            {finForm.penalty_mode === "FIXED" && "Solo se cobra el monto fijo definido manualmente, ignorando fechas de atraso y días."}
+                        <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-4">
+                          <p className="text-[10px] font-bold text-orange-200/80 mb-3 leading-relaxed uppercase tracking-wider">
+                            El cliente tiene un monto fijo de penalización configurado manualmente en su estado financiero.
                           </p>
-                        </div>
-                        
-                        {(finForm.penalty_mode === "FIXED" || finForm.penalty_mode === "MIXED") && (
-                          <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
-                            <label className="block text-[9px] text-red-400 uppercase font-black tracking-widest">Monto de Multa Fijo ($)</label>
-                            <input type="number" value={finForm.manual_penalty || 0} onChange={e=>setFinForm({...finForm, manual_penalty: Number(e.target.value)})} className="w-full bg-black/60 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-white focus:border-red-400 outline-none font-bold" />
+                          <div className="flex items-center justify-between bg-orange-500/10 rounded-xl px-4 py-3 border border-orange-500/20">
+                            <span className="text-[10px] font-black text-orange-300 uppercase tracking-widest">Monto Fijo Pactado</span>
+                            <span className="text-sm font-black text-orange-400">{formatCLP(selectedClient.manual_penalty)}</span>
                           </div>
-                        )}
+                        </div>
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
-                      <div className="space-y-1.5">
-                        <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Inicio Deuda (Fuerza Mora)</label>
-                        <DatePicker date={moraStartDate} onChange={setMoraStartDate} />
+                    {/* Desglose Cuotas */}
+                    {selectedClient.overdueInstallments && selectedClient.overdueInstallments.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-red-400">
+                          <AlertTriangle className="w-4 h-4" />
+                          <h4 className="text-[10px] font-black uppercase tracking-widest">Cuotas Vencidas (Mora Diaria)</h4>
+                        </div>
+                        <div className="space-y-2">
+                          {selectedClient.overdueInstallments.map((inst: any) => (
+                            <div key={inst.number} className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-black text-white uppercase tracking-wider">Cuota {inst.number}</span>
+                                  <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded-md border border-white/5">{inst.monthName}</span>
+                                </div>
+                                <p className="text-[10px] text-red-400/80 font-bold uppercase tracking-widest">
+                                  Venció el {formatDate(inst.dueDate)}
+                                </p>
+                              </div>
+                              <div className="text-right flex flex-col items-end gap-1.5">
+                                <span className="text-sm font-black text-red-400">{formatCLP(inst.penaltyAmount)}</span>
+                                <span className="text-[8px] font-black text-red-300/60 uppercase tracking-widest bg-red-500/10 px-2 py-0.5 rounded-md border border-red-500/10">
+                                  {inst.lateDays} {inst.lateDays === 1 ? 'día' : 'días'} de atraso
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Fin Deuda (Opcional)</label>
-                        <DatePicker date={moraEndDate} onChange={setMoraEndDate} />
+                    ) : (
+                      <div className="p-10 text-center bg-white/[0.01] rounded-2xl border border-dashed border-white/5 text-white/20">
+                        <CheckCircle2 className="w-8 h-8 text-emerald-400/50 mx-auto mb-3" />
+                        <p className="text-xs uppercase font-black tracking-widest">Al día sin cuotas vencidas</p>
                       </div>
-                    </div>
-                    
-                    <button 
-                      onClick={async () => {
-                        setIsUpdatingMora(true);
-                        try {
-                          const updatedFinForm = {
-                            ...finForm,
-                            debt_start_date: moraStartDate,
-                            debt_end_date: moraEndDate
-                          };
-                          const res = await updateClientFinancials(selectedClient.id, selectedClient.lotId, updatedFinForm);
-                          if (res.error) {
-                            toast.error(res.error);
-                          } else {
-                            toast.success("Configuración de mora aplicada correctamente.");
-                            onUpdate();
-                          }
-                        } catch (e) {
-                          toast.error("Error de conexión al aplicar configuración.");
-                        } finally {
-                          setIsUpdatingMora(false);
-                        }
-                      }}
-                      disabled={isUpdatingMora}
-                      className="w-full py-3.5 sm:py-4 rounded-xl bg-red-500 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-red-400 flex justify-center items-center gap-2 mt-6 sm:mt-8 shadow-[0_0_20px_rgba(239,68,68,0.2)] transition-all"
-                    >
-                      {isUpdatingMora ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      Aplicar Configuración de Mora
-                    </button>
+                    )}
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-4 sm:space-y-6">
+                    <div className="bg-red-500/5 border border-red-500/20 p-4 sm:p-6 rounded-2xl space-y-4 sm:space-y-6">
+                      <h4 className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-red-400">Estado Financiero Manual</h4>
+                      
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                        <button onClick={() => setFinForm({...finForm, mora_status: "ACTIVO"})} className={`flex-1 py-3 sm:py-4 px-4 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all ${finForm.mora_status === "ACTIVO" ? "bg-red-500/20 border-red-500/40 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}>
+                          Activo Con Mora
+                        </button>
+                        <button onClick={() => setFinForm({...finForm, mora_status: "AL_DIA"})} className={`flex-1 py-3 sm:py-4 px-4 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all ${finForm.mora_status === "AL_DIA" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}>
+                          Al Día Sin Mora
+                        </button>
+                        <button onClick={() => setFinForm({...finForm, mora_status: "CONGELADO"})} className={`flex-1 py-3 sm:py-4 px-4 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest border transition-all ${finForm.mora_status === "CONGELADO" ? "bg-blue-500/20 border-blue-500/40 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"}`}>
+                          Congelado <span className="hidden sm:inline">(Pausado)</span>
+                        </button>
+                      </div>
+
+                      {finForm.mora_status === "ACTIVO" && (
+                        <div className="p-4 sm:p-5 bg-black/40 rounded-xl border border-white/5 space-y-4">
+                          <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-white/60">Modo de Cálculo de Penalización</p>
+                          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                            <button onClick={() => setFinForm({...finForm, penalty_mode: "AUTO"})} className={`flex-1 py-2.5 sm:py-3 px-3 rounded-xl text-[9px] font-bold tracking-widest transition-all border ${finForm.penalty_mode === "AUTO" ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/40 hover:bg-white/5"}`}>Por Fecha (Auto)</button>
+                            <button onClick={() => setFinForm({...finForm, penalty_mode: "MIXED"})} className={`flex-1 py-2.5 sm:py-3 px-3 rounded-xl text-[9px] font-bold tracking-widest transition-all border ${finForm.penalty_mode === "MIXED" ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/40 hover:bg-white/5"}`}>Mixto (Fijo+Auto)</button>
+                            <button onClick={() => setFinForm({...finForm, penalty_mode: "FIXED"})} className={`flex-1 py-2.5 sm:py-3 px-3 rounded-xl text-[9px] font-bold tracking-widest transition-all border ${finForm.penalty_mode === "FIXED" ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/40 hover:bg-white/5"}`}>Monto Fijo</button>
+                          </div>
+                          <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3">
+                            <p className="text-xs text-blue-200/60 leading-relaxed">
+                              {finForm.penalty_mode === "AUTO" && "La multa se calcula automáticamente multiplicando los días de atraso por el interés diario configurado."}
+                              {finForm.penalty_mode === "MIXED" && "Se cobra un monto fijo histórico, más el cálculo automático para cuotas nuevas que vayan venciendo."}
+                              {finForm.penalty_mode === "FIXED" && "Solo se cobra el monto fijo definido manualmente, ignorando fechas de atraso y días."}
+                            </p>
+                          </div>
+                          
+                          {(finForm.penalty_mode === "FIXED" || finForm.penalty_mode === "MIXED") && (
+                            <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
+                              <label className="block text-[9px] text-red-400 uppercase font-black tracking-widest">Monto de Multa Fijo ($)</label>
+                              <input type="number" value={finForm.manual_penalty || 0} onChange={e=>setFinForm({...finForm, manual_penalty: Number(e.target.value)})} className="w-full bg-black/60 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-white focus:border-red-400 outline-none font-bold" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
+                        <div className="space-y-1.5">
+                          <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Inicio Deuda (Fuerza Mora)</label>
+                          <DatePicker date={moraStartDate} onChange={setMoraStartDate} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="block text-[9px] text-white/40 uppercase font-black tracking-widest">Fin Deuda (Opcional)</label>
+                          <DatePicker date={moraEndDate} onChange={setMoraEndDate} />
+                        </div>
+                      </div>
+                      
+                      <button 
+                        onClick={async () => {
+                          setIsUpdatingMora(true);
+                          try {
+                            const updatedFinForm = {
+                              ...finForm,
+                              debt_start_date: moraStartDate,
+                              debt_end_date: moraEndDate
+                            };
+                            const res = await updateClientFinancials(selectedClient.id, selectedClient.lotId, updatedFinForm);
+                            if (res.error) {
+                              toast.error(res.error);
+                            } else {
+                              toast.success("Configuración de mora aplicada correctamente.");
+                              onUpdate();
+                            }
+                          } catch (e) {
+                            toast.error("Error de conexión al aplicar configuración.");
+                          } finally {
+                            setIsUpdatingMora(false);
+                          }
+                        }}
+                        disabled={isUpdatingMora}
+                        className="w-full py-3.5 sm:py-4 rounded-xl bg-red-500 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-red-400 flex justify-center items-center gap-2 mt-6 sm:mt-8 shadow-[0_0_20px_rgba(239,68,68,0.2)] transition-all"
+                      >
+                        {isUpdatingMora ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Aplicar Configuración de Mora
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1054,39 +1133,41 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                   <h3 className="text-lg sm:text-xl font-black text-blue-400 italic tracking-tighter uppercase leading-none">Repositorio de Documentos</h3>
                 </div>
                 
-                <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 sm:p-6 mb-6">
-                  <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-blue-400 mb-3 sm:mb-4">Cargar Nuevo Documento</p>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input type="text" placeholder="Nombre del documento (ej. Carnet Identidad)" value={docName} onChange={e=>setDocName(e.target.value)} className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-400 outline-none font-bold" />
-                    <label className="px-6 py-3 rounded-xl bg-blue-500 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-blue-400 cursor-pointer flex items-center justify-center gap-2 transition-all shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
-                      {uploadingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Upload className="w-3.5 h-3.5"/>}
-                      Subir Archivo
-                      <input type="file" className="hidden" disabled={uploadingDoc} onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (!docName.trim()) { toast.error("Ingresa un nombre para el documento."); e.target.value = ""; return; }
-                        if (file.size > 8 * 1024 * 1024) { toast.error("El archivo es demasiado grande. Máximo 8MB."); e.target.value = ""; return; }
-                        
-                        setUploadingDoc(true);
-                        try {
-                          const base64 = await new Promise<string>((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result as string);
-                            reader.onerror = () => reject(new Error("Error al leer archivo"));
-                            reader.readAsDataURL(file);
-                          });
-                          const res = await uploadDocument({ reservationId: selectedClient.id, name: docName.trim(), fileType: file.type, base64Content: base64 });
-                          if (res.success) {
-                            setDocName("");
-                            refreshDocs();
-                            toast.success("Documento subido correctamente.");
-                          } else toast.error(res.error || "Fallo en la carga");
-                        } catch(err) { toast.error("Error al procesar el archivo."); }
-                        finally { setUploadingDoc(false); e.target.value = ""; }
-                      }} />
-                    </label>
+                {!isReadOnly && (
+                  <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 sm:p-6 mb-6">
+                    <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-blue-400 mb-3 sm:mb-4">Cargar Nuevo Documento</p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input type="text" placeholder="Nombre del documento (ej. Carnet Identidad)" value={docName} onChange={e=>setDocName(e.target.value)} className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-400 outline-none font-bold" />
+                      <label className="px-6 py-3 rounded-xl bg-blue-500 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-blue-400 cursor-pointer flex items-center justify-center gap-2 transition-all shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+                        {uploadingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Upload className="w-3.5 h-3.5"/>}
+                        Subir Archivo
+                        <input type="file" className="hidden" disabled={uploadingDoc} onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (!docName.trim()) { toast.error("Ingresa un nombre para el documento."); e.target.value = ""; return; }
+                          if (file.size > 8 * 1024 * 1024) { toast.error("El archivo es demasiado grande. Máximo 8MB."); e.target.value = ""; return; }
+                          
+                          setUploadingDoc(true);
+                          try {
+                            const base64 = await new Promise<string>((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = () => resolve(reader.result as string);
+                              reader.onerror = () => reject(new Error("Error al leer archivo"));
+                              reader.readAsDataURL(file);
+                            });
+                            const res = await uploadDocument({ reservationId: selectedClient.id, name: docName.trim(), fileType: file.type, base64Content: base64 });
+                            if (res.success) {
+                              setDocName("");
+                              refreshDocs();
+                              toast.success("Documento subido correctamente.");
+                            } else toast.error(res.error || "Fallo en la carga");
+                          } catch(err) { toast.error("Error al procesar el archivo."); }
+                          finally { setUploadingDoc(false); e.target.value = ""; }
+                        }} />
+                      </label>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {loadingDocs ? (
@@ -1110,7 +1191,7 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                       <div className="flex gap-2 w-full sm:w-auto justify-end">
                         <button onClick={() => {setPreviewData({url: doc.url, title: doc.name, type: doc.fileType}); setIsPreviewOpen(true);}} className="flex-1 sm:flex-none h-9 sm:w-8 sm:h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"><Eye className="w-3.5 h-3.5"/></button>
                         <a href={doc.url} download className="flex-1 sm:flex-none h-9 sm:w-8 sm:h-8 rounded-lg bg-white/5 hover:bg-blue-500 hover:text-white flex items-center justify-center text-white/40 transition-colors"><Download className="w-3.5 h-3.5"/></a>
-                        {doc.type === 'table' && (
+                        {doc.type === 'table' && !isReadOnly && (
                           <button onClick={async () => { if(confirm("¿Eliminar archivo?")) { const res = await deleteDocument(doc.id); if (res.success) setDocs(docs.filter(d=>d.id!==doc.id)); }}} className="flex-1 sm:flex-none h-9 sm:w-8 sm:h-8 rounded-lg bg-white/5 hover:bg-red-500 hover:text-white flex items-center justify-center text-white/40 transition-colors"><Trash2 className="w-3.5 h-3.5"/></button>
                         )}
                       </div>

@@ -30,7 +30,7 @@ export async function getFullPostventaData({
 }) {
   const session = await auth();
   const user = session?.user as any;
-  if (!session?.user || user?.role !== "ADMIN") {
+  if (!session?.user || (user?.role !== "ADMIN" && user?.role !== "LEGAL")) {
     return { error: "No autorizado", data: [], stats: null };
   }
 
@@ -834,7 +834,7 @@ export async function getProjectReservations(projectSlug: string) {
 export async function getFinancialHistory(reservationId: string) {
   const session = await auth();
   const user = session?.user as any;
-  if (!session?.user || user?.role !== "ADMIN") {
+  if (!session?.user || (user?.role !== "ADMIN" && user?.role !== "LEGAL")) {
     return { error: "No autorizado", history: [] };
   }
 

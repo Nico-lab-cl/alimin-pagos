@@ -24,7 +24,7 @@ export async function GET(
 
     // Check if user is either ADMIN or the OWNER of the reservation
     const user = session.user as any;
-    if (user.role !== "ADMIN") {
+    if (user.role !== "ADMIN" && user.role !== "LEGAL") {
         const reservation = await prisma.reservation.findUnique({
             where: { id: document.reservation_id },
             select: { user_id: true }

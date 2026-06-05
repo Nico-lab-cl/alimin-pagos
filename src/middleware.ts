@@ -22,6 +22,20 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/change-password", req.nextUrl));
   }
 
+  // Legal routes protection
+  if (pathname.startsWith("/legal")) {
+    if (user?.role !== "LEGAL" && user?.role !== "ADMIN") {
+      return NextResponse.redirect(new URL("/", req.nextUrl));
+    }
+  }
+
+  // If role is LEGAL, restrict access to /legal only (plus public/api paths)
+  if (user?.role === "LEGAL") {
+    if (!pathname.startsWith("/legal") && !pathname.startsWith("/api") && !isPublic) {
+      return NextResponse.redirect(new URL("/legal", req.nextUrl));
+    }
+  }
+
   // Admin routes protection
   if (pathname.startsWith("/admin")) {
     if (user?.role !== "ADMIN") {
