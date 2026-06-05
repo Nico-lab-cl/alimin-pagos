@@ -26,6 +26,11 @@ export default function LegalDashboardPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<any>(null);
+  
+  // Filtering & Pagination State
+  const [projectFilter, setProjectFilter] = useState<"ALL" | "arena-y-sol" | "libertad-y-alegria">("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   const handleSignOut = () => signOut({ callbackUrl: "/login" });
 
@@ -52,8 +57,13 @@ export default function LegalDashboardPage() {
 
         const combined = [...arenaClients, ...libertadClients];
         
-        // Filter: only clients in LATE status or with penaltyAmount > 0
-        const morosos = combined.filter((c: any) => c.status === "LATE" || c.penaltyAmount > 0);
+        // Filter: only real clients in LATE status or with penaltyAmount > 0 (excluding test accounts)
+        const morosos = combined.filter((c: any) => {
+          const isTest = c.clientName?.toLowerCase().includes("nicolas cabrera") || 
+                         c.clientEmail?.toLowerCase().includes("nicolas") ||
+                         c.clientName?.toLowerCase().includes("prueba");
+          return (c.status === "LATE" || c.penaltyAmount > 0) && !isTest;
+        });
         
         // Sort by penaltyAmount desc (critical first)
         morosos.sort((a, b) => b.penaltyAmount - a.penaltyAmount);
@@ -68,13 +78,28 @@ export default function LegalDashboardPage() {
     loadData();
   }, []);
 
-  const filteredClients = clients.filter(
-    (c: any) =>
-      !search ||
-      c.clientName?.toLowerCase().includes(search.toLowerCase()) ||
-      c.lotNumber?.toString().includes(search) ||
-      c.projectName?.toLowerCase().includes(search.toLowerCase())
+  const totalCount = clients.length;
+  const arenaCount = clients.filter((c: any) => c.projectSlug === "arena-y-sol").length;
+  const libertadCount = clients.filter((c: any) => c.projectSlug === "libertad-y-alegria").length;
+
+  const filteredClients = clients
+    .filter((c: any) => projectFilter === "ALL" || c.projectSlug === projectFilter)
+    .filter(
+      (c: any) =>
+        !search ||
+        c.clientName?.toLowerCase().includes(search.toLowerCase()) ||
+        c.lotNumber?.toString().includes(search)
+    );
+
+  const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+  const paginatedClients = filteredClients.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, projectFilter]);
 
   return (
     <div className="min-h-screen bg-[#061010] text-white font-outfit relative overflow-x-hidden">
@@ -162,10 +187,58 @@ export default function LegalDashboardPage() {
             <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-white/5 border border-white/5 shrink-0 w-full sm:w-auto justify-between sm:justify-start">
               <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Total Morosos:</span>
               <span className="px-3 py-1 rounded-xl bg-red-500/10 text-red-400 text-sm font-black border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
-                {clients.length}
+                {totalCount}
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Filters Deck */}
+        <div className="flex flex-wrap gap-4 mt-6">
+          <button
+            onClick={() => { setProjectFilter("ALL"); setCurrentPage(1); }}
+            className={`
+              group relative flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500
+              ${projectFilter === "ALL" 
+                ? "bg-white/10 border-white/20 text-white shadow-2xl" 
+                : "bg-white/5 border-white/5 text-white/30 hover:text-white/60 hover:bg-white/[0.08]"}
+              border
+            `}
+          >
+            <span>Todos los Proyectos</span>
+            <span className="px-2 py-0.5 rounded-lg bg-black/40 text-[9px] font-black text-white/60">{totalCount}</span>
+            {projectFilter === "ALL" && <div className="absolute inset-x-4 -bottom-px h-px bg-gradient-to-r from-transparent via-accent to-transparent" />}
+          </button>
+
+          <button
+            onClick={() => { setProjectFilter("arena-y-sol"); setCurrentPage(1); }}
+            className={`
+              group relative flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500
+              ${projectFilter === "arena-y-sol" 
+                ? "bg-blue-500/10 border-blue-500/20 text-white shadow-2xl" 
+                : "bg-white/5 border-white/5 text-white/30 hover:text-white/60 hover:bg-white/[0.08]"}
+              border
+            `}
+          >
+            <span>Arena y Sol</span>
+            <span className="px-2 py-0.5 rounded-lg bg-black/40 text-[9px] font-black text-blue-400">{arenaCount}</span>
+            {projectFilter === "arena-y-sol" && <div className="absolute inset-x-4 -bottom-px h-px bg-gradient-to-r from-transparent via-blue-400 to-transparent" />}
+          </button>
+
+          <button
+            onClick={() => { setProjectFilter("libertad-y-alegria"); setCurrentPage(1); }}
+            className={`
+              group relative flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500
+              ${projectFilter === "libertad-y-alegria" 
+                ? "bg-amber-500/10 border-amber-500/20 text-white shadow-2xl" 
+                : "bg-white/5 border-white/5 text-white/30 hover:text-white/60 hover:bg-white/[0.08]"}
+              border
+            `}
+          >
+            <span>Libertad y Alegría</span>
+            <span className="px-2 py-0.5 rounded-lg bg-black/40 text-[9px] font-black text-amber-400">{libertadCount}</span>
+            {projectFilter === "libertad-y-alegria" && <div className="absolute inset-x-4 -bottom-px h-px bg-gradient-to-r from-transparent via-amber-400 to-transparent" />}
+          </button>
         </div>
 
         {/* List Section */}
@@ -176,7 +249,7 @@ export default function LegalDashboardPage() {
           </div>
         ) : (
           <div className="grid gap-6">
-            {filteredClients.map((client: any, idx: number) => (
+            {paginatedClients.map((client: any, idx: number) => (
               <div
                 key={client.id}
                 className="group relative rounded-[2rem] p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center gap-6 sm:gap-8 glass-card animate-slide-up"
@@ -191,7 +264,7 @@ export default function LegalDashboardPage() {
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter uppercase italic group-hover:text-accent transition-colors truncate">
+                      <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter uppercase italic group-hover:text-accent transition-colors">
                         {client.clientName}
                       </h3>
                       <span className="px-2.5 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[8px] font-black text-blue-400 uppercase tracking-widest whitespace-nowrap">
@@ -270,6 +343,32 @@ export default function LegalDashboardPage() {
                 <p className="text-sm font-black uppercase tracking-[0.3em] opacity-20">Sin clientes en mora bajo este criterio</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-20">
+              Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredClients.length)} de {filteredClients.length} Morosos
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center rotate-180 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <div className="px-4 text-xs font-black text-white/50">{currentPage} / {totalPages}</div>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>

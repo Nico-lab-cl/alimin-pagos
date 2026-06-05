@@ -289,7 +289,7 @@ export async function getFullPostventaData({
         id: res.id,
         name: res.name,
         last_name: res.last_name,
-        clientName: res.last_name
+        clientName: (res.last_name && res.last_name !== "null")
           ? `${res.name} ${res.last_name}`.trim()
           : res.name,
         clientEmail: res.user?.email || res.email,
@@ -606,7 +606,7 @@ export async function approveReceipt(receiptId: string) {
     try {
       const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
       
-      const clientName = receipt.reservation.last_name 
+      const clientName = (receipt.reservation.last_name && receipt.reservation.last_name !== "null")
         ? `${receipt.reservation.name} ${receipt.reservation.last_name}`.trim()
         : (receipt.reservation.user?.name || receipt.reservation.name || "Cliente Alimin");
       const rut = receipt.reservation.rut || "No registrado";
