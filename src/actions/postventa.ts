@@ -852,6 +852,69 @@ export async function getFinancialHistory(reservationId: string) {
 }
 
 /**
+ * Updates a financial ledger entry amount (admin only).
+ */
+export async function updateFinancialLedgerAmount(
+  ledgerId: string,
+  newAmount: number,
+  reason: string
+) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  if (newAmount < 0) {
+    return { error: "El monto no puede ser negativo" };
+  }
+
+  try {
+    const entry = await prisma.financialLedger.findUnique({
+      where: { id: ledgerId },
+      include: { reservation: true },
+    });
+
+    if (!entry) {
+      return { error: "Entrada del historial financiero no encontrada" };
+    }
+
+    const oldAmount = entry.amount_clp;
+
+    // Update the ledger amount
+    await prisma.financialLedger.update({
+      where: { id: ledgerId },
+      data: {
+        amount_clp: newAmount,
+        description: `${entry.description || ""} (Monto modificado de $${oldAmount.toLocaleString("es-CL")} a $${newAmount.toLocaleString("es-CL")}. Motivo: ${reason})`,
+      },
+    });
+
+    // Create Audit Log
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "FinancialLedger",
+        entity_id: ledgerId,
+        details: `Monto de registro financiero modificado de $${oldAmount.toLocaleString("es-CL")} a $${newAmount.toLocaleString("es-CL")}. Motivo: ${reason}. ID Reserva: ${entry.reservation_id}`,
+        user_id: user.id,
+        user_email: user.email,
+      },
+    });
+
+    // Invalidate caches
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating financial ledger amount:", error);
+    return { error: "Error al actualizar el monto del registro" };
+  }
+}
+
+/**
  * Gets all lots for a project (admin inventory view).
  */
 export async function getAdminLots(projectSlug: string) {

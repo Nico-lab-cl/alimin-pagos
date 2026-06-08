@@ -14,7 +14,7 @@ import {
   updateClientProfile, updateClientFinancials, toggleMultiLot, 
   toggleAlContado, registerManualPayment, activateClientProfile, 
   deletePaymentReceipt, updateMoraDates, getFinancialHistory, 
-  generateTemporaryPassword 
+  generateTemporaryPassword, updateFinancialLedgerAmount 
 } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
@@ -102,6 +102,10 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
   // Financial History State
   const [financialHistory, setFinancialHistory] = useState<any[]>([]);
   const [loadingFinHistory, setLoadingFinHistory] = useState(false);
+  const [editingLedgerId, setEditingLedgerId] = useState<string | null>(null);
+  const [editLedgerAmount, setEditLedgerAmount] = useState<number>(0);
+  const [editLedgerReason, setEditLedgerReason] = useState<string>("");
+  const [isSavingLedger, setIsSavingLedger] = useState(false);
 
   // Manual Payment State
   const [isRegisteringPayment, setIsRegisteringPayment] = useState(false);
@@ -123,6 +127,30 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
       console.error("Error fetching financial history:", err);
     } finally {
       setLoadingFinHistory(false);
+    }
+  };
+
+  const handleSaveLedgerAmount = async (ledgerId: string) => {
+    if (!editLedgerReason.trim()) {
+      toast.error("Por favor ingresa un motivo para realizar el cambio.");
+      return;
+    }
+    setIsSavingLedger(true);
+    try {
+      const res = await updateFinancialLedgerAmount(ledgerId, editLedgerAmount, editLedgerReason.trim());
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success("Monto actualizado correctamente.");
+        setEditingLedgerId(null);
+        setEditLedgerReason("");
+        await refreshFinancialHistory();
+        onUpdate();
+      }
+    } catch (e) {
+      toast.error("Error al conectar con el servidor.");
+    } finally {
+      setIsSavingLedger(false);
     }
   };
 
@@ -1276,7 +1304,57 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                               <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-white/30 mt-0.5 sm:mt-1">{new Date(item.paid_at).toLocaleDateString('es-CL')}</p>
                             </div>
                           </div>
-                          <p className="text-base sm:text-lg font-bold text-white self-end sm:self-auto">{formatCLP(item.amount_clp)}</p>
+                          {editingLedgerId === item.id ? (
+                            <div className="flex flex-col gap-2 w-full mt-2 sm:mt-0 sm:w-auto self-end sm:self-auto items-end">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-emerald-400">$</span>
+                                <input 
+                                  type="number" 
+                                  value={editLedgerAmount} 
+                                  onChange={e => setEditLedgerAmount(Number(e.target.value))} 
+                                  className="bg-black/60 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none text-sm font-bold text-white w-32 focus:border-emerald-500" 
+                                />
+                                <button 
+                                  onClick={() => handleSaveLedgerAmount(item.id)} 
+                                  disabled={isSavingLedger} 
+                                  className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black uppercase tracking-wider flex items-center gap-1 disabled:opacity-50 transition-all shrink-0"
+                                >
+                                  {isSavingLedger ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                  Guardar
+                                </button>
+                                <button 
+                                  onClick={() => setEditingLedgerId(null)} 
+                                  className="px-3 py-2 rounded-lg border border-white/10 text-[10px] font-black uppercase tracking-wider text-white/60 hover:bg-white/5 transition-all shrink-0"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                              <input 
+                                type="text" 
+                                placeholder="Motivo del cambio (obligatorio)" 
+                                value={editLedgerReason} 
+                                onChange={e => setEditLedgerReason(e.target.value)} 
+                                className="bg-black/60 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none text-[11px] font-bold text-white w-full sm:w-64 placeholder-white/20 focus:border-emerald-500" 
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                              <p className="text-base sm:text-lg font-bold text-white">{formatCLP(item.amount_clp)}</p>
+                              {!isReadOnly && (
+                                <button 
+                                  onClick={() => {
+                                    setEditingLedgerId(item.id);
+                                    setEditLedgerAmount(item.amount_clp);
+                                    setEditLedgerReason("");
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                                  title="Editar Monto"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
