@@ -903,15 +903,15 @@ export async function updateFinancialLedgerAmount(
 
     // Try to find the corresponding PaymentReceipt and update it + its PDF document
     try {
-      const ledgerPaidAt = entry.paid_at || entry.created_at || new Date();
-      // Search for receipts of the same reservation created within 2 minutes of the ledger entry
+      const ledgerCreatedAt = entry.created_at || entry.paid_at || new Date();
+      // Search for receipts of the same reservation created within 2 minutes of the ledger entry's creation time
       const receipt = await prisma.paymentReceipt.findFirst({
         where: {
           reservation_id: entry.reservation_id,
           scope: entry.category === "PIE" ? "PIE" : "INSTALLMENT",
           created_at: {
-            gte: new Date(ledgerPaidAt.getTime() - 120000),
-            lte: new Date(ledgerPaidAt.getTime() + 120000),
+            gte: new Date(ledgerCreatedAt.getTime() - 120000),
+            lte: new Date(ledgerCreatedAt.getTime() + 120000),
           }
         }
       });
