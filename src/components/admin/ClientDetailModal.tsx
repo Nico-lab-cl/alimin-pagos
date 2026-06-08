@@ -105,6 +105,7 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
   const [editingLedgerId, setEditingLedgerId] = useState<string | null>(null);
   const [editLedgerAmount, setEditLedgerAmount] = useState<number>(0);
   const [editLedgerReason, setEditLedgerReason] = useState<string>("");
+  const [editLedgerCuotas, setEditLedgerCuotas] = useState<number>(1);
   const [isSavingLedger, setIsSavingLedger] = useState(false);
 
   // Manual Payment State
@@ -130,14 +131,15 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
     }
   };
 
-  const handleSaveLedgerAmount = async (ledgerId: string) => {
+  const handleSaveLedgerAmount = async (ledgerId: string, category?: string) => {
     if (!editLedgerReason.trim()) {
       toast.error("Por favor ingresa un motivo para realizar el cambio.");
       return;
     }
     setIsSavingLedger(true);
     try {
-      const res = await updateFinancialLedgerAmount(ledgerId, editLedgerAmount, editLedgerReason.trim());
+      const installmentsCount = category === "CUOTA" ? editLedgerCuotas : undefined;
+      const res = await updateFinancialLedgerAmount(ledgerId, editLedgerAmount, editLedgerReason.trim(), installmentsCount);
       if (res.error) {
         toast.error(res.error);
       } else {
@@ -1337,16 +1339,30 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                           </div>
                           {editingLedgerId === item.id ? (
                             <div className="flex flex-col gap-2 w-full mt-2 sm:mt-0 sm:w-auto self-end sm:self-auto items-end">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-emerald-400">$</span>
-                                <input 
-                                  type="number" 
-                                  value={editLedgerAmount} 
-                                  onChange={e => setEditLedgerAmount(Number(e.target.value))} 
-                                  className="bg-black/60 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none text-sm font-bold text-white w-32 focus:border-emerald-500" 
-                                />
+                              <div className="flex flex-wrap items-center gap-2 justify-end">
+                                {item.category === "CUOTA" && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-black text-white/40 uppercase tracking-wider">Cuotas:</span>
+                                    <input 
+                                      type="number" 
+                                      min="1"
+                                      value={editLedgerCuotas} 
+                                      onChange={e => setEditLedgerCuotas(Math.max(1, Number(e.target.value)))} 
+                                      className="bg-black/60 border border-white/10 rounded-lg px-2 py-1 outline-none text-xs font-bold text-white w-16 focus:border-emerald-500 text-center" 
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs font-bold text-emerald-400">$</span>
+                                  <input 
+                                    type="number" 
+                                    value={editLedgerAmount} 
+                                    onChange={e => setEditLedgerAmount(Number(e.target.value))} 
+                                    className="bg-black/60 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none text-sm font-bold text-white w-28 focus:border-emerald-500" 
+                                  />
+                                </div>
                                 <button 
-                                  onClick={() => handleSaveLedgerAmount(item.id)} 
+                                  onClick={() => handleSaveLedgerAmount(item.id, item.category)} 
                                   disabled={isSavingLedger} 
                                   className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black uppercase tracking-wider flex items-center gap-1 disabled:opacity-50 transition-all shrink-0"
                                 >
@@ -1377,6 +1393,12 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                                     setEditingLedgerId(item.id);
                                     setEditLedgerAmount(item.amount_clp);
                                     setEditLedgerReason("");
+                                    let cuotas = 1;
+                                    const match = item.description?.match(/Cuota\s*x\s*(\d+)/i);
+                                    if (match) {
+                                      cuotas = parseInt(match[1], 10);
+                                    }
+                                    setEditLedgerCuotas(cuotas);
                                   }}
                                   className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
                                   title="Editar Monto"

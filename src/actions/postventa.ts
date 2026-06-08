@@ -854,13 +854,11 @@ export async function getFinancialHistory(reservationId: string) {
   }
 }
 
-/**
- * Updates a financial ledger entry amount (admin only).
- */
 export async function updateFinancialLedgerAmount(
   ledgerId: string,
   newAmount: number,
-  reason: string
+  reason: string,
+  newInstallmentsCount?: number
 ) {
   const session = await auth();
   const user = session?.user as any;
@@ -892,12 +890,43 @@ export async function updateFinancialLedgerAmount(
 
     const oldAmount = entry.amount_clp;
 
-    // Update the ledger amount
+    let oldInstallmentsCount = 1;
+    if (entry.category === "CUOTA") {
+      const descMatch = entry.description?.match(/Cuota\s*x\s*(\d+)/i);
+      if (descMatch) {
+        oldInstallmentsCount = parseInt(descMatch[1], 10);
+      }
+    }
+
+    const installmentsCountToUse = newInstallmentsCount !== undefined ? newInstallmentsCount : oldInstallmentsCount;
+    const diff = installmentsCountToUse - oldInstallmentsCount;
+
+    // Update Reservation installments_paid count if changed
+    if (entry.category === "CUOTA" && diff !== 0) {
+      await prisma.reservation.update({
+        where: { id: entry.reservation_id },
+        data: {
+          installments_paid: {
+            increment: diff
+          }
+        }
+      });
+    }
+
+    // Generate updated description text
+    let updatedDescription = `${entry.description || ""} (Monto modificado de $${oldAmount.toLocaleString("es-CL")} a $${newAmount.toLocaleString("es-CL")}. Motivo: ${reason})`;
+    if (entry.category === "CUOTA") {
+      const baseDesc = entry.description || "Pago Manual Cuota";
+      const cleanedBaseDesc = baseDesc.replace(/Cuota\s*x\s*\d+/i, `Cuota x${installmentsCountToUse}`);
+      updatedDescription = `${cleanedBaseDesc} (Monto modificado de $${oldAmount.toLocaleString("es-CL")} a $${newAmount.toLocaleString("es-CL")}. Motivo: ${reason})`;
+    }
+
+    // Update the ledger amount and description
     await prisma.financialLedger.update({
       where: { id: ledgerId },
       data: {
         amount_clp: newAmount,
-        description: `${entry.description || ""} (Monto modificado de $${oldAmount.toLocaleString("es-CL")} a $${newAmount.toLocaleString("es-CL")}. Motivo: ${reason})`,
+        description: updatedDescription,
       },
     });
 
@@ -917,10 +946,19 @@ export async function updateFinancialLedgerAmount(
       });
 
       if (receipt) {
+        // Calculate nominal installment range if count changed
+        const newRange = (receipt.scope === "INSTALLMENT" && installmentsCountToUse > 1 && receipt.nominal_installment_number)
+          ? `${receipt.nominal_installment_number}-${receipt.nominal_installment_number + installmentsCountToUse - 1}`
+          : null;
+
         // Update the PaymentReceipt record
         await prisma.paymentReceipt.update({
           where: { id: receipt.id },
-          data: { amount_clp: newAmount }
+          data: { 
+            amount_clp: newAmount,
+            installments_count: installmentsCountToUse,
+            nominal_installment_range: newRange
+          }
         });
 
         // Find the PDF document associated with this receipt
@@ -942,7 +980,7 @@ export async function updateFinancialLedgerAmount(
           const projectName = res.project?.name || "Alimin SPA";
           const lotNumber = res.lot?.number || res.lot_id.toString();
           const stage = res.lot?.stage || "";
-          const concept = receipt.scope === "PIE" ? "Pago de Pie" : `Pago Cuota(s) x${receipt.installments_count || 1}`;
+          const concept = receipt.scope === "PIE" ? "Pago de Pie" : `Pago Cuota(s) x${installmentsCountToUse}`;
 
           const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
           const pdfBase64 = await generateReceiptPDF({
