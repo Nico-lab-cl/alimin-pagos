@@ -875,7 +875,15 @@ export async function updateFinancialLedgerAmount(
   try {
     const entry = await prisma.financialLedger.findUnique({
       where: { id: ledgerId },
-      include: { reservation: true },
+      include: {
+        reservation: {
+          include: {
+            user: true,
+            project: true,
+            lot: true
+          }
+        }
+      },
     });
 
     if (!entry) {
@@ -892,6 +900,76 @@ export async function updateFinancialLedgerAmount(
         description: `${entry.description || ""} (Monto modificado de $${oldAmount.toLocaleString("es-CL")} a $${newAmount.toLocaleString("es-CL")}. Motivo: ${reason})`,
       },
     });
+
+    // Try to find the corresponding PaymentReceipt and update it + its PDF document
+    try {
+      const ledgerPaidAt = entry.paid_at || entry.created_at || new Date();
+      // Search for receipts of the same reservation created within 2 minutes of the ledger entry
+      const receipt = await prisma.paymentReceipt.findFirst({
+        where: {
+          reservation_id: entry.reservation_id,
+          scope: entry.category === "PIE" ? "PIE" : "INSTALLMENT",
+          created_at: {
+            gte: new Date(ledgerPaidAt.getTime() - 120000),
+            lte: new Date(ledgerPaidAt.getTime() + 120000),
+          }
+        }
+      });
+
+      if (receipt) {
+        // Update the PaymentReceipt record
+        await prisma.paymentReceipt.update({
+          where: { id: receipt.id },
+          data: { amount_clp: newAmount }
+        });
+
+        // Find the PDF document associated with this receipt
+        const docName = `Comprobante_Pago_${receipt.id.substring(0, 6)}.pdf`;
+        const document = await prisma.reservationDocument.findFirst({
+          where: {
+            reservation_id: entry.reservation_id,
+            name: docName
+          }
+        });
+
+        if (document) {
+          const res = entry.reservation;
+          const clientName = res.last_name && res.last_name !== "null"
+            ? `${res.name} ${res.last_name}`.trim()
+            : (res.user?.name || res.name || "Cliente Alimin");
+          const rut = res.rut || "No registrado";
+          const email = res.user?.email || res.email || "No registrado";
+          const projectName = res.project?.name || "Alimin SPA";
+          const lotNumber = res.lot?.number || res.lot_id.toString();
+          const stage = res.lot?.stage || "";
+          const concept = receipt.scope === "PIE" ? "Pago de Pie" : `Pago Cuota(s) x${receipt.installments_count || 1}`;
+
+          const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
+          const pdfBase64 = await generateReceiptPDF({
+            clientName,
+            rut,
+            email,
+            projectName,
+            lotNumber,
+            stage,
+            concept,
+            amount: newAmount,
+            date: receipt.created_at || entry.paid_at || new Date(),
+            receiptId: receipt.id.substring(0, 8).toUpperCase(),
+          });
+
+          await prisma.reservationDocument.update({
+            where: { id: document.id },
+            data: {
+              base64_content: `data:application/pdf;base64,${pdfBase64}`
+            }
+          });
+          console.log(`Regenerated PDF receipt ${docName} with amount ${newAmount}`);
+        }
+      }
+    } catch (receiptError) {
+      console.error("Error updating corresponding PaymentReceipt or PDF document:", receiptError);
+    }
 
     // Create Audit Log
     await prisma.auditLog.create({
