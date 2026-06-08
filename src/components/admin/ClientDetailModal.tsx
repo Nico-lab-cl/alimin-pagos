@@ -705,6 +705,37 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                       <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-2 flex items-center gap-2"><FileText className="w-3 h-3" /> Observaciones Post-Venta</p>
                       <p className="text-sm font-bold text-white/80 whitespace-pre-wrap leading-relaxed">{selectedClient.observation || <span className="italic opacity-50">Sin observaciones registradas.</span>}</p>
                     </div>
+                    <div className="col-span-1 sm:col-span-2 p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10 mt-4 sm:mt-6">
+                      <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                        <Key className="w-3 h-3 text-accent" /> Historial de Acceso al Portal
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
+                          <p className="text-[8px] font-black text-white/40 uppercase tracking-[0.1em] mb-1">Activación de Portal / Envío de Credenciales</p>
+                          <p className="text-xs font-bold text-white">
+                            {selectedClient.activated_at 
+                              ? new Date(selectedClient.activated_at).toLocaleString("es-CL", { timeZone: "America/Santiago" }) 
+                              : (selectedClient.portal_active ? "Activo (Histórico)" : "No activado")}
+                          </p>
+                        </div>
+                        <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
+                          <p className="text-[8px] font-black text-white/40 uppercase tracking-[0.1em] mb-1">Último Cambio de Contraseña</p>
+                          <p className="text-xs font-bold text-white">
+                            {selectedClient.password_changed_at 
+                              ? new Date(selectedClient.password_changed_at).toLocaleString("es-CL", { timeZone: "America/Santiago" }) 
+                              : "No registrado"}
+                          </p>
+                        </div>
+                        <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
+                          <p className="text-[8px] font-black text-white/40 uppercase tracking-[0.1em] mb-1">Último Inicio de Sesión</p>
+                          <p className="text-xs font-bold text-white">
+                            {selectedClient.last_login_at 
+                              ? new Date(selectedClient.last_login_at).toLocaleString("es-CL", { timeZone: "America/Santiago" }) 
+                              : "No registrado"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

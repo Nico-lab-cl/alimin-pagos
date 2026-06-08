@@ -498,6 +498,7 @@ export async function resetPassword(token: string, newPassword: string) {
         reset_password_token: null,
         reset_password_expires: null,
         must_change_password: false,
+        password_changed_at: new Date()
       },
     });
 

@@ -57,7 +57,7 @@ export async function getFullPostventaData({
       orderBy: { created_at: "desc" },
       include: {
         lot: true,
-        user: { select: { id: true, name: true, email: true, portal_active: true, temp_password: true } },
+        user: { select: { id: true, name: true, email: true, portal_active: true, temp_password: true, activated_at: true, password_changed_at: true, last_login_at: true } },
         receipts: {
           where: { status: "APPROVED" },
           orderBy: { created_at: "desc" },
@@ -348,6 +348,9 @@ export async function getFullPostventaData({
         observation: res.observation,
         portal_active: res.user?.portal_active || false,
         temp_password: res.user?.temp_password || null,
+        activated_at: res.user?.activated_at || null,
+        password_changed_at: res.user?.password_changed_at || null,
+        last_login_at: res.user?.last_login_at || null,
       };
     });
 
@@ -1860,7 +1863,8 @@ export async function activateClientProfile(reservationId: string) {
         password: hashedPassword,
         must_change_password: true,
         portal_active: true,
-        temp_password: tempPassword
+        temp_password: tempPassword,
+        activated_at: new Date()
       }
     });
 
@@ -1994,7 +1998,8 @@ export async function generateTemporaryPassword(reservationId: string) {
         password: hashedPassword,
         must_change_password: true,
         temp_password: tempPassword,
-        portal_active: true
+        portal_active: true,
+        activated_at: new Date()
       }
     });
 

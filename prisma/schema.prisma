@@ -81,6 +81,9 @@ model User {
   reset_password_expires DateTime?      @db.Timestamptz(6)
   portal_active          Boolean?       @default(false)
   temp_password          String?        @db.VarChar(255)
+  activated_at           DateTime?      @db.Timestamptz(6)
+  password_changed_at    DateTime?      @db.Timestamptz(6)
+  last_login_at          DateTime?      @db.Timestamptz(6)
   auditLogs              AuditLog[]
   notifications          Notification[]
   reservations           Reservation[]

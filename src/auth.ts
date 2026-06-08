@@ -47,6 +47,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
             if (passwordsMatch) {
               console.log(`[Auth] Password verified. Login successful: ${email}`);
+              try {
+                await prisma.user.update({
+                  where: { id: user.id },
+                  data: { last_login_at: new Date() }
+                });
+              } catch (e) {
+                console.error("[Auth] Error updating last_login_at:", e);
+              }
               return {
                 id: user.id,
                 email: user.email,

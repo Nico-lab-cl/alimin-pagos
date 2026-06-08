@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       data: {
         password: hashedPassword,
         must_change_password: false,
+        password_changed_at: new Date()
       },
     });
 
