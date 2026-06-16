@@ -7,6 +7,7 @@ import {
   calculateTotalInterest,
   calculateAggregatedAutoPenalty,
   getProjectConfig,
+  getChileToday,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
@@ -71,8 +72,7 @@ export async function getFullPostventaData({
       },
     });
 
-    const currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0);
+    const currentDate = getChileToday();
     const fiveDaysFromNow = new Date(currentDate);
     fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
 
@@ -1605,8 +1605,7 @@ export async function getClientPOV(reservationId: string) {
 
     const lot = res.lot;
     const project = res.project;
-    const currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0);
+    const currentDate = getChileToday();
 
     const paidCuotas = res.installments_paid || 0;
     const totalCuotas = lot.cuotas || 0;

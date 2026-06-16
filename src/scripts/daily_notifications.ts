@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import { getInstallmentDueDate, calculateTotalInterest, calculateAggregatedAutoPenalty } from "../lib/financials";
+import { getInstallmentDueDate, calculateAggregatedAutoPenalty, getChileToday } from "../lib/financials";
 import { sendPushNotification } from "../lib/notifications";
 
 async function runDailyAlerts() {
@@ -14,8 +14,7 @@ async function runDailyAlerts() {
     },
   });
 
-  const currentDate = new Date();
-  currentDate.setHours(0, 0, 0, 0);
+  const currentDate = getChileToday();
 
   for (const res of reservations) {
     if (!res.user.fcm_token) continue;

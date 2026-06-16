@@ -29,6 +29,17 @@ export function getInstallmentDueDate(
 }
 
 /**
+ * Retorna la fecha actual en Chile (America/Santiago) a la medianoche (00:00:00).
+ */
+export function getChileToday(): Date {
+  const now = new Date();
+  const santiagoStr = now.toLocaleString("en-US", { timeZone: "America/Santiago" });
+  const chileDate = new Date(santiagoStr);
+  chileDate.setHours(0, 0, 0, 0);
+  return chileDate;
+}
+
+/**
  * Calculates the total penalty (mora) for a late payment.
  * Uses project-level config for daily penalty and grace period.
  */
@@ -44,7 +55,9 @@ export function calculateTotalInterest(
 ): number {
   if (moraFrozen) return 0;
 
-  let pDate = new Date(paymentDate);
+  // Convert paymentDate to Santiago timezone date to avoid UTC day shifts
+  const santiagoStr = paymentDate.toLocaleString("en-US", { timeZone: "America/Santiago" });
+  let pDate = new Date(santiagoStr);
   pDate.setHours(0, 0, 0, 0);
 
   // If debtEndDate is set, cap pDate at that date
@@ -72,7 +85,7 @@ export function calculateTotalInterest(
       gracePeriodEnd.setDate(dueDate.getDate() + gracePeriodDays);
       gracePeriodEnd.setHours(23, 59, 59, 999);
       
-      if (paymentDate <= gracePeriodEnd) {
+      if (pDate <= gracePeriodEnd) {
         return 0;
       }
 
@@ -85,7 +98,7 @@ export function calculateTotalInterest(
     gracePeriodEnd.setDate(dueDate.getDate() + gracePeriodDays);
     gracePeriodEnd.setHours(23, 59, 59, 999);
     
-    if (paymentDate <= gracePeriodEnd) {
+    if (pDate <= gracePeriodEnd) {
       return 0;
     }
 

@@ -6,6 +6,7 @@ import {
   getInstallmentDueDate,
   calculateTotalInterest,
   calculateAggregatedAutoPenalty,
+  getChileToday,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
 
@@ -48,8 +49,7 @@ export async function getUserLots() {
       },
     });
 
-    const currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0);
+    const currentDate = getChileToday();
 
     const lots = (reservations as any[]).map((res) => {
       const lot = res.lot;
