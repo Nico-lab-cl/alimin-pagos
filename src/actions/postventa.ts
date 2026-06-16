@@ -1241,7 +1241,9 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
     
     if (data.installment_start_date) {
       const [y, m, d] = data.installment_start_date.split("-").map(Number);
-      const targetDay = Number(data.due_day) || d || 5;
+      // Use the day selected in the date picker (d) rather than overriding it with due_day,
+      // so custom next payment dates on a different day of the month can be saved correctly.
+      const targetDay = d || Number(data.due_day) || 5;
       const enteredDate = new Date(Date.UTC(y, m - 1, targetDay, 12, 0, 0, 0));
       
       const paidCount = Number(data.installments_paid) || 0;
