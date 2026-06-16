@@ -29,14 +29,14 @@ export function getInstallmentDueDate(
 }
 
 /**
- * Retorna la fecha actual en Chile (America/Santiago) a la medianoche (00:00:00).
+ * Retorna la fecha actual en Chile (America/Santiago) a las 12:00:00 UTC.
+ * Usar las 12:00:00 UTC evita que el ajuste de zona horaria (UTC-3/UTC-4) retroceda el día calendario.
  */
 export function getChileToday(): Date {
   const now = new Date();
-  const santiagoStr = now.toLocaleString("en-US", { timeZone: "America/Santiago" });
-  const chileDate = new Date(santiagoStr);
-  chileDate.setHours(0, 0, 0, 0);
-  return chileDate;
+  const santiagoStr = now.toLocaleDateString("en-US", { timeZone: "America/Santiago" });
+  const [month, day, year] = santiagoStr.split("/").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
 }
 
 /**
