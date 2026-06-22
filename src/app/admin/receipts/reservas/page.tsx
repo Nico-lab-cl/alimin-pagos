@@ -6,20 +6,20 @@ import { formatCLP, formatDate } from "@/lib/utils";
 import { useSearch } from "@/context/SearchContext";
 import {
   Loader2, User, Phone, Mail, MapPin, Calendar,
-  ChevronRight, BookOpen, Eye, X, FileSignature,
-  Shield, Clock, CheckCircle2, AlertTriangle, Search
+  ChevronRight, BookOpen, X, FileSignature,
+  Shield, Clock, CheckCircle2, AlertTriangle
 } from "lucide-react";
 
 type ReservationStatus = "active" | "COMPLETED" | "cancelled" | string;
 
 const statusConfig: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
-  active: { label: "Activa", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", icon: CheckCircle2 },
-  COMPLETED: { label: "Completada", color: "text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20", icon: Shield },
-  cancelled: { label: "Cancelada", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20", icon: AlertTriangle },
+  active: { label: "Activa", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", icon: CheckCircle2 },
+  COMPLETED: { label: "Completada", color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200", icon: Shield },
+  cancelled: { label: "Cancelada", color: "text-red-700", bg: "bg-red-50", border: "border-red-200", icon: AlertTriangle },
 };
 
 function getStatusInfo(status: ReservationStatus) {
-  return statusConfig[status] || { label: status, color: "text-white/40", bg: "bg-white/5", border: "border-white/10", icon: Clock };
+  return statusConfig[status] || { label: status, color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200", icon: Clock };
 }
 
 export default function ReservasPage() {
@@ -74,33 +74,33 @@ export default function ReservasPage() {
   };
 
   return (
-    <div className="space-y-10 animate-fade-in px-4">
+    <div className="space-y-8 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8">
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
         <div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-2xl bg-accent/20 flex items-center justify-center border border-accent/20">
-              <BookOpen className="w-5 h-5 text-accent" />
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100 shadow-sm">
+              <BookOpen className="w-5 h-5 text-blue-600" />
             </div>
-            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-accent">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
               Gestión de Reservas
             </p>
           </div>
-          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">
-            Reservas <span className="text-white/20">del Proyecto</span>
+          <h1 className="text-3xl font-bold text-slate-800 tracking-tight leading-none">
+            Reservas <span className="text-slate-400 font-medium">del Proyecto</span>
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Stats pills */}
-          <div className="flex items-center gap-3 mr-2">
-            <span className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50">
+          <div className="flex items-center gap-2 mr-1">
+            <span className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500 shadow-sm">
               {stats.total} Total
             </span>
-            <span className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest text-emerald-400">
+            <span className="px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider text-emerald-700 shadow-sm">
               {stats.active} Activas
             </span>
-            <span className="px-4 py-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-[10px] font-black uppercase tracking-widest text-sky-400">
+            <span className="px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-[10px] font-bold uppercase tracking-wider text-blue-700 shadow-sm">
               {stats.completed} Completadas
             </span>
           </div>
@@ -109,23 +109,23 @@ export default function ReservasPage() {
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-            className="px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all"
-            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "0.8rem" }}
+            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-700 outline-none cursor-pointer hover:bg-slate-50/80 transition-all shadow-sm min-w-[150px]"
+            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 0.8rem center", backgroundSize: "0.6rem" }}
           >
-            <option value="all" className="bg-[#0c1a1a]">Todos los estados</option>
-            <option value="active" className="bg-[#0c1a1a]">Activas</option>
-            <option value="COMPLETED" className="bg-[#0c1a1a]">Completadas</option>
+            <option value="all">Todos los estados</option>
+            <option value="active">Activas</option>
+            <option value="COMPLETED">Completadas</option>
           </select>
 
           {/* Project selector */}
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-6 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[200px]"
-            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1.5rem center", backgroundSize: "1rem" }}
+            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-700 outline-none cursor-pointer hover:bg-slate-50/80 transition-all min-w-[180px] shadow-sm"
+            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 0.8rem center", backgroundSize: "0.6rem" }}
           >
             {projects.map((p) => (
-              <option key={p.slug} value={p.slug} className="bg-[#0c1a1a]">{p.name}</option>
+              <option key={p.slug} value={p.slug}>{p.name}</option>
             ))}
           </select>
         </div>
@@ -134,16 +134,16 @@ export default function ReservasPage() {
       {/* Content */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-40 gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-accent" />
-          <p className="text-xs font-black uppercase tracking-[0.3em] opacity-20">Cargando Reservas...</p>
+          <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Cargando Reservas...</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-40 rounded-[3rem] border border-white/5 glass-card animate-fade-in">
-          <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-10 border border-white/10">
-            <BookOpen className="w-12 h-12 text-white/10" />
+        <div className="text-center py-32 rounded-2xl border border-slate-200 bg-white shadow-sm animate-fade-in">
+          <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-6 border border-slate-100">
+            <BookOpen className="w-10 h-10 text-slate-300" />
           </div>
-          <h3 className="text-3xl font-black text-white mb-3 italic tracking-tighter uppercase">Sin Reservas</h3>
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-30 max-w-xs mx-auto">
+          <h3 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">Sin Reservas</h3>
+          <p className="text-xs font-medium text-slate-400 max-w-xs mx-auto">
             No se encontraron reservas para este proyecto con los filtros seleccionados.
           </p>
         </div>
@@ -156,28 +156,28 @@ export default function ReservasPage() {
               <div
                 key={res.id}
                 onClick={() => setDetailReservation(res)}
-                className="group relative rounded-[2.5rem] overflow-hidden glass-card cursor-pointer hover:border-accent/20 transition-all duration-500 animate-slide-up"
-                style={{ animationDelay: `${idx * 40}ms`, animationFillMode: "both" }}
+                className="group relative rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm cursor-pointer hover:shadow-md hover:border-blue-300 transition-all duration-350 animate-slide-up"
+                style={{ animationDelay: `${idx * 45}ms`, animationFillMode: "both" }}
               >
-                <div className="p-8 space-y-6">
+                <div className="p-6 space-y-5">
                   {/* Client header */}
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-accent group-hover:text-[#061010] group-hover:shadow-[0_0_25px_rgba(212,168,75,0.3)] transition-all duration-500">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/60 text-slate-550 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors duration-300">
                         <User className="w-5 h-5" />
                       </div>
-                      <div>
-                        <h4 className="text-lg font-black text-white tracking-tighter uppercase leading-none italic group-hover:translate-x-0.5 transition-transform">
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-slate-800 tracking-tight truncate group-hover:text-blue-900 transition-colors">
                           {res.fullName}
                         </h4>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-accent italic">
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] font-bold text-blue-600">
                             Lote {res.lotNumber}
                           </span>
                           {res.lotStage && (
                             <>
-                              <div className="w-1 h-1 rounded-full bg-white/10" />
-                              <span className="text-[9px] font-black uppercase tracking-widest opacity-30">
+                              <div className="w-1 h-1 rounded-full bg-slate-300" />
+                              <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
                                 {res.lotStage}
                               </span>
                             </>
@@ -185,40 +185,41 @@ export default function ReservasPage() {
                         </div>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${si.bg} ${si.border} border`}>
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${si.bg} ${si.border} flex-shrink-0`}>
                       <StatusIcon className={`w-3 h-3 ${si.color}`} />
-                      <span className={`text-[8px] font-black uppercase tracking-widest ${si.color}`}>{si.label}</span>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider ${si.color}`}>{si.label}</span>
                     </div>
                   </div>
 
                   {/* Info grid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                      <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mb-1">Rut</p>
-                      <p className="text-xs font-black text-white/70 truncate">{res.rut || "—"}</p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-slate-50/50 border border-slate-100">
+                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Rut</p>
+                      <p className="text-xs font-semibold text-slate-700 truncate">{res.rut || "—"}</p>
                     </div>
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                      <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mb-1">Asesor</p>
-                      <p className="text-xs font-black text-white/70 truncate">{res.advisor || "Sin asignar"}</p>
+                    <div className="p-2.5 rounded-xl bg-slate-50/50 border border-slate-100">
+                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Asesor</p>
+                      <p className="text-xs font-semibold text-slate-700 truncate">{res.advisor || "Sin asignar"}</p>
                     </div>
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                      <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mb-1">Reserva</p>
-                      <p className="text-xs font-black text-accent">{formatCLP(res.reservation_price)}</p>
+                    <div className="p-2.5 rounded-xl bg-slate-50/50 border border-slate-100">
+                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Reserva</p>
+                      <p className="text-xs font-bold text-blue-600">{formatCLP(res.reservation_price)}</p>
                     </div>
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                      <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mb-1">Cuotas</p>
-                      <p className="text-xs font-black text-white/70">{res.installments_paid} pagadas</p>
+                    <div className="p-2.5 rounded-xl bg-slate-50/50 border border-slate-100">
+                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Cuotas</p>
+                      <p className="text-xs font-semibold text-slate-700">{res.installments_paid} pagadas</p>
                     </div>
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                    <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest opacity-20">
-                      <Calendar className="w-3 h-3" />
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
                       {formatDate(res.created_at)}
                     </div>
-                    <div className="flex items-center gap-1 text-[10px] font-black text-accent opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest">
-                      Ver Detalle <ChevronRight className="w-3 h-3" />
+                    <div className="flex items-center gap-0.5 text-xs font-bold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span>Ver Detalle</span>
+                      <ChevronRight className="w-4 h-4" />
                     </div>
                   </div>
                 </div>
@@ -230,25 +231,25 @@ export default function ReservasPage() {
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-20">
+        <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-4">
+          <p className="text-xs font-medium text-slate-400">
             Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filtered.length)} de {filtered.length} Reservas
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center rotate-180 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center rotate-180 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 text-slate-650" />
             </button>
-            <div className="px-4 text-xs font-black text-white/50">{currentPage} / {totalPages}</div>
+            <div className="px-3 text-xs font-bold text-slate-600">{currentPage} / {totalPages}</div>
             <button
               onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
-              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 text-slate-650" />
             </button>
           </div>
         </div>
@@ -257,44 +258,44 @@ export default function ReservasPage() {
       {/* Detail Modal */}
       {detailReservation && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in"
           onClick={() => setDetailReservation(null)}
         >
           <div
-            className="bg-[#050C0C] border border-white/10 rounded-[3rem] w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-slide-up overflow-hidden"
+            className="bg-white border border-slate-200 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-slide-up overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-10 py-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <FileSignature className="w-5 h-5 text-accent" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Detalle de Reserva</p>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <FileSignature className="w-4 h-4 text-blue-600" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Detalle de Reserva</p>
                 </div>
-                <h2 className="text-2xl md:text-3xl font-black text-white italic tracking-tighter uppercase leading-none">
+                <h2 className="text-xl font-bold text-slate-800 tracking-tight leading-none">
                   {detailReservation.fullName}
                 </h2>
               </div>
               <button
                 onClick={() => setDetailReservation(null)}
-                className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-red-500/10 hover:text-red-400 transition-all"
+                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-550 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Content */}
-            <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
               {/* Status banner */}
               {(() => {
                 const si = getStatusInfo(detailReservation.status);
                 const StatusIcon = si.icon;
                 return (
-                  <div className={`flex items-center gap-4 p-5 rounded-2xl ${si.bg} ${si.border} border`}>
-                    <StatusIcon className={`w-6 h-6 ${si.color}`} />
+                  <div className={`flex items-center gap-3 p-4 rounded-xl ${si.bg} ${si.border} border`}>
+                    <StatusIcon className={`w-5 h-5 ${si.color}`} />
                     <div>
-                      <p className={`text-sm font-black uppercase tracking-widest ${si.color}`}>{si.label}</p>
-                      <p className="text-[10px] font-bold text-white/30 mt-0.5">Estado actual de la reserva</p>
+                      <p className={`text-xs font-bold uppercase tracking-wider ${si.color}`}>{si.label}</p>
+                      <p className="text-[10px] font-medium text-slate-400 mt-0.5">Estado actual de la reserva en el sistema</p>
                     </div>
                   </div>
                 );
@@ -314,13 +315,13 @@ export default function ReservasPage() {
                   { label: "Dirección", value: [detailReservation.address_street, detailReservation.address_commune, detailReservation.address_region].filter(Boolean).join(", ") || "—", icon: MapPin },
                   { label: "Fecha de Reserva", value: formatDate(detailReservation.created_at), icon: Calendar },
                 ].map((item, i) => (
-                  <div key={i} className="flex items-start gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
-                      <item.icon className="w-4 h-4 text-white/20" />
+                  <div key={i} className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-50/50 border border-slate-100">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-450 flex items-center justify-center flex-shrink-0">
+                      <item.icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-white/20 mb-1">{item.label}</p>
-                      <p className="text-sm font-bold text-white/80 truncate">{item.value}</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{item.label}</p>
+                      <p className="text-xs font-semibold text-slate-700 truncate">{item.value}</p>
                     </div>
                   </div>
                 ))}
@@ -328,25 +329,25 @@ export default function ReservasPage() {
 
               {/* Financial summary */}
               <div className="grid grid-cols-3 gap-4">
-                <div className="p-5 rounded-2xl bg-accent/5 border border-accent/10 text-center">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-accent/60 mb-2">Monto Reserva</p>
-                  <p className="text-xl font-black text-accent italic tracking-tighter">{formatCLP(detailReservation.reservation_price)}</p>
+                <div className="p-4.5 rounded-xl bg-blue-50 border border-blue-100 text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-blue-800 mb-1">Monto Reserva</p>
+                  <p className="text-lg font-bold text-blue-900 tracking-tight">{formatCLP(detailReservation.reservation_price)}</p>
                 </div>
-                <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 text-center">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-white/20 mb-2">Pie</p>
-                  <p className="text-xl font-black text-white/80 italic tracking-tighter">{formatCLP(detailReservation.pie)}</p>
+                <div className="p-4.5 rounded-xl bg-slate-50 border border-slate-200/80 text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1">Pie</p>
+                  <p className="text-lg font-bold text-slate-700 tracking-tight">{formatCLP(detailReservation.pie)}</p>
                 </div>
-                <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 text-center">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-white/20 mb-2">Precio Lote</p>
-                  <p className="text-xl font-black text-white/80 italic tracking-tighter">{formatCLP(detailReservation.lotPrice)}</p>
+                <div className="p-4.5 rounded-xl bg-slate-50 border border-slate-200/80 text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1">Precio Lote</p>
+                  <p className="text-lg font-bold text-slate-700 tracking-tight">{formatCLP(detailReservation.lotPrice)}</p>
                 </div>
               </div>
 
               {/* Observation / Notes */}
               {(detailReservation.observation || detailReservation.notes) && (
-                <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-white/20 mb-3">Observaciones</p>
-                  <p className="text-sm text-white/60 leading-relaxed whitespace-pre-wrap">
+                <div className="p-5 rounded-xl bg-slate-50 border border-slate-150">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2">Observaciones</p>
+                  <p className="text-xs text-slate-650 leading-relaxed whitespace-pre-wrap font-medium">
                     {detailReservation.observation || detailReservation.notes}
                   </p>
                 </div>

@@ -226,14 +226,6 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <button className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-550 hover:text-slate-800 transition-all shadow-sm">
               <BookOpen className="w-4 h-4" />
             </button>
-            
-            <div className="w-px h-6 bg-slate-200" />
-            
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shadow-sm">
-                <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=256&auto=format&fit=facearea&facepad=2" alt="User Avatar" className="w-full h-full object-cover" />
-              </div>
-            </div>
           </div>
         </header>
 

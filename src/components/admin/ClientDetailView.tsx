@@ -6,7 +6,7 @@ import {
   ArrowLeft, Bell, HelpCircle, User, FileText, Calendar, Building, Clock, 
   AlertTriangle, Phone, CheckCircle2, ChevronRight, ChevronDown, Download, Plus, 
   Mail, Settings, MoreVertical, MessageSquare, Send, ShieldAlert, History, Zap, Loader2,
-  Trash2, Eye, X
+  Trash2, Eye, X, Save
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -32,6 +32,16 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
   const [isSavingMora, setIsSavingMora] = useState(false);
   const [showMoraBreakdown, setShowMoraBreakdown] = useState(false);
   const [showPOV, setShowPOV] = useState(false);
+  const [showMoraModal, setShowMoraModal] = useState(false);
+  const [isSavingMoraSettings, setIsSavingMoraSettings] = useState(false);
+
+  const [moraForm, setMoraForm] = useState({
+    mora_status: selectedClient.mora_status || "ACTIVO",
+    penalty_mode: selectedClient.penalty_mode || "AUTO",
+    manual_penalty: selectedClient.manual_penalty || 0,
+    debt_start_date: selectedClient.debt_start_date ? new Date(selectedClient.debt_start_date).toISOString().split("T")[0] : "",
+    debt_end_date: selectedClient.debt_end_date ? new Date(selectedClient.debt_end_date).toISOString().split("T")[0] : "",
+  });
 
   // Profile Edit State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -102,6 +112,13 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       penalty_mode: selectedClient.penalty_mode || "AUTO",
       manual_penalty: selectedClient.manual_penalty || 0,
       extra_paid_amount: selectedClient.extra_paid_amount || 0,
+    });
+    setMoraForm({
+      mora_status: selectedClient.mora_status || "ACTIVO",
+      penalty_mode: selectedClient.penalty_mode || "AUTO",
+      manual_penalty: selectedClient.manual_penalty || 0,
+      debt_start_date: selectedClient.debt_start_date ? new Date(selectedClient.debt_start_date).toISOString().split("T")[0] : "",
+      debt_end_date: selectedClient.debt_end_date ? new Date(selectedClient.debt_end_date).toISOString().split("T")[0] : "",
     });
   }, [selectedClient]);
 
@@ -286,6 +303,33 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       toast.error("Error al actualizar datos financieros");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveMora = async () => {
+    setIsSavingMoraSettings(true);
+    try {
+      const res = await updateClientFinancials(selectedClient.id, selectedClient.lotId, {
+        mora_status: moraForm.mora_status,
+        mora_frozen: moraForm.mora_status === "CONGELADO",
+        penalty_mode: moraForm.penalty_mode,
+        manual_penalty: Number(moraForm.manual_penalty),
+        debt_start_date: moraForm.debt_start_date || null,
+        debt_end_date: moraForm.debt_end_date || null,
+      });
+
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success("Configuración de mora aplicada con éxito");
+        setShowMoraModal(false);
+        onUpdate();
+        fetchNotesAndHistory();
+      }
+    } catch (e) {
+      toast.error("Error al actualizar la configuración de mora");
+    } finally {
+      setIsSavingMoraSettings(false);
     }
   };
 
@@ -562,7 +606,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button 
             onClick={() => setShowPOV(true)}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
@@ -578,6 +622,16 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             <Plus className="w-3.5 h-3.5" />
             Registrar Pago
           </button>
+
+          {activeTab === "FINANCES" && (
+            <button 
+              onClick={() => setShowMoraModal(true)}
+              className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white border border-red-500/20 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Ajustes de Mora
+            </button>
+          )}
           
           <button 
             onClick={handleToggleFreeze}
@@ -604,7 +658,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-slate-200 gap-6">
+      <div className="flex border-b border-slate-200 gap-6 overflow-x-auto whitespace-nowrap pb-1 no-scrollbar scroll-smooth">
         <button
           onClick={() => setActiveTab("GENERAL")}
           className={cn(
@@ -1902,6 +1956,184 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           clientName={selectedClient.clientName} 
           onClose={() => setShowPOV(false)} 
         />
+      )}
+
+      {/* Ajustes de Mora Modal Overlay */}
+      {showMoraModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in p-4 overflow-y-auto">
+          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-red-500" />
+                <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider">Ajustes de Mora</h3>
+              </div>
+              <button 
+                onClick={() => setShowMoraModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-450 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div className="space-y-6 text-xs font-semibold text-slate-750">
+              
+              {/* Mora Status Selector */}
+              <div className="space-y-2">
+                <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Estado Financiero (Mora)</label>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => setMoraForm({...moraForm, mora_status: "ACTIVO"})} 
+                    className={cn(
+                      "flex-1 py-3 px-4 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer",
+                      moraForm.mora_status === "ACTIVO" 
+                        ? "bg-red-50 border-red-300 text-red-600 shadow-sm" 
+                        : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
+                    )}
+                  >
+                    Activo Con Mora
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setMoraForm({...moraForm, mora_status: "AL_DIA"})} 
+                    className={cn(
+                      "flex-1 py-3 px-4 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer",
+                      moraForm.mora_status === "AL_DIA" 
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-600 shadow-sm" 
+                        : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
+                    )}
+                  >
+                    Al Día Sin Mora
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setMoraForm({...moraForm, mora_status: "CONGELADO"})} 
+                    className={cn(
+                      "flex-1 py-3 px-4 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer",
+                      moraForm.mora_status === "CONGELADO" 
+                        ? "bg-blue-50 border-blue-300 text-blue-600 shadow-sm" 
+                        : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
+                    )}
+                  >
+                    Congelado (Pausado)
+                  </button>
+                </div>
+              </div>
+
+              {/* Penalty Mode Selector (only if ACTIVO) */}
+              {moraForm.mora_status === "ACTIVO" && (
+                <div className="p-4 bg-slate-50/50 border border-slate-150 rounded-2xl space-y-4">
+                  <div className="space-y-2">
+                    <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Modo de Cálculo de Penalización</label>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                      <button 
+                        type="button"
+                        onClick={() => setMoraForm({...moraForm, penalty_mode: "AUTO"})} 
+                        className={cn(
+                          "flex-1 py-2.5 px-3 rounded-xl text-[9px] font-bold tracking-wider uppercase transition-all border cursor-pointer",
+                          moraForm.penalty_mode === "AUTO" 
+                            ? "bg-slate-100 border-slate-300 text-slate-800 shadow-inner font-black" 
+                            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
+                        )}
+                      >
+                        Por Fecha (Auto)
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setMoraForm({...moraForm, penalty_mode: "MIXED"})} 
+                        className={cn(
+                          "flex-1 py-2.5 px-3 rounded-xl text-[9px] font-bold tracking-wider uppercase transition-all border cursor-pointer",
+                          moraForm.penalty_mode === "MIXED" 
+                            ? "bg-slate-100 border-slate-350 text-slate-800 shadow-inner font-black" 
+                            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
+                        )}
+                      >
+                        Mixto (Fijo+Auto)
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setMoraForm({...moraForm, penalty_mode: "FIXED"})} 
+                        className={cn(
+                          "flex-1 py-2.5 px-3 rounded-xl text-[9px] font-bold tracking-wider uppercase transition-all border cursor-pointer",
+                          moraForm.penalty_mode === "FIXED" 
+                            ? "bg-slate-100 border-slate-300 text-slate-800 shadow-inner font-black" 
+                            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
+                        )}
+                      >
+                        Monto Fijo
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Mode explanation banner */}
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-[11px] text-blue-800 font-medium leading-relaxed">
+                    {moraForm.penalty_mode === "AUTO" && "La multa se calcula automáticamente multiplicando los días de atraso por el interés diario configurado."}
+                    {moraForm.penalty_mode === "MIXED" && "Se cobra un monto fijo histórico, más el cálculo automático para cuotas nuevas que vayan venciendo."}
+                    {moraForm.penalty_mode === "FIXED" && "Solo se cobra el monto fijo definido manualmente, ignorando fechas de atraso y días."}
+                  </div>
+
+                  {/* Manual Penalty Input */}
+                  {(moraForm.penalty_mode === "FIXED" || moraForm.penalty_mode === "MIXED") && (
+                    <div className="space-y-1.5 animate-fade-in">
+                      <label className="block text-[9px] uppercase tracking-wider text-red-500 font-bold">Monto de Multa Fijo ($)</label>
+                      <input 
+                        type="number" 
+                        value={moraForm.manual_penalty || 0}
+                        onChange={e => setMoraForm({...moraForm, manual_penalty: Number(e.target.value)})}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-850 focus:border-red-400 outline-none"
+                        placeholder="Monto en CLP"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Debt Date Ranges */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Inicio Deuda (Fuerza Mora)</label>
+                  <input 
+                    type="date" 
+                    value={moraForm.debt_start_date}
+                    onChange={e => setMoraForm({...moraForm, debt_start_date: e.target.value})}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-750 focus:border-blue-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Fin Deuda (Opcional)</label>
+                  <input 
+                    type="date" 
+                    value={moraForm.debt_end_date}
+                    onChange={e => setMoraForm({...moraForm, debt_end_date: e.target.value})}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-750 focus:border-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowMoraModal(false)}
+                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-655 rounded-xl font-bold transition-all cursor-pointer text-center"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveMora}
+                  disabled={isSavingMoraSettings}
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-650 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  {isSavingMoraSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Aplicar Ajustes de Mora
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
