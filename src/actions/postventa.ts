@@ -1389,63 +1389,103 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
       updatedNotes = JSON.stringify(parsedNotes);
     }
 
-    // Set dates
-    let startDateObj: Date | null = null;
-    let nextDateObj: Date | null = null;
+    // Build update objects dynamically based on provided fields
+    const lotUpdateData: any = {};
+    if (data.price_total_clp !== undefined) lotUpdateData.price_total_clp = Number(data.price_total_clp);
+    if (data.cuotas !== undefined) lotUpdateData.cuotas = Number(data.cuotas);
+    if (data.valor_cuota !== undefined) lotUpdateData.valor_cuota = Number(data.valor_cuota);
+    if (data.pie !== undefined) lotUpdateData.pie = Number(data.pie);
+
+    const reservationUpdateData: any = {};
+    if (changes.length > 0) {
+      reservationUpdateData.notes = updatedNotes;
+    }
+    if (data.reservation_price !== undefined) reservationUpdateData.reservation_price = Number(data.reservation_price);
+    if (data.pie !== undefined) reservationUpdateData.pie = Number(data.pie);
+    if (data.last_installment_value !== undefined) reservationUpdateData.last_installment_value = Number(data.last_installment_value);
+    if (data.daily_penalty !== undefined) reservationUpdateData.daily_penalty = Number(data.daily_penalty);
+    if (data.due_day !== undefined) reservationUpdateData.due_day = Number(data.due_day);
+    if (data.grace_days !== undefined) reservationUpdateData.grace_days = Number(data.grace_days);
     
-    if (data.installment_start_date) {
-      const [y, m, d] = data.installment_start_date.split("-").map(Number);
-      // Use the day selected in the date picker (d) rather than overriding it with due_day,
-      // so custom next payment dates on a different day of the month can be saved correctly.
-      const targetDay = d || Number(data.due_day) || 5;
-      const enteredDate = new Date(Date.UTC(y, m - 1, targetDay, 12, 0, 0, 0));
-      
-      const paidCount = Number(data.installments_paid) || 0;
-      const calculatedAnchor = new Date(enteredDate);
-      calculatedAnchor.setUTCMonth(calculatedAnchor.getUTCMonth() - paidCount);
-      
-      startDateObj = calculatedAnchor;
-      nextDateObj = enteredDate;
+    if (data.mora_status !== undefined) {
+      reservationUpdateData.mora_status = data.mora_status;
+      reservationUpdateData.mora_frozen = data.mora_status === "CONGELADO";
+    } else if (data.mora_frozen !== undefined) {
+      reservationUpdateData.mora_frozen = data.mora_frozen;
+      reservationUpdateData.mora_status = data.mora_frozen ? "CONGELADO" : "ACTIVO";
     }
 
-    await prisma.$transaction([
-      prisma.lot.update({
-        where: { id: Number(lotId) || lotId },
-        data: {
-          price_total_clp: Number(data.price_total_clp) || 0,
-          cuotas: Number(data.cuotas) || 0,
-          valor_cuota: Number(data.valor_cuota) || 0,
-          pie: Number(data.pie) || 0
-        }
-      }),
-      prisma.reservation.update({
-        where: { id: reservationId },
-        data: {
-          reservation_price: Number(data.reservation_price) || 0,
-          pie: Number(data.pie) || 0,
-          last_installment_value: Number(data.last_installment_value) || 0,
-          daily_penalty: Number(data.daily_penalty) || 0,
-          due_day: Number(data.due_day) || 5,
-          grace_days: Number(data.grace_days) || 0,
-          mora_frozen: data.mora_status === "CONGELADO",
-          mora_status: data.mora_status,
-          debt_start_date: (data.debt_start_date && data.debt_start_date.trim() !== "") 
-            ? new Date(data.debt_start_date + "T12:00:00") 
-            : null,
-          debt_end_date: (data.debt_end_date && data.debt_end_date.trim() !== "") 
-            ? new Date(data.debt_end_date + "T12:00:00") 
-            : null,
-          next_payment_date: nextDateObj || null,
-          installments_paid: Number(data.installments_paid) || 0,
-          penalty_mode: data.penalty_mode || "AUTO",
-          manual_penalty: (data.penalty_mode === "FIXED" || data.penalty_mode === "MIXED") ? (Number(data.manual_penalty) || null) : null,
-          extra_paid_amount: Number(data.extra_paid_amount) || 0,
-          installment_ranges: data.installment_ranges || [],
-          notes: updatedNotes,
-          ...(startDateObj && { installment_start_date: startDateObj }),
-        }
-      })
-    ]);
+    if (data.debt_start_date !== undefined) {
+      reservationUpdateData.debt_start_date = (data.debt_start_date && data.debt_start_date.trim() !== "") 
+        ? new Date(data.debt_start_date + "T12:00:00") 
+        : null;
+    }
+    if (data.debt_end_date !== undefined) {
+      reservationUpdateData.debt_end_date = (data.debt_end_date && data.debt_end_date.trim() !== "") 
+        ? new Date(data.debt_end_date + "T12:00:00") 
+        : null;
+    }
+
+    if (data.installments_paid !== undefined) {
+      reservationUpdateData.installments_paid = Number(data.installments_paid);
+    }
+
+    if (data.installment_start_date !== undefined) {
+      if (data.installment_start_date) {
+        const [y, m, d] = data.installment_start_date.split("-").map(Number);
+        const targetDay = d || Number(data.due_day) || reservation.due_day || 5;
+        const enteredDate = new Date(Date.UTC(y, m - 1, targetDay, 12, 0, 0, 0));
+        
+        const paidCount = data.installments_paid !== undefined ? Number(data.installments_paid) : (reservation.installments_paid || 0);
+        const calculatedAnchor = new Date(enteredDate);
+        calculatedAnchor.setUTCMonth(calculatedAnchor.getUTCMonth() - paidCount);
+        
+        reservationUpdateData.installment_start_date = calculatedAnchor;
+        reservationUpdateData.next_payment_date = enteredDate;
+      } else {
+        reservationUpdateData.next_payment_date = null;
+      }
+    } else if (data.next_payment_date !== undefined) {
+      reservationUpdateData.next_payment_date = data.next_payment_date ? new Date(data.next_payment_date + "T12:00:00") : null;
+    }
+
+    if (data.penalty_mode !== undefined) {
+      reservationUpdateData.penalty_mode = data.penalty_mode;
+    }
+    
+    if (data.manual_penalty !== undefined) {
+      const activeMode = data.penalty_mode !== undefined ? data.penalty_mode : reservation.penalty_mode;
+      reservationUpdateData.manual_penalty = (activeMode === "FIXED" || activeMode === "MIXED") ? (Number(data.manual_penalty) || null) : null;
+    } else if (data.penalty_mode !== undefined) {
+      if (data.penalty_mode === "AUTO") {
+        reservationUpdateData.manual_penalty = null;
+      }
+    }
+
+    if (data.extra_paid_amount !== undefined) reservationUpdateData.extra_paid_amount = Number(data.extra_paid_amount);
+    if (data.installment_ranges !== undefined) reservationUpdateData.installment_ranges = data.installment_ranges;
+
+    const operations: any[] = [];
+    if (Object.keys(lotUpdateData).length > 0) {
+      operations.push(
+        prisma.lot.update({
+          where: { id: Number(lotId) || lotId },
+          data: lotUpdateData
+        })
+      );
+    }
+    if (Object.keys(reservationUpdateData).length > 0) {
+      operations.push(
+        prisma.reservation.update({
+          where: { id: reservationId },
+          data: reservationUpdateData
+        })
+      );
+    }
+
+    if (operations.length > 0) {
+      await prisma.$transaction(operations);
+    }
 
     memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");
