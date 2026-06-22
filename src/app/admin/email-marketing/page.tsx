@@ -13,7 +13,7 @@ import {
   MoreVertical,
   Plus
 } from "lucide-react";
-import { getFullPostventaData, getProjectLedgerStats } from "@/actions/postventa";
+import { getFullPostventaData, getProjectLedgerStats, getAdminProjects } from "@/actions/postventa";
 import { formatCLP } from "@/lib/utils";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,9 @@ import { cn } from "@/lib/utils";
 export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("Este mes");
+  const [selectedProject, setSelectedProject] = useState("ALL");
+  const [projects, setProjects] = useState<any[]>([]);
+
   const [stats, setStats] = useState({
     revenue: 0,
     paidCuotas: 0,
@@ -31,21 +34,85 @@ export default function ReportsPage() {
     topDebtors: [] as any[],
     arenaRevenue: 0,
     libertadRevenue: 0,
+    monthlyChart: [] as { month: string; value: number; percent: number }[],
   });
 
   const formatCLPMillion = (amount: number) => {
     return `$${(amount / 1000000).toFixed(1)}M`;
   };
 
+  const getDateParams = (periodStr: string) => {
+    const baseDate = new Date();
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth(); // 0-indexed (5 for June)
+    
+    let customStartDate: string | undefined;
+    let customEndDate: string | undefined;
+    let queryMonth: number | undefined;
+    let queryYear: number | undefined;
+
+    if (periodStr === "Este mes") {
+      queryMonth = month + 1;
+      queryYear = year;
+    } else if (periodStr === "Mes anterior") {
+      if (month === 0) {
+        queryMonth = 12;
+        queryYear = year - 1;
+      } else {
+        queryMonth = month;
+        queryYear = year;
+      }
+    } else if (periodStr === "Este año") {
+      customStartDate = `${year}-01-01`;
+      customEndDate = `${year}-12-31`;
+    }
+    
+    return { queryMonth, queryYear, customStartDate, customEndDate };
+  };
+
+  const getPeriodRangeText = () => {
+    const baseDate = new Date();
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    
+    const formatDate = (d: Date) => {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    };
+
+    if (period === "Este mes") {
+      const start = new Date(year, month, 1);
+      const end = new Date(year, month + 1, 0);
+      return `${formatDate(start)} - ${formatDate(end)}`;
+    } else if (period === "Mes anterior") {
+      const start = new Date(year, month - 1, 1);
+      const end = new Date(year, month, 0);
+      return `${formatDate(start)} - ${formatDate(end)}`;
+    } else if (period === "Este año") {
+      const start = new Date(year, 0, 1);
+      const end = new Date(year, 11, 31);
+      return `${formatDate(start)} - ${formatDate(end)}`;
+    } else {
+      return "Histórico Total";
+    }
+  };
+
   useEffect(() => {
     async function loadReports() {
       setLoading(true);
       try {
-        const [arenaResult, libertadResult, arenaLedger, libertadLedger] = await Promise.all([
+        // Fetch projects
+        const projRes = await getAdminProjects();
+        if (projRes.projects) {
+          setProjects(projRes.projects);
+        }
+
+        // Fetch client data
+        const [arenaResult, libertadResult] = await Promise.all([
           getFullPostventaData({ projectSlug: "arena-y-sol" }),
           getFullPostventaData({ projectSlug: "libertad-y-alegria" }),
-          getProjectLedgerStats("arena-y-sol"),
-          getProjectLedgerStats("libertad-y-alegria"),
         ]);
 
         const arenaClients = (arenaResult.data || []).map((c: any) => ({
@@ -60,11 +127,39 @@ export default function ReportsPage() {
           projectSlug: "libertad-y-alegria"
         }));
 
-        const combinedClients = [...arenaClients, ...libertadClients];
+        // Filter combined clients based on selectedProject
+        let combinedClients = [...arenaClients, ...libertadClients];
+        if (selectedProject !== "ALL") {
+          combinedClients = combinedClients.filter(c => c.projectSlug === selectedProject);
+        }
 
-        // 1. Revenue
-        const arenaRev = (!arenaLedger.error && typeof arenaLedger.revenue === "number") ? arenaLedger.revenue : 0;
-        const libertadRev = (!libertadLedger.error && typeof libertadLedger.revenue === "number") ? libertadLedger.revenue : 0;
+        // 1. Fetch ledger stats based on date parameters and selected project
+        const dateParams = getDateParams(period);
+        let arenaRev = 0;
+        let libertadRev = 0;
+        
+        if (selectedProject === "ALL" || selectedProject === "arena-y-sol") {
+          const arenaLedger = await getProjectLedgerStats(
+            "arena-y-sol",
+            dateParams.queryMonth,
+            dateParams.queryYear,
+            dateParams.customStartDate,
+            dateParams.customEndDate
+          );
+          arenaRev = (!arenaLedger.error && typeof arenaLedger.revenue === "number") ? arenaLedger.revenue : 0;
+        }
+
+        if (selectedProject === "ALL" || selectedProject === "libertad-y-alegria") {
+          const libertadLedger = await getProjectLedgerStats(
+            "libertad-y-alegria",
+            dateParams.queryMonth,
+            dateParams.queryYear,
+            dateParams.customStartDate,
+            dateParams.customEndDate
+          );
+          libertadRev = (!libertadLedger.error && typeof libertadLedger.revenue === "number") ? libertadLedger.revenue : 0;
+        }
+
         const totalRevenue = arenaRev + libertadRev;
 
         // 2. Cuotas Cobradas
@@ -85,6 +180,34 @@ export default function ReportsPage() {
           .sort((a, b) => b.penaltyAmount - a.penaltyAmount)
           .slice(0, 5);
 
+        // 6. Fetch monthly chart stats for ENE-JUN (months 1-6) of current year
+        const currentYear = new Date().getFullYear();
+        const monthsList = [1, 2, 3, 4, 5, 6];
+        const monthlyStats = await Promise.all(
+          monthsList.map(async (m) => {
+            let monthRevenue = 0;
+            if (selectedProject === "ALL" || selectedProject === "arena-y-sol") {
+              const res = await getProjectLedgerStats("arena-y-sol", m, currentYear);
+              monthRevenue += (!res.error && typeof res.revenue === "number") ? res.revenue : 0;
+            }
+            if (selectedProject === "ALL" || selectedProject === "libertad-y-alegria") {
+              const res = await getProjectLedgerStats("libertad-y-alegria", m, currentYear);
+              monthRevenue += (!res.error && typeof res.revenue === "number") ? res.revenue : 0;
+            }
+            return monthRevenue;
+          })
+        );
+        
+        const maxMonthly = Math.max(...monthlyStats, 1);
+        const monthlyChart = [
+          { month: "ENE", value: monthlyStats[0], percent: (monthlyStats[0] / maxMonthly) * 100 },
+          { month: "FEB", value: monthlyStats[1], percent: (monthlyStats[1] / maxMonthly) * 100 },
+          { month: "MAR", value: monthlyStats[2], percent: (monthlyStats[2] / maxMonthly) * 100 },
+          { month: "ABR", value: monthlyStats[3], percent: (monthlyStats[3] / maxMonthly) * 100 },
+          { month: "MAY", value: monthlyStats[4], percent: (monthlyStats[4] / maxMonthly) * 100 },
+          { month: "JUN", value: monthlyStats[5], percent: (monthlyStats[5] / maxMonthly) * 100 },
+        ];
+
         setStats({
           revenue: totalRevenue,
           paidCuotas,
@@ -95,6 +218,7 @@ export default function ReportsPage() {
           topDebtors,
           arenaRevenue: arenaRev,
           libertadRevenue: libertadRev,
+          monthlyChart,
         });
       } catch (error) {
         console.error("Error loading reports data:", error);
@@ -103,7 +227,7 @@ export default function ReportsPage() {
       }
     }
     loadReports();
-  }, []);
+  }, [period, selectedProject]);
 
   const handleExportExcel = () => {
     const headers = ["Cliente", "Proyecto", "Lote", "RUT", "Monto Pendiente", "Días en Mora", "Estado"];
@@ -122,7 +246,7 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Reporte_Deuda_Morosos_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute("download", `Reporte_Deuda_Morosos_${selectedProject}_${new Date().toISOString().split("T")[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -155,6 +279,18 @@ export default function ReportsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {/* Project Selection */}
+          <select
+            value={selectedProject}
+            onChange={(e) => setSelectedProject(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 transition-all shadow-sm focus:border-blue-500 uppercase"
+          >
+            <option value="ALL">Todos los Proyectos</option>
+            {projects.map((p) => (
+              <option key={p.slug} value={p.slug}>{p.name}</option>
+            ))}
+          </select>
+
           {/* Period Selection */}
           <select
             value={period}
@@ -170,7 +306,7 @@ export default function ReportsPage() {
           {/* Date Picker Range Display */}
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm text-xs font-semibold text-slate-600">
             <Calendar className="w-4 h-4 text-slate-450" />
-            <span>01/06/2026 - 30/06/2026</span>
+            <span>{getPeriodRangeText()}</span>
           </div>
 
           {/* Export Buttons */}
@@ -284,18 +420,20 @@ export default function ReportsPage() {
           </div>
 
           <div className="h-60 w-full flex items-end justify-between px-4 pt-8 pb-2">
-            {[
-              { month: "ENE", value: 40 },
-              { month: "FEB", value: 65 },
-              { month: "MAR", value: 55 },
-              { month: "ABR", value: 85 },
-              { month: "MAY", value: 75 },
-              { month: "JUN", value: 95 }
-            ].map((bar) => (
-              <div key={bar.month} className="flex flex-col items-center gap-2 w-1/6">
-                <div className="relative w-10 sm:w-12 bg-blue-100 rounded-t-lg group overflow-hidden" style={{ height: `${bar.value * 1.8}px` }}>
-                  <div className="absolute bottom-0 left-0 right-0 bg-blue-600 hover:bg-blue-700 transition-colors" style={{ height: "92%" }} />
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-blue-700" />
+            {stats.monthlyChart.map((bar) => (
+              <div key={bar.month} className="flex flex-col items-center gap-2 w-1/6 group/bar">
+                <div className="relative w-10 sm:w-12 bg-blue-50 rounded-t-lg overflow-visible h-32 flex flex-col justify-end">
+                  {/* Tooltip on hover */}
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-bold px-2 py-0.5 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-sm z-10">
+                    {formatCLP(bar.value)}
+                  </div>
+                  
+                  <div 
+                    className="w-full bg-blue-600 hover:bg-blue-700 transition-all rounded-t-md relative" 
+                    style={{ height: `${Math.max(bar.percent, 3)}%` }} 
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-blue-700 rounded-t-md" />
+                  </div>
                 </div>
                 <span className="text-[10px] font-bold text-slate-400">{bar.month}</span>
               </div>
@@ -316,28 +454,32 @@ export default function ReportsPage() {
 
           <div className="space-y-6 py-6 flex-1 flex flex-col justify-center">
             {/* Arena y Sol */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-bold text-slate-700">
-                <span>Arena y Sol</span>
-                <span>{formatCLPMillion(stats.arenaRevenue)}</span>
+            {(selectedProject === "ALL" || selectedProject === "arena-y-sol") && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-bold text-slate-700">
+                  <span>Arena y Sol</span>
+                  <span>{formatCLPMillion(stats.arenaRevenue)}</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden">
+                  <div className="bg-blue-600 h-full" style={{ width: stats.arenaRevenue > 0 ? "65%" : "0%" }} />
+                  <div className="bg-blue-300 h-full" style={{ width: stats.arenaRevenue > 0 ? "25%" : "0%" }} />
+                </div>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden">
-                <div className="bg-blue-600 h-full" style={{ width: "65%" }} />
-                <div className="bg-blue-300 h-full" style={{ width: "25%" }} />
-              </div>
-            </div>
+            )}
 
             {/* Libertad y Alegría */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-bold text-slate-700">
-                <span>Libertad y Alegría</span>
-                <span>{formatCLPMillion(stats.libertadRevenue)}</span>
+            {(selectedProject === "ALL" || selectedProject === "libertad-y-alegria") && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-bold text-slate-700">
+                  <span>Libertad y Alegría</span>
+                  <span>{formatCLPMillion(stats.libertadRevenue)}</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden">
+                  <div className="bg-amber-600 h-full" style={{ width: stats.libertadRevenue > 0 ? "75%" : "0%" }} />
+                  <div className="bg-amber-250 h-full" style={{ width: stats.libertadRevenue > 0 ? "15%" : "0%" }} />
+                </div>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden">
-                <div className="bg-amber-600 h-full" style={{ width: "75%" }} />
-                <div className="bg-amber-250 h-full" style={{ width: "15%" }} />
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 pt-4 border-t border-slate-100">
