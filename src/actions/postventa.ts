@@ -2090,7 +2090,7 @@ export async function getProjectLedgerStats(
     const recauAgg = await prisma.financialLedger.aggregate({
       where: {
         reservation: { project_id: project.id },
-        category: { in: ["CUOTA", "PIE"] },
+        category: "CUOTA",
         ...dateFilter,
       },
       _sum: { amount_clp: true },
