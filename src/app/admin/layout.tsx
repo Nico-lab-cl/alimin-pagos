@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   Map, 
@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { SearchProvider, useSearch } from "@/context/SearchContext";
+import { getFullPostventaData } from "@/actions/postventa";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -61,7 +62,66 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const [scrolled, setScrolled] = useState(false);
   const { data: session } = useSession();
   const pathname = usePathname();
-  const { search, setSearch } = useSearch();
+  const router = useRouter();
+  const { 
+    search, 
+    setSearch, 
+    selectedClientId, 
+    setSelectedClientId,
+    selectedClientProject,
+    setSelectedClientProject
+  } = useSearch();
+
+  const [allClients, setAllClients] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // Load all clients for search autocomplete on mount
+  useEffect(() => {
+    async function loadAllClients() {
+      try {
+        const [arenaRes, libertadRes] = await Promise.all([
+          getFullPostventaData({ projectSlug: "arena-y-sol" }),
+          getFullPostventaData({ projectSlug: "libertad-y-alegria" })
+        ]);
+        
+        const arenaClients = (arenaRes.data || []).map((c: any) => ({
+          ...c,
+          projectName: "Arena y Sol",
+          projectSlug: "arena-y-sol"
+        }));
+        
+        const libertadClients = (libertadRes.data || []).map((c: any) => ({
+          ...c,
+          projectName: "Libertad y Alegría",
+          projectSlug: "libertad-y-alegria"
+        }));
+        
+        setAllClients([...arenaClients, ...libertadClients]);
+      } catch (err) {
+        console.error("Error loading search clients:", err);
+      }
+    }
+    
+    if (session) {
+      loadAllClients();
+    }
+  }, [session]);
+
+  // Filter clients based on search query
+  useEffect(() => {
+    if (!search.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const term = search.toLowerCase();
+    const filtered = allClients.filter(c => 
+      c.clientName?.toLowerCase().includes(term) ||
+      c.rut?.toLowerCase().includes(term) ||
+      c.clientEmail?.toLowerCase().includes(term)
+    ).slice(0, 8);
+    setSearchResults(filtered);
+  }, [search, allClients]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -207,11 +267,37 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Buscar lotes, clientes..." 
+              placeholder="Buscar clientes..." 
               value={search}
+              onFocus={() => setShowDropdown(true)}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-850 placeholder-slate-400 focus:border-blue-500 outline-none transition-all font-medium"
             />
+            
+            {showDropdown && searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                {searchResults.map((client) => (
+                  <button
+                    key={client.id}
+                    onClick={() => {
+                      setSelectedClientId(client.id);
+                      setSelectedClientProject(client.projectSlug);
+                      setSearch("");
+                      router.push("/admin/clients");
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex flex-col gap-0.5 cursor-pointer"
+                  >
+                    <span className="text-sm font-bold text-slate-800 uppercase">{client.clientName}</span>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                      <span>RUT: {client.rut}</span>
+                      <span>•</span>
+                      <span className="text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.2 rounded font-extrabold">{client.projectName} - Lote {client.lotNumber}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-6">

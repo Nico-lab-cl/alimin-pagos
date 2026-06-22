@@ -15,7 +15,7 @@ import { useSearch } from "@/context/SearchContext";
 import ClientDetailView from "@/components/admin/ClientDetailView";
 
 export default function ClientsPage() {
-  const { search, setSearch } = useSearch();
+  const { search, setSearch, selectedClientId, setSelectedClientId, selectedClientProject, setSelectedClientProject } = useSearch();
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [data, setData] = useState<any>(null);
@@ -113,6 +113,24 @@ export default function ClientsPage() {
   useEffect(() => {
     refreshMainData();
   }, [selectedProject]);
+
+  useEffect(() => {
+    if (selectedClientId) {
+      if (selectedClientProject && selectedClientProject !== selectedProject) {
+        setSelectedProject(selectedClientProject);
+        return;
+      }
+      if (data?.data) {
+        const client = data.data.find((c: any) => c.id === selectedClientId);
+        if (client) {
+          setSelectedClient(client);
+          setSelectedClientId(null);
+          setSelectedClientProject(null);
+          setSearch("");
+        }
+      }
+    }
+  }, [selectedClientId, selectedClientProject, data?.data, selectedProject]);
 
   useEffect(() => {
     setSelectedClientIds([]);
