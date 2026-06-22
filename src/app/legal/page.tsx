@@ -27,15 +27,20 @@ export default function LegalDashboardPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   
   // Filtering & Pagination State
   const [projectFilter, setProjectFilter] = useState<"ALL" | "arena-y-sol" | "libertad-y-alegria">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
   const handleSignOut = () => signOut({ callbackUrl: "/login" });
 
   const exportAllToExcel = (clientsList: any[]) => {
+    const listToExport = selectedClientIds.length > 0
+      ? clientsList.filter((c: any) => selectedClientIds.includes(c.id))
+      : clientsList;
+    
     const headers = [
       "Nombre Cliente",
       "Proyecto",
@@ -49,7 +54,7 @@ export default function LegalDashboardPage() {
       "Proximo Vencimiento"
     ];
     
-    const rows = clientsList.map(c => [
+    const rows = listToExport.map(c => [
       c.clientName || "",
       c.projectName || "",
       c.lotNumber || "",
@@ -159,10 +164,11 @@ export default function LegalDashboardPage() {
       (c: any) =>
         !search ||
         c.clientName?.toLowerCase().includes(search.toLowerCase()) ||
+        c.rut?.toLowerCase().includes(search.toLowerCase()) ||
         c.lotNumber?.toString().includes(search)
     );
 
-  const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / itemsPerPage));
   const paginatedClients = filteredClients.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -170,295 +176,319 @@ export default function LegalDashboardPage() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedClientIds([]);
   }, [search, projectFilter]);
 
   return (
-    <div className="min-h-screen bg-[#061010] text-white font-outfit relative overflow-x-hidden">
-      {/* Premium Background Effects */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden emerald-mesh opacity-50 z-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-500/5 rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[150px]" />
-      </div>
-
-      <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-8 pb-24 space-y-12">
-        {/* Top Header */}
-        <header className="flex items-center justify-between border-b border-white/5 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-[0_10px_40px_rgba(212,168,75,0.2)]">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans relative overflow-x-hidden">
+      {/* Top Header */}
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center p-1.5 shadow-sm">
               <img src="/logo.png" alt="Alimin Logo" className="w-8 h-8 object-contain" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tighter uppercase leading-none italic text-glow">Alimin</h1>
-              <p className="text-[9px] font-black text-accent tracking-[0.3em] uppercase mt-1 opacity-60">Consola Legal</p>
+              <h1 className="text-base font-bold tracking-tight text-slate-800 leading-none">Alimin</h1>
+              <p className="text-[9px] font-black text-slate-400 tracking-[0.25em] uppercase mt-0.5">Consola Legal</p>
             </div>
           </div>
 
           <div className="flex items-center gap-6">
             <div className="hidden md:flex items-center gap-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Estado:</span>
-              <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest border border-emerald-500/20 flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Estado:</span>
+              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-bold uppercase tracking-widest border border-emerald-100 flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Operativo
               </span>
             </div>
 
-            <div className="w-px h-6 bg-white/10 hidden md:block" />
+            <div className="w-px h-6 bg-slate-200 hidden md:block" />
 
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-black truncate uppercase tracking-[0.15em] leading-none mb-1">
+                <p className="text-xs font-bold text-slate-750 uppercase tracking-[0.1em] leading-none mb-0.5">
                   Alimin legal
                 </p>
-                <p className="text-[9px] text-white/40 font-bold uppercase tracking-widest">
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
                   Acceso Restringido
                 </p>
               </div>
 
               <button
                 onClick={handleSignOut}
-                className="p-3 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-red-400 hover:bg-red-400/5 hover:border-red-400/15 transition-all flex items-center gap-2"
+                className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-650 hover:bg-red-50 hover:border-red-250 transition-all flex items-center gap-1.5 text-xs font-semibold cursor-pointer shadow-sm"
                 title="Cerrar Sesión"
               >
-                <LogOut className="w-4 h-4" />
-                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Salir</span>
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="uppercase tracking-wider">Salir</span>
               </button>
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Header Section */}
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mt-6">
+      <div className="max-w-7xl mx-auto px-6 md:px-12 py-8 space-y-8 animate-fade-in">
+        {/* Header Title Section */}
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
           <div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-2xl bg-red-500/20 flex items-center justify-center border border-red-500/20">
-                <Scale className="w-5 h-5 text-red-400" />
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center border border-red-100">
+                <Scale className="w-4 h-4 text-red-500" />
               </div>
-              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-red-400">Riesgo & Mora Legal</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Riesgo & Mora Legal</p>
             </div>
-            <h1 className="text-5xl font-black text-white tracking-tighter uppercase leading-none">
-              Centro de <span className="text-white/20">alertas</span>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 uppercase">
+              Centro de Alertas
             </h1>
-            <p className="text-xs text-white/40 mt-3 max-w-xl font-medium uppercase tracking-wide leading-relaxed">
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl font-medium">
               Esta consola muestra a los clientes con mora crítica de los proyectos **Arena y Sol** y **Libertad y Alegría**. La información es estrictamente confidencial y de solo lectura.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
             <button
               onClick={() => exportAllToExcel(filteredClients)}
-              className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20 shadow-2xl transition-all w-full sm:w-auto justify-center"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold uppercase tracking-wider border border-slate-200 shadow-sm transition-all w-full sm:w-auto justify-center cursor-pointer"
             >
-              <Download className="w-4 h-4 shrink-0" />
-              Exportar Contactos (Excel)
+              <Download className="w-4 h-4 shrink-0 text-slate-500" />
+              <span>{selectedClientIds.length > 0 ? `Exportar (${selectedClientIds.length})` : "Exportar Contactos"}</span>
             </button>
 
             <div className="relative group w-full sm:w-80">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-accent transition-colors" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
               <input
                 type="text"
-                placeholder="FILTRAR CLIENTE, LOTE O PROYECTO..."
+                placeholder="Filtrar cliente, lote o proyecto..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 placeholder:text-slate-400 outline-none focus:border-blue-500 transition-all shadow-sm"
               />
             </div>
 
-            <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-white/5 border border-white/5 shrink-0 w-full sm:w-auto justify-between sm:justify-start">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Total Morosos:</span>
-              <span className="px-3 py-1 rounded-xl bg-red-500/10 text-red-400 text-sm font-black border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white border border-slate-200 shrink-0 w-full sm:w-auto justify-between sm:justify-start shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Morosos:</span>
+              <span className="px-2.5 py-0.5 rounded-lg bg-red-50 text-red-650 text-xs font-bold border border-red-100">
                 {totalCount}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Filters Deck */}
-        <div className="flex flex-wrap gap-4 mt-6">
+        {/* Filters Tabs Deck */}
+        <div className="flex overflow-x-auto pb-1 border-b border-slate-200/80 gap-4">
           <button
             onClick={() => { setProjectFilter("ALL"); setCurrentPage(1); }}
             className={`
-              group relative flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500
+              group relative flex items-center gap-2 pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer
               ${projectFilter === "ALL" 
-                ? "bg-white/10 border-white/20 text-white shadow-2xl" 
-                : "bg-white/5 border-white/5 text-white/30 hover:text-white/60 hover:bg-white/[0.08]"}
-              border
+                ? "text-blue-600 border-b-2 border-blue-600 font-bold" 
+                : "text-slate-400 hover:text-slate-650 border-b-2 border-transparent"}
             `}
           >
             <span>Todos los Proyectos</span>
-            <span className="px-2 py-0.5 rounded-lg bg-black/40 text-[9px] font-black text-white/60">{totalCount}</span>
-            {projectFilter === "ALL" && <div className="absolute inset-x-4 -bottom-px h-px bg-gradient-to-r from-transparent via-accent to-transparent" />}
+            <span className={`px-2 py-0.5 rounded-lg text-[9px] ${
+              projectFilter === "ALL" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
+            }`}>{totalCount}</span>
           </button>
 
           <button
             onClick={() => { setProjectFilter("arena-y-sol"); setCurrentPage(1); }}
             className={`
-              group relative flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500
+              group relative flex items-center gap-2 pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer
               ${projectFilter === "arena-y-sol" 
-                ? "bg-blue-500/10 border-blue-500/20 text-white shadow-2xl" 
-                : "bg-white/5 border-white/5 text-white/30 hover:text-white/60 hover:bg-white/[0.08]"}
-              border
+                ? "text-blue-600 border-b-2 border-blue-600 font-bold" 
+                : "text-slate-400 hover:text-slate-650 border-b-2 border-transparent"}
             `}
           >
             <span>Arena y Sol</span>
-            <span className="px-2 py-0.5 rounded-lg bg-black/40 text-[9px] font-black text-blue-400">{arenaCount}</span>
-            {projectFilter === "arena-y-sol" && <div className="absolute inset-x-4 -bottom-px h-px bg-gradient-to-r from-transparent via-blue-400 to-transparent" />}
+            <span className={`px-2 py-0.5 rounded-lg text-[9px] ${
+              projectFilter === "arena-y-sol" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
+            }`}>{arenaCount}</span>
           </button>
 
           <button
             onClick={() => { setProjectFilter("libertad-y-alegria"); setCurrentPage(1); }}
             className={`
-              group relative flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500
+              group relative flex items-center gap-2 pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer
               ${projectFilter === "libertad-y-alegria" 
-                ? "bg-amber-500/10 border-amber-500/20 text-white shadow-2xl" 
-                : "bg-white/5 border-white/5 text-white/30 hover:text-white/60 hover:bg-white/[0.08]"}
-              border
+                ? "text-blue-600 border-b-2 border-blue-600 font-bold" 
+                : "text-slate-400 hover:text-slate-650 border-b-2 border-transparent"}
             `}
           >
             <span>Libertad y Alegría</span>
-            <span className="px-2 py-0.5 rounded-lg bg-black/40 text-[9px] font-black text-amber-400">{libertadCount}</span>
-            {projectFilter === "libertad-y-alegria" && <div className="absolute inset-x-4 -bottom-px h-px bg-gradient-to-r from-transparent via-amber-400 to-transparent" />}
+            <span className={`px-2 py-0.5 rounded-lg text-[9px] ${
+              projectFilter === "libertad-y-alegria" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
+            }`}>{libertadCount}</span>
           </button>
         </div>
 
-        {/* List Section */}
+        {/* Table Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-40 gap-4">
-            <Loader2 className="w-10 h-10 animate-spin text-accent" />
-            <p className="text-xs font-black uppercase tracking-[0.3em] opacity-20 font-bold">Analizando Carteras Morosas...</p>
+            <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 opacity-60">Analizando Carteras Morosas...</p>
           </div>
         ) : (
-          <div className="grid gap-6">
-            {paginatedClients.map((client: any, idx: number) => (
-              <div
-                key={client.id}
-                onClick={() => setSelectedClient(client)}
-                className="group relative rounded-[2rem] p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center gap-6 sm:gap-8 glass-card animate-slide-up cursor-pointer hover:bg-white/[0.04] transition-all duration-300 border border-white/5 hover:border-white/10"
-                style={{ 
-                  animationDelay: `${idx * 40}ms`,
-                  animationFillMode: "both"
-                }}
-              >
-                <div className="flex items-center gap-4 sm:gap-6 flex-1 min-w-0">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-[1rem] sm:rounded-[1.5rem] bg-white/5 border border-white/10 flex items-center justify-center text-lg sm:text-xl font-black text-white group-hover:scale-110 transition-transform duration-500 shadow-2xl shrink-0">
-                    {client.clientName?.substring(0, 2).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter uppercase italic group-hover:text-accent transition-colors">
-                        {client.clientName}
-                      </h3>
-                      <span className="px-2.5 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[8px] font-black text-blue-400 uppercase tracking-widest whitespace-nowrap">
-                        {client.projectName}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2.5">
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5">
-                        <Zap className="w-3.5 h-3.5 text-accent" />
-                        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-white/60">Lote {client.lotNumber}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-white/20 uppercase tracking-widest">
-                        <span>{client.paidCuotas}/{client.totalCuotas} Cuotas</span>
-                        <div className="w-1 h-1 rounded-full bg-white/10" />
-                        <span>{formatCLP(client.valor_cuota)}/m</span>
-                      </div>
-                    </div>
-                    {/* Overdue Installments Breakdown Row */}
-                    {client.overdueInstallments?.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-3">
-                        {(client.penalty_mode === "FIXED" || client.penalty_mode === "MIXED") && client.manual_penalty > 0 && (
-                          <span className="text-[8px] font-black uppercase tracking-widest bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-md border border-orange-500/20">
-                            Fija: {formatCLP(client.manual_penalty)}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-6 py-4 w-12 text-center">
+                      <input
+                        type="checkbox"
+                        checked={filteredClients.length > 0 && filteredClients.every((c: any) => selectedClientIds.includes(c.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedClientIds(filteredClients.map((c: any) => c.id));
+                          } else {
+                            setSelectedClientIds([]);
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                      />
+                    </th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Cliente</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">RUT</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Lote</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Progreso</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Desglose de Mora</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Atraso</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Saldo Mora</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm text-slate-800">
+                  {paginatedClients.map((client: any) => (
+                    <tr 
+                      key={client.id}
+                      onClick={() => setSelectedClient(client)}
+                      className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
+                    >
+                      <td className="px-6 py-4 text-center w-12" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedClientIds.includes(client.id)}
+                          onChange={(e) => {
+                            setSelectedClientIds(prev =>
+                              prev.includes(client.id) ? prev.filter(id => id !== client.id) : [...prev, client.id]
+                            );
+                          }}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <div className="font-bold text-slate-800 uppercase group-hover:text-blue-600 transition-colors leading-snug">
+                            {client.clientName}
+                          </div>
+                          <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-100">
+                            {client.projectName}
                           </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-medium text-slate-600">
+                        {client.rut || "—"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wide">
+                          Lote {client.lotNumber}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <span className="text-xs font-bold text-slate-700">{client.paidCuotas}/{client.totalCuotas} Cuotas</span>
+                          <span className="block text-[10px] text-slate-400 mt-0.5">{formatCLP(client.valor_cuota)}/mes</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 max-w-xs">
+                        {client.overdueInstallments?.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {(client.penalty_mode === "FIXED" || client.penalty_mode === "MIXED") && client.manual_penalty > 0 && (
+                              <span className="text-[9px] font-bold uppercase bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100">
+                                Fija: {formatCLP(client.manual_penalty)}
+                              </span>
+                            )}
+                            {client.overdueInstallments.slice(0, 3).map((inst: any) => (
+                              <span key={inst.number} className="text-[9px] font-semibold bg-red-50 text-red-650 px-1.5 py-0.5 rounded border border-red-100">
+                                C{inst.number}: {inst.lateDays}d
+                              </span>
+                            ))}
+                            {client.overdueInstallments.length > 3 && (
+                              <span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                                +{client.overdueInstallments.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-450 italic">Sin desglose</span>
                         )}
-                        {client.overdueInstallments.map((inst: any) => (
-                          <span key={inst.number} className="text-[8px] font-black uppercase tracking-widest bg-red-500/10 text-red-400/80 px-2 py-0.5 rounded-md border border-red-500/10">
-                            C{inst.number}: {inst.lateDays}d
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between lg:justify-end gap-6 flex-shrink-0">
-                  {/* Financial Status */}
-                  <div className="grid gap-1 text-left sm:text-right">
-                    <p className="text-lg sm:text-xl font-black tracking-tight text-red-400">
-                      +{formatCLP(client.penaltyAmount)}
-                    </p>
-                    <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] opacity-20">
-                      {client.lateDays} Días Mora
-                    </p>
-                  </div>
-
-                  <div className="w-px h-10 bg-white/5 hidden lg:block" />
-
-                  {/* Date Status */}
-                  <div className="grid gap-1 text-right hidden sm:grid">
-                    <p className="text-sm sm:text-base font-black text-white/80">
-                      {client.nextDueDate ? formatDate(client.nextDueDate) : "No Definido"}
-                    </p>
-                    <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] opacity-20">Próxima Fecha</p>
-                  </div>
-
-                  {/* Status Badge */}
-                  <div className="px-4 sm:px-6 py-2 sm:py-3 rounded-2xl text-[8px] sm:text-[10px] font-black tracking-[0.2em] bg-red-500/10 text-red-400 border border-red-500/20 shadow-2xl">
-                    MORA
-                  </div>
-
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      exportIndividualToExcel(client);
-                    }}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-emerald-500/10 hover:text-emerald-400 text-white/40 transition-all"
-                    title="Exportar Ficha (Excel)"
-                  >
-                    <Download className="w-5 h-5" />
-                  </button>
-
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedClient(client);
-                    }}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-accent hover:text-[#061010] transition-all"
-                    title="Ver Expediente Completo (Solo Lectura)"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {filteredClients.length === 0 && (
-              <div className="py-40 text-center border-2 border-dashed border-white/5 rounded-[3rem] glass-card">
-                <ShieldAlert className="w-16 h-16 mx-auto mb-6 opacity-5" />
-                <p className="text-sm font-black uppercase tracking-[0.3em] opacity-20">Sin clientes en mora bajo este criterio</p>
-              </div>
-            )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="px-2 py-0.5 rounded bg-red-50 text-red-650 font-bold text-xs border border-red-100">
+                          {client.lateDays} d
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="font-bold text-red-600 text-base">
+                          +{formatCLP(client.penaltyAmount)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button 
+                            onClick={() => exportIndividualToExcel(client)}
+                            className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-450 hover:text-emerald-600 transition-all shadow-sm cursor-pointer"
+                            title="Exportar Ficha (Excel)"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                          
+                          <button 
+                            onClick={() => setSelectedClient(client)}
+                            className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:border-blue-200 text-slate-455 hover:text-blue-600 transition-all shadow-sm cursor-pointer"
+                            title="Ver Expediente Completo (Solo Lectura)"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  
+                  {filteredClients.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="py-20 text-center text-sm font-semibold text-slate-400 uppercase tracking-widest">
+                        Sin clientes en mora bajo este criterio
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {/* Pagination Controls */}
         {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-20">
+          <div className="flex items-center justify-between border-t border-slate-200/80 pt-4 mt-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
               Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredClients.length)} de {filteredClients.length} Morosos
             </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center rotate-180 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4 rotate-180" />
               </button>
-              <div className="px-4 text-xs font-black text-white/50">{currentPage} / {totalPages}</div>
+              <div className="px-3 text-xs font-bold text-slate-500">{currentPage} / {totalPages}</div>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
