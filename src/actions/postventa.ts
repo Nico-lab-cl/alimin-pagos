@@ -2045,7 +2045,13 @@ export async function getClientPOV(reservationId: string) {
 /**
  * Gets aggregated ledger statistics for the dashboard, optionally filtered by month and year.
  */
-export async function getProjectLedgerStats(projectSlug: string, month?: number, year?: number) {
+export async function getProjectLedgerStats(
+  projectSlug: string, 
+  month?: number, 
+  year?: number,
+  customStartDate?: string,
+  customEndDate?: string
+) {
   const session = await auth();
   const user = session?.user as any;
   if (!session?.user || user?.role !== "ADMIN") {
@@ -2061,7 +2067,16 @@ export async function getProjectLedgerStats(projectSlug: string, month?: number,
     if (!project) return { error: "Proyecto no encontrado" };
 
     let dateFilter = {};
-    if (month !== undefined && year !== undefined) {
+    if (customStartDate || customEndDate) {
+      const gte = customStartDate ? new Date(customStartDate + "T00:00:00") : undefined;
+      const lte = customEndDate ? new Date(customEndDate + "T23:59:59") : undefined;
+      dateFilter = {
+        paid_at: {
+          ...(gte ? { gte } : {}),
+          ...(lte ? { lte } : {}),
+        },
+      };
+    } else if (month !== undefined && year !== undefined) {
       const startDate = new Date(year, month - 1, 1, 0, 0, 0);
       const endDate = new Date(year, month, 1, 0, 0, 0);
       dateFilter = {

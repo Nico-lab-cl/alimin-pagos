@@ -24,6 +24,7 @@ export default function ClientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"ALL" | "LATE" | "GRACE" | "UPCOMING" | "OK">("ALL");
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   
   // Edit State
   const [isEditing, setIsEditing] = useState(false);
@@ -112,6 +113,10 @@ export default function ClientsPage() {
   useEffect(() => {
     refreshMainData();
   }, [selectedProject]);
+
+  useEffect(() => {
+    setSelectedClientIds([]);
+  }, [selectedProject, selectedStage, activeTab, search]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -293,8 +298,12 @@ export default function ClientsPage() {
   });
 
   const handleExportCSV = () => {
+    const listToExport = selectedClientIds.length > 0
+      ? filteredClients.filter((c: any) => selectedClientIds.includes(c.id))
+      : filteredClients;
+
     const headers = ["Cliente", "RUT", "Email", "Teléfono", "Lote", "Etapa", "Cuotas Pagadas", "Total Cuotas", "Estado", "Saldo Pendiente"];
-    const rows = filteredClients.map((c: any) => [
+    const rows = listToExport.map((c: any) => [
       c.clientName || "",
       c.rut || "",
       c.clientEmail || "",
@@ -375,27 +384,29 @@ export default function ClientsPage() {
           </select>
 
           {/* Stage select */}
-          <select
-            value={selectedStage}
-            onChange={(e) => setSelectedStage(e.target.value)}
-            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[150px]"
-            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
-          >
-            <option value="ALL">Filtro de Etapas: Todas</option>
-            <option value="MULTILOTE">Multi-Lote</option>
-            {testClients.length > 0 && <option value="PRUEBAS">Clientes Pruebas</option>}
-            {uniqueStages.map((stage) => (
-              <option key={stage} value={stage}>Etapa {stage}</option>
-            ))}
-          </select>
+          {(selectedProject?.toLowerCase().includes("libertad") || selectedProject?.toLowerCase().includes("alegria")) && (
+            <select
+              value={selectedStage}
+              onChange={(e) => setSelectedStage(e.target.value)}
+              className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[150px]"
+              style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
+            >
+              <option value="ALL">Filtro de Etapas: Todas</option>
+              <option value="MULTILOTE">Multi-Lote</option>
+              {testClients.length > 0 && <option value="PRUEBAS">Clientes Pruebas</option>}
+              {uniqueStages.map((stage) => (
+                <option key={stage} value={stage}>Etapa {stage}</option>
+              ))}
+            </select>
+          )}
 
           {/* Export button */}
           <button 
             onClick={handleExportCSV}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm font-semibold text-[#191c1e] hover:bg-slate-50 transition-all cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm font-semibold text-[#191c1e] hover:bg-slate-50 transition-all cursor-pointer shadow-sm"
           >
             <Download className="w-4 h-4 text-[#64748B]" />
-            <span>Exportar</span>
+            <span>{selectedClientIds.length > 0 ? `Exportar (${selectedClientIds.length})` : "Exportar"}</span>
           </button>
         </div>
       </div>
@@ -501,6 +512,20 @@ export default function ClientsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#F1F5F9] border-b border-[#E2E8F0]">
+                  <th className="px-6 py-4 w-12 text-center">
+                    <input
+                      type="checkbox"
+                      checked={filteredClients.length > 0 && filteredClients.every((c: any) => selectedClientIds.includes(c.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedClientIds(filteredClients.map((c: any) => c.id));
+                        } else {
+                          setSelectedClientIds([]);
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 border-[#E2E8F0] rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider">Nombre del Cliente</th>
                   <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider">RUT</th>
                   <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider text-center">Lote</th>
@@ -609,6 +634,18 @@ export default function ClientsPage() {
                       }}
                       className="hover:bg-slate-50 transition-colors cursor-pointer group"
                     >
+                      <td className="px-6 py-4 text-center w-12" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedClientIds.includes(c.id)}
+                          onChange={(e) => {
+                            setSelectedClientIds(prev =>
+                              prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id]
+                            );
+                          }}
+                          className="w-4 h-4 text-blue-600 border-slate-350 rounded focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs uppercase shrink-0 shadow-sm ${avatarBg}`}>
@@ -674,7 +711,6 @@ export default function ClientsPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <p className={`text-base font-bold italic tracking-tight group-hover:opacity-90 transition-opacity ${balanceColor}`}>{formatCLP(c.pendingBalance)}</p>
-                        <p className="text-[9px] font-semibold text-[#64748B] uppercase tracking-wider opacity-60 mt-0.5">Saldo Restante</p>
                       </td>
                       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">

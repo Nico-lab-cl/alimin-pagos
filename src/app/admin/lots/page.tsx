@@ -5,7 +5,8 @@ import { getAdminProjects, getAdminLots, updateLot } from "@/actions/postventa";
 import { formatCLP } from "@/lib/utils";
 import { 
   Loader2, Search, Map as MapIcon, Layers, ChevronRight, Zap, Filter, 
-  LayoutGrid, List, Plus, MoreVertical, UserPlus, ShieldAlert, CheckCircle2 
+  LayoutGrid, List, Plus, MoreVertical, UserPlus, ShieldAlert, CheckCircle2,
+  Download
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ export default function AdminLotsPage() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState<"ALL" | "SOLD" | "AVAILABLE" | "TEST">("ALL");
+  const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
   const itemsPerPage = 12;
 
   // Modals
@@ -64,6 +66,10 @@ export default function AdminLotsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [search, activeTab]);
+
+  useEffect(() => {
+    setSelectedLotIds([]);
+  }, [selectedProject, activeTab, search]);
 
   const handleStatusToggle = async (lot: any, newStatus: string) => {
     const res = await updateLot(lot.id, { status: newStatus });
@@ -115,6 +121,32 @@ export default function AdminLotsPage() {
       currentPage * itemsPerPage
     );
   }, [filteredLots, currentPage]);
+
+  const handleExportCSV = () => {
+    const listToExport = selectedLotIds.length > 0
+      ? lots.filter(l => selectedLotIds.includes(l.id))
+      : filteredLots;
+
+    const headers = ["Lote", "Etapa", "Superficie (m2)", "Estado", "Propietario", "Valuación"];
+    const rows = listToExport.map((l: any) => [
+      `Lote ${l.number || ""}`,
+      l.stage || "",
+      l.area_m2 || 0,
+      l.assignedClient ? "Vendido" : "Disponible",
+      l.assignedClient || "",
+      l.price_total_clp || 0
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map((row: any) => row.map((val: any) => `"${val.toString().replace(/"/g, '""')}"`).join(";"))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Lotes_${selectedProject}_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in text-slate-800 font-sans">
@@ -176,6 +208,15 @@ export default function AdminLotsPage() {
               <List className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Export Button */}
+          <button 
+            onClick={handleExportCSV}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer shadow-sm"
+          >
+            <Download className="w-4 h-4 text-slate-500" />
+            <span>{selectedLotIds.length > 0 ? `Exportar (${selectedLotIds.length})` : "Exportar"}</span>
+          </button>
 
           {/* New Lot Button */}
           <button 
@@ -289,9 +330,21 @@ export default function AdminLotsPage() {
                     <div>
                       {/* Card Header */}
                       <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Unidad Catastral</p>
-                          <h3 className="text-2xl font-bold text-slate-800 tracking-tight leading-none">Lote {lot.number}</h3>
+                        <div className="flex items-center gap-3">
+                          <input 
+                            type="checkbox"
+                            checked={selectedLotIds.includes(lot.id)}
+                            onChange={(e) => {
+                              setSelectedLotIds(prev => 
+                                prev.includes(lot.id) ? prev.filter(id => id !== lot.id) : [...prev, lot.id]
+                              );
+                            }}
+                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                          />
+                          <div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Unidad Catastral</p>
+                            <h3 className="text-xl font-bold text-slate-800 tracking-tight leading-none">Lote {lot.number}</h3>
+                          </div>
                         </div>
 
                         {/* Action Menu */}
@@ -388,6 +441,20 @@ export default function AdminLotsPage() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-6 py-4 w-12 text-center">
+                        <input
+                          type="checkbox"
+                          checked={filteredLots.length > 0 && filteredLots.every(l => selectedLotIds.includes(l.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedLotIds(filteredLots.map(l => l.id));
+                            } else {
+                              setSelectedLotIds([]);
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                        />
+                      </th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Lote / Unidad</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Etapa</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Superficie</th>
@@ -408,6 +475,18 @@ export default function AdminLotsPage() {
 
                       return (
                         <tr key={lot.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-6 py-4 text-center w-12" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedLotIds.includes(lot.id)}
+                              onChange={(e) => {
+                                setSelectedLotIds(prev =>
+                                  prev.includes(lot.id) ? prev.filter(id => id !== lot.id) : [...prev, lot.id]
+                                );
+                              }}
+                              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                            />
+                          </td>
                           <td className="px-6 py-4">
                             <div className="font-bold text-slate-800">Lote {lot.number}</div>
                           </td>
