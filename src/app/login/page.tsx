@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Loader2, Eye, EyeOff, Building2, ShieldCheck, ArrowRight, Zap } from "lucide-react";
+import { Loader2, User, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -47,130 +46,118 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden emerald-mesh">
-      {/* Decorative Background Elements */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-[10%] -left-[10%] w-[60%] h-[60%] rounded-full bg-emerald-500/5 blur-[120px] animate-pulse" />
-        <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] rounded-full bg-accent/5 blur-[100px] animate-float" />
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
-      </div>
-
-      <div className="w-full max-w-[480px] animate-slide-up relative z-10">
-        {/* Logo & Branding */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] glass-card mb-8 border-accent/20 group hover:border-accent/50 transition-all duration-700">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent/20 to-accent-dark/20 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform p-2">
-              <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
-            </div>
+    <div className="flex flex-col min-h-screen items-center justify-center font-body-md text-on-surface p-4 bg-[#F8FAFC]">
+      <main className="w-full max-w-md animate-slide-up">
+        {/* Central Card */}
+        <div className="bg-white rounded-2xl p-6 md:p-10 flex flex-col items-center border border-border-subtle shadow-[0_10px_15px_-3px_rgba(0,0,0,0.05),0_4px_6px_-2px_rgba(0,0,0,0.02)]">
+          {/* Identity Section */}
+          <div className="flex flex-col items-center mb-6">
+            <img 
+              alt="Logo Alimin Cobranzas" 
+              className="w-20 h-20 mb-4 object-contain" 
+              src="/logo.png"
+            />
+            <h1 className="font-headline-sm text-headline-sm text-cobalt-blue">Alimin Cobranzas</h1>
+            <p className="font-headline-md text-headline-md text-on-surface-variant mt-1 text-center">
+              Ingreso al Portal Administrativo
+            </p>
           </div>
-          <h1 className="text-4xl font-black text-white italic uppercase tracking-tighter mb-2 leading-none">
-            Portal de <span className="text-accent underline decoration-accent/20 underline-offset-8">Pagos</span>
-          </h1>
-          <div className="flex items-center justify-center gap-2 opacity-40">
-            <Zap className="w-3 h-3 text-accent" />
-            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Inmobiliaria Alimin SPA</p>
-          </div>
-        </div>
 
-        {/* Robust Login Card */}
-        <div className="glass-card rounded-[3rem] p-10 md:p-12 border-white/10 relative overflow-hidden">
-          {/* Subtle Internal Glow */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 blur-3xl" />
-          
-          <form onSubmit={handleSubmit} className="space-y-8 relative z-10">
-            <div className="space-y-6">
-              {/* Email Field */}
-              <div className="space-y-2">
-                <label htmlFor="email" className="label-premium">
-                  Email Corporativo / Cliente
-                </label>
-                <div className="relative group">
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="ejemplo@aliminspa.cl"
-                    required
-                    className="w-full input-premium pl-4 pr-4 py-5 text-sm font-medium tracking-tight"
-                  />
-                </div>
+          {/* Login Form */}
+          <form onSubmit={handleSubmit} className="w-full space-y-6">
+            {/* RUT / Email Input */}
+            <div className="flex flex-col space-y-1">
+              <label className="font-label-md text-label-md text-text-muted" htmlFor="email">
+                RUT o Correo Electrónico
+              </label>
+              <div className="relative border border-outline-variant rounded-lg transition-all focus-within:border-cobalt-blue focus-within:ring-2 focus-within:ring-cobalt-blue/10 bg-transparent">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="w-5 h-5 text-outline-variant" />
+                </span>
+                <input 
+                  className="block w-full pl-10 pr-3 py-3 font-body-md text-body-md rounded-lg border-none focus:ring-0 focus:outline-none bg-transparent placeholder:text-outline-variant text-on-surface" 
+                  id="email" 
+                  placeholder="ej: 12.345.678-9" 
+                  type="text"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
+            </div>
 
-              {/* Password Field */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label htmlFor="password" className="label-premium">Clave de Acceso</label>
-                  <Link href="/forgot-password" className="text-[9px] font-black uppercase text-accent/40 hover:text-accent tracking-widest transition-colors mb-2">¿Olvidaste tu clave?</Link>
-                </div>
-                <div className="relative group">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    required
-                    minLength={6}
-                    className="w-full input-premium pl-4 pr-12 py-5 text-sm font-medium tracking-tight"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
+            {/* Password Input */}
+            <div className="flex flex-col space-y-1">
+              <div className="flex justify-between items-center">
+                <label className="font-label-md text-label-md text-text-muted" htmlFor="password">
+                  Contraseña
+                </label>
+                <a className="font-body-sm text-body-sm text-cobalt-blue hover:underline" href="/forgot-password">
+                  ¿Olvidaste tu contraseña?
+                </a>
+              </div>
+              <div className="relative border border-outline-variant rounded-lg transition-all focus-within:border-cobalt-blue focus-within:ring-2 focus-within:ring-cobalt-blue/10 bg-transparent">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="w-5 h-5 text-outline-variant" />
+                </span>
+                <input 
+                  className="block w-full pl-10 pr-10 py-3 font-body-md text-body-md rounded-lg border-none focus:ring-0 focus:outline-none bg-transparent text-on-surface" 
+                  id="password" 
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+                <button 
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-outline-variant hover:text-on-surface transition-colors" 
+                  onClick={() => setShowPassword(!showPassword)} 
+                  type="button"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="p-5 rounded-2xl bg-error/10 border border-error/20 text-[11px] font-bold text-error text-center animate-fade-in uppercase tracking-wider">
+              <div className="p-4 rounded-lg bg-error-container border border-error/20 text-xs font-bold text-on-error-container text-center animate-fade-in uppercase tracking-wider">
                 {error}
               </div>
             )}
 
-            {/* Submit Button - Brushed Gold */}
-            <button
+            {/* Primary Action */}
+            <button 
+              className="w-full bg-cobalt-blue text-white font-headline-md text-headline-md py-4 rounded-lg shadow-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer" 
               type="submit"
               disabled={loading}
-              className="w-full py-6 rounded-2xl btn-metallic-gold text-xs flex items-center justify-center gap-3 active:scale-[0.98]"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Verificando Credenciales...
+                  <span>Verificando Credenciales...</span>
                 </>
               ) : (
-                <>
-                  Acceder al Sistema
-                  <ArrowRight className="w-5 h-5" />
-                </>
+                <span>Iniciar Sesión</span>
               )}
             </button>
           </form>
 
-          {/* Security Indicator */}
-          <div className="mt-10 pt-8 border-t border-white/5 flex items-center justify-center gap-3 opacity-30">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <p className="text-[9px] font-black uppercase tracking-[0.2em]">Encriptación SSL de Grado Bancario</p>
+          {/* Card Footer */}
+          <div className="mt-10 border-t border-border-subtle pt-4 w-full text-center">
+            <p className="font-body-sm text-body-sm text-text-muted">Alimin Cobranzas</p>
           </div>
         </div>
 
-        {/* Improved Footer */}
-        <div className="mt-12 text-center space-y-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">
-            © 2026 Alimin SPA <span className="mx-2 opacity-50">•</span> Gestión Inmobiliaria
-          </p>
-          <div className="flex justify-center gap-6 opacity-20 hover:opacity-100 transition-opacity">
-            <a href="#" className="text-[9px] font-bold uppercase tracking-widest hover:text-accent transition-colors">Términos</a>
-            <a href="#" className="text-[9px] font-bold uppercase tracking-widest hover:text-accent transition-colors">Privacidad</a>
-            <a href="#" className="text-[9px] font-bold uppercase tracking-widest hover:text-accent transition-colors">Soporte</a>
-          </div>
+        {/* External Footer Links */}
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <nav className="flex gap-6 font-body-sm text-body-sm text-text-muted">
+            <a className="hover:text-cobalt-blue transition-colors" href="#">Términos y Condiciones</a>
+            <a className="hover:text-cobalt-blue transition-colors" href="#">Privacidad</a>
+            <a className="hover:text-cobalt-blue transition-colors" href="#">Soporte</a>
+          </nav>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

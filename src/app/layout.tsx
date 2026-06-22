@@ -35,9 +35,7 @@ export default function RootLayout({
       <body className={`${inter.variable} ${outfit.variable} font-outfit antialiased`}>
         <AuthProvider>
           <FCMInitializer />
-          <div className="mobile-nav-safe">
-            {children}
-          </div>
+          {children}
           <MobileNav />
         </AuthProvider>
         <Toaster

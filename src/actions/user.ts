@@ -279,6 +279,7 @@ export async function getUserLots() {
             name: d.name,
             category: d.category,
             uploadedAt: d.uploadedAt,
+            fileType: d.fileType || d.file_type || null,
             url: `/api/documents/${res.id}?name=${encodeURIComponent(d.name)}`,
           }));
         } catch {}
@@ -323,6 +324,16 @@ export async function getUserLots() {
         dailyPenalty: res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
         upcomingInstallments,
         documents,
+        receipts: res.receipts.map((r: any) => ({
+          id: r.id,
+          amount_clp: r.amount_clp,
+          status: r.status,
+          scope: r.scope,
+          created_at: r.created_at,
+          receipt_url: r.receipt_url,
+          nominal_installment_number: r.nominal_installment_number,
+          nominal_installment_range: r.nominal_installment_range,
+        })),
         // Bank data for payment
         bank: {
           name: project.bank_name,

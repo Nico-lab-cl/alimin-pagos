@@ -12,9 +12,10 @@ interface DatePickerProps {
   onChange: (date: string) => void;
   label?: string;
   className?: string;
+  lightMode?: boolean;
 }
 
-export function DatePicker({ date, onChange, label, className }: DatePickerProps) {
+export function DatePicker({ date, onChange, label, className, lightMode = false }: DatePickerProps) {
   // Helper to parse YYYY-MM-DD string as local date to avoid timezone shifts
   const parseLocalDate = (dateStr: string | Date | null | undefined): Date => {
     if (!dateStr) return new Date();
@@ -65,7 +66,10 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
   return (
     <div className={cn("space-y-2", className)}>
       {label && (
-        <label className="block text-[8px] text-white/40 uppercase font-black tracking-widest italic">
+        <label className={cn(
+          "block text-[8px] uppercase font-black tracking-widest italic",
+          lightMode ? "text-slate-400 font-bold" : "text-white/40"
+        )}>
           {label}
         </label>
       )}
@@ -76,8 +80,11 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
             <button
               type="button"
               className={cn(
-                "w-full flex items-center justify-between bg-black/40 border border-white/10 rounded-xl pl-4 pr-10 py-2.5 text-sm text-white focus:border-accent outline-none font-bold transition-all hover:bg-white/5 text-left",
-                !date && "text-white/20"
+                "w-full flex items-center justify-between rounded-xl pl-4 pr-10 py-2.5 text-sm outline-none font-bold transition-all text-left border",
+                lightMode
+                  ? "bg-white border-slate-200 text-slate-800 hover:bg-slate-50 focus:border-blue-500"
+                  : "bg-black/40 border-white/10 text-white hover:bg-white/5 focus:border-accent",
+                !date && (lightMode ? "text-slate-400" : "text-white/20")
               )}
             >
               <span>{date ? format(parseLocalDate(date), "PPP", { locale: es }) : "Seleccionar fecha"}</span>
@@ -91,13 +98,19 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
                     e.stopPropagation();
                     onChange("");
                   }}
-                  className="p-1 rounded-lg text-white/40 hover:text-red-400 hover:bg-white/10 transition-all cursor-pointer flex items-center justify-center"
+                  className={cn(
+                    "p-1 rounded-lg transition-all cursor-pointer flex items-center justify-center",
+                    lightMode ? "text-slate-400 hover:text-red-500 hover:bg-slate-100" : "text-white/40 hover:text-red-400 hover:bg-white/10"
+                  )}
                   title="Limpiar fecha"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
-              <CalendarIcon className="w-4 h-4 text-accent/60 pointer-events-none" />
+              <CalendarIcon className={cn(
+                "w-4 h-4 pointer-events-none",
+                lightMode ? "text-slate-400" : "text-accent/60"
+              )} />
             </div>
           </div>
         </Popover.Trigger>
@@ -105,39 +118,59 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
         <Popover.Portal>
           <Popover.Content
             sideOffset={8}
-            className="z-[200] w-[320px] bg-[#0A1110] border border-white/10 rounded-3xl p-5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200"
+            className={cn(
+              "z-[200] w-[320px] rounded-3xl p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200 border",
+              lightMode
+                ? "bg-white border-slate-200"
+                : "bg-[#0A1110] border-white/10 backdrop-blur-xl"
+            )}
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-sm font-black text-white uppercase tracking-widest italic">
+              <h2 className={cn(
+                "text-sm font-black uppercase tracking-widest italic",
+                lightMode ? "text-slate-800 font-bold" : "text-white"
+              )}>
                 {format(currentMonth, "MMMM yyyy", { locale: es })}
               </h2>
               <div className="flex gap-0.5">
                 <button
                   onClick={handlePrevYear}
                   title="Año Anterior"
-                  className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-white transition-all"
+                  className={cn(
+                    "p-1.5 rounded-lg transition-all",
+                    lightMode ? "text-slate-400 hover:text-slate-800 hover:bg-slate-100" : "text-white/20 hover:text-white hover:bg-white/5"
+                  )}
                 >
                   <ChevronsLeft className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={handlePrevMonth}
                   title="Mes Anterior"
-                  className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-white transition-all"
+                  className={cn(
+                    "p-1.5 rounded-lg transition-all",
+                    lightMode ? "text-slate-400 hover:text-slate-800 hover:bg-slate-100" : "text-white/20 hover:text-white hover:bg-white/5"
+                  )}
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={handleNextMonth}
                   title="Siguiente Mes"
-                  className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-white transition-all"
+                  className={cn(
+                    "p-1.5 rounded-lg transition-all",
+                    lightMode ? "text-slate-400 hover:text-slate-800 hover:bg-slate-100" : "text-white/20 hover:text-white hover:bg-white/5"
+                  )}
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={handleNextYear}
                   title="Siguiente Año"
-                  className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-white transition-all"
+                  className={cn(
+                    "p-1.5 rounded-lg transition-all",
+                    lightMode ? "text-slate-400 hover:text-slate-800 hover:bg-slate-100" : "text-white/20 hover:text-white hover:bg-white/5"
+                  )}
                 >
                   <ChevronsRight className="w-3.5 h-3.5" />
                 </button>
@@ -147,7 +180,10 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
             {/* Weekdays */}
             <div className="grid grid-cols-7 gap-1 mb-2">
               {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
-                <div key={day} className="text-center text-[8px] font-black text-white/20 uppercase tracking-widest">
+                <div key={day} className={cn(
+                  "text-center text-[8px] font-black uppercase tracking-widest",
+                  lightMode ? "text-slate-400" : "text-white/20"
+                )}>
                   {day}
                 </div>
               ))}
@@ -166,10 +202,18 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
                     onClick={() => handleSelect(day)}
                     className={cn(
                       "h-9 rounded-xl text-xs font-bold transition-all relative flex items-center justify-center",
-                      !isCurrentMonth && "text-white/10 opacity-20 hover:opacity-100",
-                      isCurrentMonth && !isSelected && "text-white/60 hover:bg-white/5 hover:text-white",
-                      isSelected && "bg-accent text-[#061010] shadow-[0_0_15px_rgba(212,168,75,0.3)]",
-                      isTdy && !isSelected && "border border-accent/30 text-accent font-black"
+                      !isCurrentMonth && (lightMode ? "text-slate-300 opacity-40 hover:opacity-100" : "text-white/10 opacity-20 hover:opacity-100"),
+                      isCurrentMonth && !isSelected && (lightMode ? "text-slate-700 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white"),
+                      isSelected && (
+                        lightMode 
+                          ? "bg-blue-600 text-white shadow-sm" 
+                          : "bg-accent text-[#061010] shadow-[0_0_15px_rgba(212,168,75,0.3)]"
+                      ),
+                      isTdy && !isSelected && (
+                        lightMode 
+                          ? "border border-blue-200 text-blue-600 font-bold" 
+                          : "border border-accent/30 text-accent font-black"
+                      )
                     )}
                   >
                     {format(day, "d")}
@@ -178,7 +222,9 @@ export function DatePicker({ date, onChange, label, className }: DatePickerProps
               })}
             </div>
             
-            <Popover.Arrow className="fill-[#0A1110] border-white/10" />
+            <Popover.Arrow className={cn(
+              lightMode ? "fill-white border-slate-200" : "fill-[#0A1110]"
+            )} />
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>

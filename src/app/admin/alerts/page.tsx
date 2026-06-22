@@ -82,10 +82,10 @@ export default function AlertsPage() {
             <div className="w-10 h-10 rounded-2xl bg-red-500/20 flex items-center justify-center border border-red-500/20">
               <ShieldAlert className="w-5 h-5 text-red-400" />
             </div>
-            <p className="subtitle-responsive text-red-400">Security & Risk</p>
+            <p className="subtitle-responsive text-red-400">Historial & Cobranza</p>
           </div>
           <h1 className="title-responsive">
-            Centro de <span className="text-white/20">Alertas</span>
+            Centro de <span className="text-white/20">Registros</span>
           </h1>
         </div>
 
@@ -245,7 +245,7 @@ export default function AlertsPage() {
           {clients.length === 0 && (
             <div className="py-40 text-center border-2 border-dashed border-white/5 rounded-[3rem] glass-card">
               <Bell className="w-16 h-16 mx-auto mb-6 opacity-5" />
-              <p className="text-sm font-black uppercase tracking-[0.3em] opacity-20">Sin alertas activas bajo este criterio</p>
+              <p className="text-sm font-black uppercase tracking-[0.3em] opacity-20">Sin registros activos bajo este criterio</p>
             </div>
           )}
         </div>
@@ -255,7 +255,7 @@ export default function AlertsPage() {
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-20">
-            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, clients.length)} de {clients.length} Alertas
+            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, clients.length)} de {clients.length} Registros
           </p>
           <div className="flex items-center gap-2">
             <button

@@ -18,43 +18,47 @@ import {
   Bell,
   Search,
   Mail,
-  BookOpen
+  BookOpen,
+  TrendingUp
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+import { SearchProvider, useSearch } from "@/context/SearchContext";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const menuItems = [
   { 
     href: "/admin", 
-    label: "Dashboard", 
-    icon: LayoutDashboard,
-    subItems: [
-      { href: "/admin/income", label: "Ingresos", icon: TrendingUp }
-    ]
+    label: "Panel de Control", 
+    icon: LayoutDashboard
   },
-  { href: "/admin/lots", label: "Inventario", icon: Map },
-  { href: "/admin/alerts", label: "Alertas", icon: AlertCircle },
   { href: "/admin/clients", label: "Clientes", icon: Users },
   { 
     href: "/admin/receipts", 
-    label: "Comprobantes", 
+    label: "Bandeja de Pagos", 
     icon: CheckSquare,
     subItems: [
       { href: "/admin/receipts/reservas", label: "Reservas", icon: BookOpen }
     ]
   },
-  { href: "/admin/email-marketing", label: "Email Marketing", icon: Mail },
+  { href: "/admin/lots", label: "Lotes", icon: Map },
+  { href: "/admin/email-marketing", label: "Informes", icon: Mail },
 ];
 
-import { SearchProvider, useSearch } from "@/context/SearchContext";
-import { TrendingUp } from "lucide-react";
-
-
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <SearchProvider>
+      <AdminLayoutContent>{children}</AdminLayoutContent>
+    </SearchProvider>
+  );
+}
+
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { data: session } = useSession();
   const pathname = usePathname();
+  const { search, setSearch } = useSearch();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -70,160 +74,184 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleSignOut = () => signOut({ callbackUrl: "/login" });
 
   return (
-    <SearchProvider>
-      <div className="min-h-screen bg-[#061010] text-white flex overflow-hidden font-outfit">
-        {/* Premium Background Effects */}
-        <div className="fixed inset-0 pointer-events-none overflow-hidden emerald-mesh opacity-50">
-          <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-500/5 rounded-full blur-[150px] animate-pulse" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[150px]" />
-        </div>
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex overflow-hidden font-outfit">
+      {/* Sidebar Placeholder - Desktop Only */}
+      <div className="hidden lg:block lg:w-64 flex-shrink-0" />
 
-        {/* Sidebar Placeholder - Desktop Only */}
-        <div className="hidden lg:block lg:w-24 flex-shrink-0 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]" />
-
-        {/* Sidebar - Desktop & Mobile */}
-        <aside className={`
-          fixed inset-y-0 left-0 z-50
-          glass-panel border-r border-white/5
-          transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]
-          ${isOpen ? "translate-x-0 w-80" : "-translate-x-full lg:translate-x-0 lg:w-24 lg:hover:w-80"}
-          group/sidebar
-        `}>
-          <div className="h-full flex flex-col p-10 px-5 lg:px-5 lg:group-hover/sidebar:px-10 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]">
-            {/* Logo Section */}
-            <div className="flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start mb-16 cursor-pointer gap-5 lg:gap-0 lg:group-hover/sidebar:gap-5 transition-all duration-500">
-              <div className="w-14 h-14 lg:w-12 lg:h-12 lg:group-hover/sidebar:w-14 lg:group-hover/sidebar:h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-[0_10px_40px_rgba(212,168,75,0.2)] transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 p-2 flex-shrink-0">
-                <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
-              </div>
-              <div className="transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs flex flex-col justify-center">
-                <h1 className="text-3xl font-black tracking-tighter uppercase leading-none italic text-glow">Alimin</h1>
-                <p className="text-[10px] font-black text-accent tracking-[0.4em] uppercase mt-1.5 opacity-60">Consola Central</p>
-              </div>
+      {/* Sidebar - Desktop & Mobile */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50
+        bg-white border-r border-slate-200/80
+        transition-all duration-300
+        ${isOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0 lg:w-64"}
+      `}>
+        <div className="h-full flex flex-col p-6">
+          {/* Logo Section */}
+          <div className="flex items-center gap-3 mb-10 px-2">
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center p-1.5 flex-shrink-0 shadow-sm">
+              <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
             </div>
-
-            {/* Navigation */}
-            <nav className="flex-1 space-y-4">
-              {menuItems.map((item) => {
-                const isActive = pathname === item.href || (item.subItems?.some(s => pathname === s.href));
-                return (
-                  <div key={item.href} className="space-y-2">
-                    <Link
-                      href={item.href}
-                      className={`
-                        group flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start px-6 lg:px-4 lg:group-hover/sidebar:px-6 py-5 rounded-[1.5rem] transition-all duration-500
-                        ${isActive 
-                          ? "btn-metallic-gold shadow-[0_15px_35px_rgba(212,168,75,0.3)]" 
-                          : "text-white/30 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/5"}
-                      `}
-                    >
-                      <div className="flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start transition-all duration-500 w-full">
-                        <item.icon className={`w-5 h-5 flex-shrink-0 transition-all duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:text-accent'}`} />
-                        <span className="text-[11px] font-black lowercase tracking-[0.1em] uppercase transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs ml-5 lg:ml-0 lg:group-hover/sidebar:ml-5">{item.label}</span>
-                      </div>
-                      {isActive && <ChevronRight className="w-4 h-4 opacity-50 flex-shrink-0 transition-all duration-500 lg:opacity-0 lg:group-hover/sidebar:opacity-50" />}
-                    </Link>
-                    
-                    {item.subItems && isActive && (
-                      <div className="pl-8 space-y-2 animate-slide-down transition-all duration-500 lg:max-h-0 lg:opacity-0 lg:overflow-hidden lg:group-hover/sidebar:max-h-40 lg:group-hover/sidebar:opacity-100">
-                        {item.subItems.map((sub) => {
-                          const isSubActive = pathname === sub.href;
-                          return (
-                            <Link
-                              key={sub.href}
-                              href={sub.href}
-                              className={`
-                                flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
-                                ${isSubActive ? "text-accent bg-accent/10" : "text-white/20 hover:text-white/60 hover:bg-white/5"}
-                              `}
-                            >
-                              <sub.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                              <span className="transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs ml-4 lg:ml-0 lg:group-hover/sidebar:ml-4">{sub.label}</span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </nav>
-
-            {/* User Section & Logout */}
-            <div className="mt-auto pt-10 border-t border-white/5 space-y-6">
-              <div className="flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start gap-5 lg:gap-0 lg:group-hover/sidebar:gap-5 px-3 lg:px-1 lg:group-hover/sidebar:px-3 transition-all duration-500">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group overflow-hidden relative shadow-inner flex-shrink-0">
-                  <div className="absolute inset-0 bg-accent transition-transform duration-700 translate-y-full group-hover:translate-y-0 opacity-20" />
-                  <span className="text-sm font-black text-accent relative z-10">AD</span>
-                </div>
-                <div className="min-w-0 transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs">
-                  <p className="text-xs font-black truncate uppercase tracking-[0.15em] leading-none mb-1.5">{session?.user?.name || "Administrador"}</p>
-                  <div className="flex items-center gap-2 text-[9px] text-emerald-400 font-black uppercase tracking-widest">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-glow" />
-                    <span>Terminal Activo</span>
-                  </div>
-                </div>
-              </div>
-              
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center justify-start lg:justify-center lg:group-hover/sidebar:justify-start gap-4 lg:gap-0 lg:group-hover/sidebar:gap-4 px-6 lg:px-4 lg:group-hover/sidebar:px-6 py-5 rounded-2xl text-white/20 hover:text-red-400 hover:bg-red-400/5 border border-transparent hover:border-red-400/10 transition-all duration-500"
-              >
-                <LogOut className="w-5 h-5 flex-shrink-0 transition-transform group-hover:-translate-x-1" />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] transition-all duration-500 whitespace-nowrap overflow-hidden lg:opacity-0 lg:max-w-0 lg:group-hover/sidebar:opacity-100 lg:group-hover/sidebar:max-w-xs">Cerrar Sesión</span>
-              </button>
+            <div className="flex flex-col justify-center">
+              <h1 className="text-base font-bold tracking-tight text-slate-800 leading-none">Alimin</h1>
+              <p className="text-[9px] font-semibold text-slate-400 uppercase mt-0.5">Portal Admin</p>
             </div>
           </div>
-        </aside>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          {/* Mobile Header */}
-          <header className={`lg:hidden flex items-center justify-between p-6 transition-all duration-300 z-50 ${scrolled ? 'bg-[#061010]/95 backdrop-blur-xl border-b border-white/5' : ''}`}>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-                <Zap className="w-5 h-5 text-[#061010]" />
-              </div>
-              <span className="font-black uppercase tracking-tighter text-lg">Alimin</span>
-            </div>
-            <button 
-              onClick={() => setIsOpen(!isOpen)}
-              className="p-3 rounded-xl bg-white/5 text-accent border border-white/10"
+          {/* Navigation */}
+          <nav className="flex-1 space-y-1">
+            {menuItems.map((item) => {
+              const isActive = pathname === item.href || (item.subItems?.some(s => pathname === s.href));
+              return (
+                <div key={item.href} className="space-y-1">
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "group flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200",
+                      isActive 
+                        ? "bg-slate-100/80 text-blue-600 font-semibold" 
+                        : "text-slate-650 hover:text-slate-900 hover:bg-slate-50"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className={cn(
+                        "w-5 h-5 flex-shrink-0 transition-colors",
+                        isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                      )} />
+                      <span className="text-sm font-medium tracking-tight">{item.label}</span>
+                    </div>
+                    {item.subItems && (
+                      <ChevronRight className={cn(
+                        "w-4 h-4 opacity-50 transition-transform duration-200",
+                        isActive && "rotate-90"
+                      )} />
+                    )}
+                  </Link>
+                  
+                  {item.subItems && isActive && (
+                    <div className="pl-6 mt-1 space-y-1">
+                      {item.subItems.map((sub) => {
+                        const isSubActive = pathname === sub.href;
+                        return (
+                          <Link
+                            key={sub.href}
+                            href={sub.href}
+                            className={cn(
+                              "flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs font-medium transition-all",
+                              isSubActive ? "text-blue-600 bg-blue-50/50 font-semibold" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                            )}
+                          >
+                            <sub.icon className="w-4 h-4 flex-shrink-0" />
+                            <span>{sub.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+
+          {/* Bottom Section */}
+          <div className="mt-auto pt-6 border-t border-slate-100 space-y-1">
+            <button
+              onClick={() => toast.info("Módulo de Configuración disponible próximamente")}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all text-left cursor-pointer"
             >
-              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              <Zap className="w-5 h-5 text-slate-400" />
+              <span>Configuración</span>
             </button>
-          </header>
+            <button
+              onClick={() => toast.info("Soporte Técnico y de Operaciones disponible próximamente")}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all text-left cursor-pointer"
+            >
+              <Globe className="w-5 h-5 text-slate-400" />
+              <span>Soporte</span>
+            </button>
+            
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-500 hover:text-red-650 hover:bg-red-50 text-sm font-medium transition-all text-left cursor-pointer"
+            >
+              <LogOut className="w-5 h-5 text-slate-400" />
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
+        </div>
+      </aside>
 
-          {/* Top Internal Header (Desktop Only) */}
-          <header className="hidden lg:flex items-center justify-end px-12 py-8 bg-transparent">
-            <div className="flex items-center gap-6">
-              <button className="relative p-3 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-accent rounded-full border-2 border-[#061010]" />
-              </button>
-              <div className="w-px h-6 bg-white/10" />
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] font-black uppercase tracking-widest text-white/30">System Status:</span>
-                <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">Operational</span>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Mobile Header */}
+        <header className={cn(
+          "lg:hidden flex items-center justify-between p-4 transition-all duration-350 z-50 border-b",
+          scrolled ? "bg-white/95 backdrop-blur-xl border-slate-200/80 shadow-sm" : "bg-white border-slate-100"
+        )}>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+              <Zap className="w-4.5 h-4.5 text-white" />
+            </div>
+            <span className="font-bold uppercase tracking-tight text-slate-800 text-base">Alimin</span>
+          </div>
+          <button 
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-2.5 rounded-xl bg-slate-50 text-slate-600 border border-slate-250"
+          >
+            {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </header>
+
+        {/* Top Internal Header (Desktop Only) */}
+        <header className="hidden lg:flex items-center justify-between px-12 py-5 bg-white border-b border-slate-200/80">
+          <h2 className="text-base font-bold text-slate-850">Alimin Admin</h2>
+          
+          {/* Search Input in Center */}
+          <div className="relative max-w-md w-full mx-8">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Buscar lotes, clientes..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-850 placeholder-slate-400 focus:border-blue-500 outline-none transition-all font-medium"
+            />
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <button className="relative p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-550 hover:text-slate-800 transition-all shadow-sm">
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />
+            </button>
+            
+            <button className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-550 hover:text-slate-800 transition-all shadow-sm">
+              <BookOpen className="w-4 h-4" />
+            </button>
+            
+            <div className="w-px h-6 bg-slate-200" />
+            
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shadow-sm">
+                <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=256&auto=format&fit=facearea&facepad=2" alt="User Avatar" className="w-full h-full object-cover" />
               </div>
             </div>
-          </header>
+          </div>
+        </header>
 
-          {/* Scrollable Content */}
-          <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 md:p-12 lg:px-12 lg:pt-0 scroll-smooth">
-            <div className="max-w-7xl mx-auto animate-fade-in pb-20">
-              {children}
-            </div>
-          </main>
-        </div>
-
-        {/* Overlay for mobile sidebar */}
-        {isOpen && (
-          <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-40 lg:hidden transition-all duration-500"
-            onClick={() => setIsOpen(false)}
-          />
-        )}
+        {/* Scrollable Content */}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 md:p-12 lg:px-12 lg:py-10 scroll-smooth">
+          <div className="max-w-7xl mx-auto animate-fade-in pb-20">
+            {children}
+          </div>
+        </main>
       </div>
-    </SearchProvider>
+
+      {/* Overlay for mobile sidebar */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-all duration-300"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </div>
   );
 }

@@ -6,17 +6,16 @@ import { usePathname } from "next/navigation";
 import { 
   Home, 
   FileText, 
-  CreditCard, 
   LogOut, 
   Menu, 
   X,
   ChevronRight,
   Zap,
-  LayoutDashboard,
-  User as UserIcon,
   Bell
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const menuItems = [
   { href: "/user", label: "Dashboard", icon: Home },
@@ -41,117 +40,155 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
 
   const handleSignOut = () => signOut({ callbackUrl: "/login" });
 
-  return (
-    <div className="min-h-screen bg-[#061010] text-white flex flex-col font-outfit">
-      {/* Premium Background Effects */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden emerald-mesh opacity-40">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-500/5 rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[150px]" />
-      </div>
+  const userName = session?.user?.name || "Propietario";
+  const initials = userName
+    ? userName.split(" ").filter(Boolean).map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
+    : "US";
 
-      {/* Header / Navbar */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${scrolled ? 'bg-[#061010]/95 backdrop-blur-xl py-4 md:py-5 border-b border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)]' : 'bg-transparent py-6 md:py-10'}`}>
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+      {/* Top Navbar */}
+      <nav className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b bg-white",
+        scrolled ? "py-3 border-slate-200 shadow-sm" : "py-4 border-slate-100"
+      )}>
         <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
           {/* Logo Area */}
-          <Link href="/user" className="group flex items-center gap-5 transition-all hover:scale-105 active:scale-95">
-            <div className="relative">
-              <div className="absolute inset-0 bg-accent/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
-              <div className="relative w-10 h-10 md:w-14 md:h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-[0_10px_30px_rgba(212,168,75,0.2)] transition-transform duration-500 group-hover:rotate-3 p-2">
-                <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
-              </div>
+          <Link href="/user" className="flex items-center gap-3 active:scale-95 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center p-1.5 shadow-sm">
+              <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-black tracking-tighter uppercase leading-none text-white italic text-glow">Alimin</h1>
-              <p className="text-[8px] md:text-[10px] font-black text-accent tracking-[0.4em] uppercase mt-1 md:mt-1.5 opacity-60">Portal de Inversión</p>
+              <h1 className="text-lg font-bold tracking-tight text-slate-800 leading-none">Alimin</h1>
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-12">
+          {/* Desktop Navigation Links */}
+          <div className="hidden md:flex items-center gap-8">
             {menuItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`relative text-[11px] font-black uppercase tracking-[0.3em] transition-all hover:text-accent ${isActive ? 'text-accent' : 'text-white/30'}`}
+                  className={cn(
+                    "text-xs font-semibold uppercase tracking-wider transition-colors hover:text-blue-600",
+                    isActive ? "text-blue-600 border-b-2 border-blue-600 pb-1 -mb-1" : "text-slate-500"
+                  )}
                 >
                   {item.label}
-                  {isActive && (
-                    <span className="absolute -bottom-3 left-0 right-0 h-0.5 bg-accent rounded-full animate-fade-in shadow-[0_0_10px_rgba(212,168,75,0.5)]" />
-                  )}
                 </Link>
               );
             })}
           </div>
 
-          {/* User Header Section */}
-          <div className="flex items-center gap-6">
-            <div className="hidden lg:flex flex-col items-end">
-              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20 mb-1.5">Titular Activo</span>
-              <span className="text-sm font-black text-white italic truncate max-w-[180px] uppercase tracking-tighter leading-none">{session?.user?.name || "Propietario"}</span>
+          {/* User & Session Status */}
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-3">
+              <span className="text-xs text-slate-500">
+                ¡Hola, <span className="font-semibold text-slate-800">{userName}</span>! Bienvenido a tu hogar.
+              </span>
+              <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-700 shadow-sm select-none">
+                {initials}
+              </div>
             </div>
-            <button className="relative p-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all hidden sm:flex hover:border-accent/40 group">
-              <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              <span className="absolute top-3.5 right-3.5 w-2 h-2 bg-accent rounded-full shadow-[0_0_10px_rgba(212,168,75,0.8)]" />
-            </button>
-            <button 
-              onClick={() => setIsOpen(!isOpen)}
-              className="lg:hidden p-3 md:p-4 rounded-2xl bg-white/5 text-accent border border-white/10 active:scale-90 transition-transform"
-            >
-              <Menu className="w-6 h-6 md:w-7 md:h-7" />
-            </button>
+
             <button 
               onClick={handleSignOut}
-              className="hidden lg:flex px-6 py-4 rounded-2xl bg-red-500/5 border border-red-500/10 text-red-400/60 hover:text-white hover:bg-red-500 hover:border-red-500 transition-all font-black text-[10px] uppercase tracking-[0.2em]"
+              className="hidden sm:inline-block text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors cursor-pointer"
             >
-              <LogOut className="w-4 h-4 mr-3" />
-              Log Out
+              Cerrar Sesión
+            </button>
+
+            {/* Mobile Menu Toggle */}
+            <button 
+              onClick={() => setIsOpen(!isOpen)}
+              className="md:hidden p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 active:scale-95 transition-transform"
+            >
+              <Menu className="w-5 h-5" />
             </button>
           </div>
         </div>
       </nav>
 
       {/* Main Content Area */}
-      <main className="flex-1 pt-24 md:pt-32 pb-20 px-4 md:px-12 max-w-7xl mx-auto w-full relative z-10 animate-fade-in">
+      <main className="flex-1 pt-24 pb-16 px-6 md:px-12 max-w-7xl mx-auto w-full relative z-10">
         {children}
       </main>
 
-      {/* Mobile Sidebar Menu */}
-      <div className={`fixed inset-0 z-[60] transition-all duration-500 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsOpen(false)} />
-        <div className={`absolute right-0 top-0 bottom-0 w-80 glass-panel border-l border-white/10 p-10 transform transition-transform duration-500 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-          <div className="flex justify-between items-center mb-16">
-            <span className="text-xl font-black italic uppercase italic tracking-tighter">Explorar</span>
-            <button onClick={() => setIsOpen(false)} className="p-2 text-white/40"><X className="w-6 h-6" /></button>
-          </div>
+      {/* Mobile Navigation Drawer */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
           
-          <nav className="space-y-6">
-            {menuItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center justify-between text-2xl font-black italic tracking-tighter uppercase text-white/40 hover:text-white transition-all"
-              >
-                {item.label}
-                <ChevronRight className="w-5 h-5 text-accent" />
-              </Link>
-            ))}
-            <div className="h-px bg-white/5 my-10" />
+          {/* Drawer Panel */}
+          <div className="absolute right-0 top-0 bottom-0 w-64 bg-white border-l border-slate-200 p-6 flex flex-col justify-between shadow-2xl animate-slide-in">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+                <span className="font-bold text-slate-800">Menú</span>
+                <button onClick={() => setIsOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* User Greeting (Mobile) */}
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-150">
+                <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-xs font-bold text-blue-750">
+                  {initials}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Hola</p>
+                  <p className="text-xs font-bold text-slate-800 truncate">{userName}</p>
+                </div>
+              </div>
+              
+              {/* Navigation Links */}
+              <nav className="flex flex-col gap-2">
+                {menuItems.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all",
+                        isActive ? "bg-blue-50 text-blue-600 border border-blue-150" : "text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <item.icon className="w-4 h-4" />
+                        {item.label}
+                      </span>
+                      <ChevronRight className="w-4 h-4 opacity-50" />
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* Logout button */}
             <button 
               onClick={handleSignOut}
-              className="flex items-center gap-4 text-xl font-black text-red-500 uppercase italic tracking-tighter"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-red-50 hover:bg-red-100 border border-red-150 text-red-600 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
             >
-              <LogOut className="w-6 h-6" />
+              <LogOut className="w-4 h-4" />
               Cerrar Sesión
             </button>
-          </nav>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Footer (Simplified) */}
-      <footer className="py-12 px-6 md:px-12 border-t border-white/5 text-center opacity-30">
-        <p className="text-[10px] font-black uppercase tracking-[0.4em]">Alimin SPA — Wealth & Assets Management</p>
+      {/* Footer */}
+      <footer className="py-8 border-t border-slate-200 bg-white text-center text-xs text-slate-500 font-medium">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-wrap gap-4">
+            <Link href="/legal?type=terms" className="hover:text-blue-600">Términos y Condiciones</Link>
+            <Link href="/legal?type=privacy" className="hover:text-blue-600">Privacidad</Link>
+            <Link href="/legal?type=support" className="hover:text-blue-600">Soporte</Link>
+          </div>
+          <p>Alimin Cobranzas v2.1.0 • © 2024 Todos los derechos reservados</p>
+        </div>
       </footer>
     </div>
   );

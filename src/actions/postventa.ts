@@ -779,15 +779,23 @@ export async function getAllReceipts(projectSlug: string) {
   }
 
   try {
-    const project = await prisma.project.findUnique({
-      where: { slug: projectSlug },
-    });
-    if (!project) return { error: "Proyecto no encontrado", receipts: [] };
+    let where: any = {};
+    if (projectSlug && projectSlug !== "all") {
+      const project = await prisma.project.findUnique({
+        where: { slug: projectSlug },
+      });
+      if (!project) return { error: "Proyecto no encontrado", receipts: [] };
+      where.reservation = { project_id: project.id };
+    } else if (user.allowedProjects && Array.isArray(user.allowedProjects)) {
+      where.reservation = {
+        project: {
+          slug: { in: user.allowedProjects }
+        }
+      };
+    }
 
     const receipts = await prisma.paymentReceipt.findMany({
-      where: {
-        reservation: { project_id: project.id },
-      },
+      where,
       orderBy: { created_at: "desc" },
       include: {
         reservation: {
@@ -796,16 +804,23 @@ export async function getAllReceipts(projectSlug: string) {
             last_name: true,
             email: true,
             phone: true,
+            rut: true,
             documents: {
               select: {
                 id: true,
                 name: true,
               },
             },
+            project: {
+              select: {
+                name: true,
+                slug: true,
+              }
+            }
           },
         },
         lot: {
-          select: { number: true, stage: true },
+          select: { number: true, stage: true, cuotas: true },
         },
       },
     });
@@ -1106,6 +1121,64 @@ export async function updateClientProfile(reservationId: string, data: { name: s
       }
     }
 
+    // Comparison for logging
+    const changes: string[] = [];
+    if (data.name !== undefined && data.name !== reservation.name) {
+      changes.push(`Nombre: "${reservation.name}" -> "${data.name}"`);
+    }
+    if (data.email !== undefined && sanitizedEmail !== reservation.email) {
+      changes.push(`Email: "${reservation.email}" -> "${sanitizedEmail}"`);
+    }
+    if (data.rut !== undefined && data.rut !== reservation.rut) {
+      changes.push(`RUT: "${reservation.rut || 'No registrado'}" -> "${data.rut}"`);
+    }
+    if (data.phone !== undefined && data.phone !== reservation.phone) {
+      changes.push(`Teléfono: "${reservation.phone || 'No registrado'}" -> "${data.phone}"`);
+    }
+    if (data.observation !== undefined && data.observation !== reservation.observation) {
+      changes.push(`Observación: "${reservation.observation || 'No registrado'}" -> "${data.observation}"`);
+    }
+    if (data.address_street !== undefined && data.address_street !== reservation.address_street) {
+      changes.push(`Calle: "${reservation.address_street || 'No registrada'}" -> "${data.address_street}"`);
+    }
+    if (data.address_number !== undefined && data.address_number !== reservation.address_number) {
+      changes.push(`Número: "${reservation.address_number || 'No registrado'}" -> "${data.address_number}"`);
+    }
+    if (data.address_commune !== undefined && data.address_commune !== reservation.address_commune) {
+      changes.push(`Comuna: "${reservation.address_commune || 'No registrada'}" -> "${data.address_commune}"`);
+    }
+    if (data.address_region !== undefined && data.address_region !== reservation.address_region) {
+      changes.push(`Región: "${reservation.address_region || 'No registrada'}" -> "${data.address_region}"`);
+    }
+    if (data.marital_status !== undefined && data.marital_status !== reservation.marital_status) {
+      changes.push(`Estado civil: "${reservation.marital_status || 'No registrado'}" -> "${data.marital_status}"`);
+    }
+    if (data.profession !== undefined && data.profession !== reservation.profession) {
+      changes.push(`Profesión: "${reservation.profession || 'No registrada'}" -> "${data.profession}"`);
+    }
+    if (data.nationality !== undefined && data.nationality !== reservation.nationality) {
+      changes.push(`Nacionalidad: "${reservation.nationality || 'No registrada'}" -> "${data.nationality}"`);
+    }
+
+    let updatedNotes = reservation.notes || "[]";
+    if (changes.length > 0) {
+      let parsedNotes = [];
+      try {
+        parsedNotes = JSON.parse(updatedNotes);
+      } catch (e) {
+        parsedNotes = [];
+      }
+      const logNote = {
+        id: Math.random().toString(36).substring(7),
+        text: `Perfil de cliente editado:\n- ${changes.join('\n- ')}`,
+        type: "Registro",
+        date: new Date().toISOString(),
+        author: adminUser.name || adminUser.email || "Administrador"
+      };
+      parsedNotes.unshift(logNote);
+      updatedNotes = JSON.stringify(parsedNotes);
+    }
+
     // Check for shared users (decoupling logic)
     const otherReservationsWithSameUser = await prisma.reservation.findMany({
       where: { 
@@ -1152,7 +1225,8 @@ export async function updateClientProfile(reservationId: string, data: { name: s
           address_street: data.address_street,
           address_number: data.address_number,
           address_region: data.address_region,
-          address_commune: data.address_commune
+          address_commune: data.address_commune,
+          notes: updatedNotes
         }
       });
     } else {
@@ -1179,7 +1253,8 @@ export async function updateClientProfile(reservationId: string, data: { name: s
             address_street: data.address_street,
             address_number: data.address_number,
             address_region: data.address_region,
-            address_commune: data.address_commune
+            address_commune: data.address_commune,
+            notes: updatedNotes
           }
         })
       ]);
@@ -1235,6 +1310,85 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
 
     if (!reservation) return { error: "Reserva no encontrada" };
 
+    // Comparison for logging
+    const changes: string[] = [];
+    const formatCLP = (val: number | null | undefined) => {
+      if (val === null || val === undefined) return "$0";
+      return `$${Math.round(val).toLocaleString('de-DE')}`;
+    };
+
+    if (data.price_total_clp !== undefined && Number(data.price_total_clp) !== (reservation.lot.price_total_clp || 0)) {
+      changes.push(`Valor Total Lote: ${formatCLP(reservation.lot.price_total_clp)} -> ${formatCLP(data.price_total_clp)}`);
+    }
+    if (data.cuotas !== undefined && Number(data.cuotas) !== (reservation.lot.cuotas || 0)) {
+      changes.push(`Cantidad de Cuotas: ${reservation.lot.cuotas || 0} -> ${data.cuotas}`);
+    }
+    if (data.valor_cuota !== undefined && Number(data.valor_cuota) !== (reservation.lot.valor_cuota || 0)) {
+      changes.push(`Valor de Cuota: ${formatCLP(reservation.lot.valor_cuota)} -> ${formatCLP(data.valor_cuota)}`);
+    }
+    if (data.pie !== undefined && Number(data.pie) !== (reservation.pie || reservation.lot.pie || 0)) {
+      const oldPie = reservation.pie || reservation.lot.pie || 0;
+      changes.push(`Pie: ${formatCLP(oldPie)} -> ${formatCLP(data.pie)}`);
+    }
+    if (data.reservation_price !== undefined && Number(data.reservation_price) !== (reservation.reservation_price || 0)) {
+      changes.push(`Reserva: ${formatCLP(reservation.reservation_price)} -> ${formatCLP(data.reservation_price)}`);
+    }
+    if (data.last_installment_value !== undefined && Number(data.last_installment_value) !== (reservation.last_installment_value || 0)) {
+      changes.push(`Valor Última Cuota: ${formatCLP(reservation.last_installment_value)} -> ${formatCLP(data.last_installment_value)}`);
+    }
+    if (data.daily_penalty !== undefined && Number(data.daily_penalty) !== (reservation.daily_penalty || 0)) {
+      changes.push(`Interés (multa por día): ${formatCLP(reservation.daily_penalty)} -> ${formatCLP(data.daily_penalty)}`);
+    }
+    if (data.due_day !== undefined && Number(data.due_day) !== (reservation.due_day || 0)) {
+      changes.push(`Día de Pago: ${reservation.due_day || 0} -> ${data.due_day}`);
+    }
+    if (data.grace_days !== undefined && Number(data.grace_days) !== (reservation.grace_days || 0)) {
+      changes.push(`Días de Gracia: ${reservation.grace_days || 0} -> ${data.grace_days}`);
+    }
+    if (data.installments_paid !== undefined && Number(data.installments_paid) !== (reservation.installments_paid || 0)) {
+      changes.push(`Cuotas Pagadas: ${reservation.installments_paid || 0} -> ${data.installments_paid}`);
+    }
+    if (data.mora_status !== undefined && data.mora_status !== reservation.mora_status) {
+      changes.push(`Estado Mora: "${reservation.mora_status || 'No definido'}" -> "${data.mora_status}"`);
+    }
+    if (data.penalty_mode !== undefined && data.penalty_mode !== reservation.penalty_mode) {
+      changes.push(`Modo Multa: "${reservation.penalty_mode || 'AUTO'}" -> "${data.penalty_mode}"`);
+    }
+    if (data.manual_penalty !== undefined && data.manual_penalty !== reservation.manual_penalty) {
+      changes.push(`Multa Manual: ${formatCLP(reservation.manual_penalty)} -> ${formatCLP(data.manual_penalty)}`);
+    }
+    if (data.extra_paid_amount !== undefined && Number(data.extra_paid_amount) !== (reservation.extra_paid_amount || 0)) {
+      changes.push(`Monto Extra Pagado: ${formatCLP(reservation.extra_paid_amount)} -> ${formatCLP(data.extra_paid_amount)}`);
+    }
+
+    if (data.installment_start_date) {
+      const oldStartDate = reservation.installment_start_date 
+        ? new Date(reservation.installment_start_date).toISOString().split('T')[0] 
+        : 'No registrada';
+      if (oldStartDate !== data.installment_start_date) {
+        changes.push(`Próximo Vencimiento (Fecha seleccionada): "${oldStartDate}" -> "${data.installment_start_date}"`);
+      }
+    }
+
+    let updatedNotes = reservation.notes || "[]";
+    if (changes.length > 0) {
+      let parsedNotes = [];
+      try {
+        parsedNotes = JSON.parse(updatedNotes);
+      } catch (e) {
+        parsedNotes = [];
+      }
+      const logNote = {
+        id: Math.random().toString(36).substring(7),
+        text: `Datos financieros editados:\n- ${changes.join('\n- ')}`,
+        type: "Registro",
+        date: new Date().toISOString(),
+        author: adminUser.name || adminUser.email || "Administrador"
+      };
+      parsedNotes.unshift(logNote);
+      updatedNotes = JSON.stringify(parsedNotes);
+    }
+
     // Set dates
     let startDateObj: Date | null = null;
     let nextDateObj: Date | null = null;
@@ -1287,6 +1441,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
           manual_penalty: (data.penalty_mode === "FIXED" || data.penalty_mode === "MIXED") ? (Number(data.manual_penalty) || null) : null,
           extra_paid_amount: Number(data.extra_paid_amount) || 0,
           installment_ranges: data.installment_ranges || [],
+          notes: updatedNotes,
           ...(startDateObj && { installment_start_date: startDateObj }),
         }
       })
@@ -1821,6 +1976,7 @@ export async function getClientPOV(reservationId: string) {
           name: d.name,
           category: d.category,
           uploadedAt: d.uploadedAt,
+          fileType: d.fileType || d.file_type || null,
           url: `/api/documents/${res.id}?name=${encodeURIComponent(d.name)}`,
         }));
       } catch {}
@@ -1830,6 +1986,7 @@ export async function getClientPOV(reservationId: string) {
         name: d.name,
         category: d.category,
         uploadedAt: d.created_at,
+        fileType: d.file_type,
         url: `/api/documents/${d.id}`,
       }));
       documents = [...newDocs, ...documents];
@@ -2670,5 +2827,79 @@ export async function assignLotOwner(data: {
   } catch (error) {
     console.error("Error assigning lot owner:", error);
     return { error: "Error al asignar dueño al lote" };
+  }
+}
+
+export async function getClientNotes(clientId: string) {
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: clientId },
+      select: { notes: true }
+    });
+    if (!reservation) return [];
+    if (!reservation.notes) return [];
+    return JSON.parse(reservation.notes);
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function addClientNote(clientId: string, noteText: string, noteType: string) {
+  try {
+    const session = await auth();
+    const user = session?.user as any;
+    if (!session?.user) {
+      return { error: "No autorizado" };
+    }
+
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: clientId },
+      select: { notes: true }
+    });
+    if (!reservation) return { error: "Cliente no encontrado" };
+
+    let currentNotes = [];
+    if (reservation.notes) {
+      try {
+        currentNotes = JSON.parse(reservation.notes);
+      } catch (err) {
+        currentNotes = [];
+      }
+    }
+
+    const newNote = {
+      id: Math.random().toString(36).substring(7),
+      text: noteText,
+      type: noteType,
+      date: new Date().toISOString(),
+      author: user.name || user.email || "Administrador"
+    };
+
+    currentNotes.unshift(newNote);
+
+    await prisma.reservation.update({
+      where: { id: clientId },
+      data: { notes: JSON.stringify(currentNotes) }
+    });
+
+    // Create Audit Log
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "Reservation",
+        entity_id: clientId,
+        details: `Nota interna agregada de tipo ${noteType}: "${noteText}"`,
+        user_id: user.id || null,
+        user_email: user.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    revalidatePath("/admin/clients");
+
+    return { success: true, note: newNote };
+  } catch (error) {
+    console.error("Error adding client note:", error);
+    return { error: "Error al agregar nota interna" };
   }
 }

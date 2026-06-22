@@ -13,16 +13,37 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           console.log("[Auth] Starting authorization process...");
           const parsedCredentials = z
             .object({
-              email: z.string().email(),
+              email: z.string(),
               password: z.string().min(6),
             })
             .safeParse(credentials);
 
           if (parsedCredentials.success) {
             const { email: rawEmail, password } = parsedCredentials.data;
-            const email = rawEmail.toLowerCase();
+            let email = rawEmail.toLowerCase().trim();
 
-            console.log(`[Auth] Checking database for user: ${email}`);
+            console.log(`[Auth] Checking database for user identifier: ${email}`);
+
+            if (!email.includes("@")) {
+              const cleanRUT = email.replace(/[^0-9kK]/g, "");
+              console.log(`[Auth] Input is not an email. Treating as RUT: ${email} (cleaned: ${cleanRUT})`);
+              const reservation = await prisma.reservation.findFirst({
+                where: {
+                  OR: [
+                    { rut: email },
+                    { rut: { contains: cleanRUT } }
+                  ]
+                },
+                include: { user: true }
+              });
+              if (reservation?.user) {
+                email = reservation.user.email;
+                console.log(`[Auth] Resolved RUT ${rawEmail} to user email: ${email}`);
+              } else {
+                console.log(`[Auth] No user found associated with RUT: ${rawEmail}`);
+                return null;
+              }
+            }
 
             let user;
             try {

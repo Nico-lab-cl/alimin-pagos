@@ -10,7 +10,7 @@ export function getInstallmentDueDate(
   installmentNumber: number,
   dueDayOfMonth?: number
 ): Date {
-  const base = new Date(installmentStartDate);
+  const base = getSantiagoUTCDate(new Date(installmentStartDate));
   
   // Use UTC methods to prevent local timezone shift (critical for midnight UTC dates)
   // Use the provided dueDayOfMonth if valid, otherwise default to the day of installmentStartDate
@@ -29,14 +29,28 @@ export function getInstallmentDueDate(
 }
 
 /**
+ * Helper to get a UTC Date set at 12:00:00 UTC representing the calendar day in Chile (America/Santiago) timezone.
+ */
+export function getSantiagoUTCDate(date: Date): Date {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santiago",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  const parts = formatter.formatToParts(date);
+  const year = Number(parts.find(p => p.type === "year")?.value);
+  const month = Number(parts.find(p => p.type === "month")?.value);
+  const day = Number(parts.find(p => p.type === "day")?.value);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+}
+
+/**
  * Retorna la fecha actual en Chile (America/Santiago) a las 12:00:00 UTC.
  * Usar las 12:00:00 UTC evita que el ajuste de zona horaria (UTC-3/UTC-4) retroceda el día calendario.
  */
 export function getChileToday(): Date {
-  const now = new Date();
-  const santiagoStr = now.toLocaleDateString("en-US", { timeZone: "America/Santiago" });
-  const [month, day, year] = santiagoStr.split("/").map(Number);
-  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+  return getSantiagoUTCDate(new Date());
 }
 
 /**
@@ -55,17 +69,15 @@ export function calculateTotalInterest(
 ): number {
   if (moraFrozen) return 0;
 
-  // Convert paymentDate to Santiago timezone date to avoid UTC day shifts
-  const santiagoStr = paymentDate.toLocaleString("en-US", { timeZone: "America/Santiago" });
-  let pDate = new Date(santiagoStr);
-  pDate.setHours(0, 0, 0, 0);
+  const pDate = getSantiagoUTCDate(paymentDate);
+  const dDate = getSantiagoUTCDate(dueDate);
 
   // If debtEndDate is set, cap pDate at that date
+  let activePaymentDate = pDate;
   if (debtEndDate) {
-    const dEnd = new Date(debtEndDate);
-    dEnd.setHours(0, 0, 0, 0);
-    if (pDate > dEnd) {
-      pDate = dEnd;
+    const dEnd = getSantiagoUTCDate(new Date(debtEndDate));
+    if (activePaymentDate > dEnd) {
+      activePaymentDate = dEnd;
     }
   }
 
@@ -73,56 +85,51 @@ export function calculateTotalInterest(
 
   if (debtStartDate) {
     // Manual debt start date overrides grace period calculation
-    const dStart = new Date(debtStartDate);
-    dStart.setHours(0, 0, 0, 0);
+    const dStart = getSantiagoUTCDate(new Date(debtStartDate));
     
     // Only apply manual start date if it is greater than or equal to the due date of the current installment
-    if (dStart >= dueDate) {
+    if (dStart >= dDate) {
       gDate = dStart;
     } else {
-      // If it is before the current due date, it's obsolete historical data, so use normal grace calculation
-      const gracePeriodEnd = new Date(dueDate);
-      gracePeriodEnd.setDate(dueDate.getDate() + gracePeriodDays);
-      gracePeriodEnd.setHours(23, 59, 59, 999);
+      // Normal grace calculation
+      const gracePeriodEnd = new Date(dDate);
+      gracePeriodEnd.setUTCDate(dDate.getUTCDate() + gracePeriodDays);
       
-      if (pDate <= gracePeriodEnd) {
+      if (activePaymentDate <= gracePeriodEnd) {
         return 0;
       }
 
       gDate = new Date(gracePeriodEnd);
-      gDate.setDate(gDate.getDate() + 1);
+      gDate.setUTCDate(gDate.getUTCDate() + 1);
     }
   } else {
     // Grace period ends X days after due date
-    const gracePeriodEnd = new Date(dueDate);
-    gracePeriodEnd.setDate(dueDate.getDate() + gracePeriodDays);
-    gracePeriodEnd.setHours(23, 59, 59, 999);
+    const gracePeriodEnd = new Date(dDate);
+    gracePeriodEnd.setUTCDate(dDate.getUTCDate() + gracePeriodDays);
     
-    if (pDate <= gracePeriodEnd) {
+    if (activePaymentDate <= gracePeriodEnd) {
       return 0;
     }
 
     // The first day of penalty is the day AFTER grace period ends
     gDate = new Date(gracePeriodEnd);
-    gDate.setDate(gDate.getDate() + 1);
+    gDate.setUTCDate(gDate.getUTCDate() + 1);
   }
-  gDate.setHours(0, 0, 0, 0);
 
   // Apply penalty start date cutoff if configured
   if (penaltyStartDate) {
-    const cutoff = new Date(penaltyStartDate);
-    cutoff.setHours(0, 0, 0, 0);
+    const cutoff = getSantiagoUTCDate(new Date(penaltyStartDate));
 
-    if (pDate < cutoff) return 0;
+    if (activePaymentDate < cutoff) return 0;
     if (gDate < cutoff) {
-      gDate.setTime(cutoff.getTime());
+      gDate = cutoff;
     }
   }
 
-  if (pDate < gDate) return 0;
+  if (activePaymentDate < gDate) return 0;
 
-  const diffTime = pDate.getTime() - gDate.getTime();
-  const daysLate = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  const diffTime = activePaymentDate.getTime() - gDate.getTime();
+  const daysLate = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
   return dailyPenaltyAmount * daysLate;
 }

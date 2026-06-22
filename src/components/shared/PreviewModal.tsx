@@ -2,6 +2,7 @@
 
 import { X, Loader2, Download, ExternalLink, FileText } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from "react";
+import { downloadDocument } from "@/lib/utils";
 
 interface PreviewModalProps {
   isOpen: boolean;
@@ -15,6 +16,30 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const getDownloadFilename = () => {
+    let name = title || "documento";
+    if (name.toLowerCase().endsWith(".pdf") || 
+        name.toLowerCase().endsWith(".png") || 
+        name.toLowerCase().endsWith(".jpg") || 
+        name.toLowerCase().endsWith(".jpeg") || 
+        name.toLowerCase().endsWith(".docx") || 
+        name.toLowerCase().endsWith(".xlsx")) {
+      return name;
+    }
+    const type = fileType || "";
+    if (type.includes("pdf")) return `${name}.pdf`;
+    if (type.includes("png")) return `${name}.png`;
+    if (type.includes("jpeg") || type.includes("jpg")) return `${name}.jpg`;
+    if (type.includes("word") || type.includes("officedocument.word")) return `${name}.docx`;
+    if (type.includes("sheet") || type.includes("officedocument.spreadsheet")) return `${name}.xlsx`;
+    
+    const nameLower = name.toLowerCase();
+    if (nameLower.includes("contrato") || nameLower.includes("promesa") || nameLower.includes("comprobante") || nameLower.includes("certificado")) {
+      return `${name}.pdf`;
+    }
+    return `${name}.pdf`;
+  };
 
   // Clear safety timeout helper
   const clearSafetyTimeout = useCallback(() => {
@@ -92,14 +117,13 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
           </div>
 
           <div className="flex items-center gap-3">
-             <a 
-              href={url} 
-              download 
+             <button 
+              onClick={() => downloadDocument(url, title, fileType)}
               className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:bg-accent hover:text-black transition-all"
               title="Descargar"
             >
               <Download className="w-4 h-4" />
-            </a>
+            </button>
             <button 
               onClick={onClose}
               className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:bg-red-500/20 hover:text-red-400 transition-all"
@@ -129,14 +153,13 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
                   Este archivo (Word, Excel o similar) no se puede mostrar en el navegador. Usa el botón de abajo para descargarlo.
                 </p>
               </div>
-              <a 
-                href={url}
-                download
+              <button 
+                onClick={() => downloadDocument(url, title, fileType)}
                 className="px-8 py-4 bg-accent text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 transition-all flex items-center gap-3 shadow-[0_0_30px_rgba(212,168,75,0.3)]"
               >
                 Descargar Archivo Original
                 <Download className="w-3 h-3" />
-              </a>
+              </button>
             </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center p-4">

@@ -1,23 +1,20 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { getUserLots, getUserNotifications, markNotificationAsRead } from "@/actions/user";
-import { formatCLP, formatDate } from "@/lib/utils";
+import { formatCLP, getDownloadFilename, downloadDocument } from "@/lib/utils";
 import {
-  MapPin,
-  Calendar,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle,
+  Home,
+  CheckCircle2,
   Clock,
   Loader2,
-  CreditCard,
-  ArrowRight,
-  Ruler,
-  Zap,
-  Building2,
+  Download,
   ShieldCheck,
-  ChevronRight
+  FileText,
+  Compass,
+  MessageSquare,
+  Mail,
+  AlertTriangle,
+  ExternalLink
 } from "lucide-react";
 import Link from "next/link";
 
@@ -25,6 +22,8 @@ export default function UserDashboard() {
   const [data, setData] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeLotIndex, setActiveLotIndex] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
 
   useEffect(() => {
     Promise.all([
@@ -44,244 +43,376 @@ export default function UserDashboard() {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   };
 
-  const unreadNotifications = notifications.filter(n => !n.read);
-
+  const formatDateMockup = (dateInput: any) => {
+    if (!dateInput) return "—";
+    const date = new Date(dateInput);
+    const day = String(date.getDate()).padStart(2, '0');
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-accent" />
-        <p className="text-xs font-black uppercase tracking-[0.3em] opacity-20">Consolidando Activos...</p>
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Cargando tu Portal...</p>
       </div>
     );
   }
 
   if (data?.error || !data?.lots?.length) {
     return (
-      <div className="text-center py-40 rounded-[3rem] border border-white/5 glass-card animate-fade-in max-w-2xl mx-auto">
-        <Building2 className="w-20 h-20 mx-auto mb-8 opacity-10" />
-        <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase mb-4">Sin Propiedades</h2>
-        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/30 max-w-sm mx-auto leading-relaxed">
-          Todavía no tienes terrenos vinculados a tu cuenta. Si esto es un error, contacta a postventa.
+      <div className="text-center py-24 bg-white border border-slate-100 rounded-3xl max-w-2xl mx-auto shadow-sm">
+        <Home className="w-16 h-16 mx-auto mb-6 text-slate-300" />
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">Sin Propiedades Activas</h2>
+        <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+          No encontramos terrenos vinculados a tu cuenta. Si crees que esto es un error, por favor contacta al equipo de postventa.
         </p>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-16 animate-fade-in">
-      {/* Welcome Title */}
-      <div>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-px bg-accent" />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Resumen de Inversiones</p>
-        </div>
-        <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none italic">
-          Mis <span className="text-white/20">Activos</span>
-        </h2>
-      </div>
+  const lot = data.lots[activeLotIndex];
 
-      {/* Notifications Section */}
+  // Document selectors
+  const contratoDoc = lot.documents?.find((d: any) =>
+    d.name?.toLowerCase().includes("contrato") || d.category?.toLowerCase().includes("contrato")
+  );
+  const certificadoDoc = lot.documents?.find((d: any) =>
+    d.name?.toLowerCase().includes("certificado") || d.category?.toLowerCase().includes("certificado")
+  );
+  const fichaDoc = lot.documents?.find((d: any) =>
+    d.name?.toLowerCase().includes("ficha") || d.name?.toLowerCase().includes("tecnica") || d.category?.toLowerCase().includes("ficha")
+  );
+
+  // Generate payment history
+  const paymentHistory: any[] = [];
+  
+  // 1. Paid installments
+  for (let i = lot.paidCuotas; i >= 1; i--) {
+    const matchingReceipt = lot.receipts?.find((r: any) => 
+      r.nominal_installment_number === i || 
+      (r.nominal_installment_range && r.nominal_installment_range.split('-').map(Number).includes(i))
+    );
+    
+    let payDate = new Date(lot.nextDueDate || new Date());
+    payDate.setMonth(payDate.getMonth() - (lot.paidCuotas - i + 1));
+    
+    if (matchingReceipt) {
+      payDate = new Date(matchingReceipt.created_at);
+    }
+
+    paymentHistory.push({
+      cuota: `Cuota #${String(i).padStart(2, '0')}`,
+      fecha: formatDateMockup(payDate),
+      monto: formatCLP(matchingReceipt?.amount_clp || lot.valor_cuota),
+      estado: "Pagado",
+      comprobante: matchingReceipt?.receipt_url || null,
+    });
+  }
+
+  // 2. Next pending installment (if not fully paid)
+  if (lot.paidCuotas < lot.totalCuotas) {
+    const nextInstallment = lot.upcomingInstallments?.find((c: any) => c.number === lot.paidCuotas + 1);
+    
+    paymentHistory.push({
+      cuota: `Cuota #${String(lot.paidCuotas + 1).padStart(2, '0')}`,
+      fecha: formatDateMockup(lot.nextDueDate),
+      monto: formatCLP(nextInstallment?.amount || lot.valor_cuota),
+      estado: "Pendiente",
+      comprobante: null,
+    });
+  }
+
+  const unreadNotifications = notifications.filter(n => !n.read);
+
+  return (
+    <div className="space-y-8 max-w-7xl mx-auto">
+      {/* Notifications Banner */}
       {unreadNotifications.length > 0 && (
-        <div className="space-y-4 animate-slide-up">
+        <div className="space-y-3">
           {unreadNotifications.map((n) => (
             <div 
               key={n.id}
-              className="relative p-8 rounded-[2.5rem] bg-red-400/5 border border-red-400/20 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden group hover:bg-red-400/10 transition-all duration-500"
+              className="p-5 rounded-2xl bg-red-50 border border-red-100 flex items-start sm:items-center justify-between gap-4 shadow-sm"
             >
-              <div className="flex items-center gap-6 relative z-10">
-                <div className="w-14 h-14 rounded-2xl bg-red-400/20 flex items-center justify-center border border-red-400/30 shadow-2xl">
-                  <AlertTriangle className="w-7 h-7 text-red-400" />
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-650 shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-black text-white uppercase italic tracking-tighter mb-1">{n.title}</h4>
-                  <p className="text-[11px] font-bold text-white/50 uppercase tracking-widest leading-relaxed max-w-xl">
-                    {n.message}
-                  </p>
+                  <h4 className="text-sm font-bold text-slate-800">{n.title}</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>
                 </div>
               </div>
               <button 
                 onClick={() => handleMarkAsRead(n.id)}
-                className="relative z-10 px-8 py-4 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all active:scale-95 whitespace-nowrap"
+                className="px-4 py-2 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shrink-0 cursor-pointer"
               >
                 Entendido
               </button>
-              
-              {/* Background Glow */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-red-400/5 rounded-full blur-[80px] pointer-events-none group-hover:bg-red-400/10 transition-all" />
             </div>
           ))}
         </div>
       )}
 
+      {/* Lot selector if user owns more than one */}
+      {data.lots.length > 1 && (
+        <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm w-fit">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-2">Seleccionar Terreno:</span>
+          <div className="flex gap-2">
+            {data.lots.map((l: any, idx: number) => (
+              <button
+                key={l.reservationId}
+                onClick={() => setActiveLotIndex(idx)}
+                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeLotIndex === idx 
+                    ? "bg-blue-600 text-white shadow-sm" 
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Lote {l.lotNumber} ({l.projectName})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Lot Cards Grid */}
-      <div className="grid gap-12">
-        {data.lots.map((lot: any, idx: number) => (
-          <div
-            key={lot.reservationId}
-            className="group relative rounded-[3rem] overflow-hidden glass-card animate-slide-up bg-white/[0.01]"
-            style={{ animationDelay: `${idx * 150}ms`, animationFillMode: "both" }}
-          >
-            <div className="grid grid-cols-1 lg:grid-cols-12">
-              {/* Left Column: Property Visual & Basic Info */}
-              <div className="lg:col-span-5 p-6 md:p-12 relative overflow-hidden border-b lg:border-b-0 lg:border-r border-white/5">
-                <div className="relative z-10 h-full flex flex-col">
-                  <div className="mb-10">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent mb-2">{lot.projectName}</p>
-                    <h3 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase italic leading-none mb-4">
-                      Lote <span className="group-hover:text-accent transition-colors">#{lot.lotNumber}</span>
-                    </h3>
-                    <div className="flex items-center gap-4">
-                      {lot.lotStage && (
-                        <span className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[9px] font-black uppercase tracking-widest text-white/50">ETAPA {lot.lotStage}</span>
-                      )}
-                      {lot.area_m2 && (
-                        <div className="flex items-center gap-2 text-[10px] font-black text-white uppercase tracking-widest opacity-30">
-                          <Ruler className="w-3.5 h-3.5" />
-                          <span>{lot.area_m2} m²</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-auto space-y-6">
-                    <div className="flex items-center gap-4 p-5 rounded-2xl bg-white/5 border border-white/5 group-hover:border-accent/40 transition-all duration-700 backdrop-blur-md">
-                      <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">
-                        <ShieldCheck className="w-5 h-5 text-[#061010]" />
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-widest text-white/30">Estado Contractual</p>
-                        <p className="text-xs font-black uppercase tracking-widest text-white">Vigente & Verificado</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Decorative Elements */}
-                <Zap className="absolute -bottom-10 -left-10 w-64 h-64 text-white/[0.02] group-hover:text-accent/[0.05] group-hover:scale-110 transition-all duration-1000" />
-              </div>
-
-              {/* Right Column: Financials & Actions */}
-              <div className="lg:col-span-7 p-6 md:p-12 space-y-10">
-                {/* Visual Progress Bar */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <TrendingUp className="w-4 h-4 text-accent" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Progreso de Adquisición</span>
-                    </div>
-                    <span className="text-lg font-black italic text-white leading-none">
-                      {lot.acquisitionProgress}%
-                    </span>
-                  </div>
-                  <div className="h-4 rounded-full bg-white/5 border border-white/5 overflow-hidden p-1">
-                    <div 
-                      className="h-full rounded-full transition-all duration-[2s] ease-out shadow-[0_0_20px_rgba(212,168,75,0.4)]"
-                      style={{ 
-                        width: `${Math.min(100, lot.acquisitionProgress)}%`,
-                        background: 'linear-gradient(90deg, #d4a84b 0%, #e0be72 50%, #b88e35 100%)'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Financial Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                  <div className="rounded-2xl p-5 md:p-6 bg-white/[0.02] border border-white/5">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20 mb-2">Total Invertido</p>
-                    <p className="text-2xl font-black text-emerald-400 tracking-tighter">{formatCLP(lot.totalPaid)}</p>
-                  </div>
-                  <div className="rounded-2xl p-5 md:p-6 bg-white/[0.02] border border-white/5">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20 mb-2">Compromiso Total</p>
-                    <p className="text-2xl font-black text-white/90 tracking-tighter">{formatCLP(lot.totalToPay)}</p>
-                  </div>
-                  <div className="rounded-2xl p-5 md:p-6 bg-white/[0.02] border border-white/5">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20 mb-2">Cuotas Pagadas</p>
-                    <p className="text-2xl font-black text-white tracking-tighter italic">
-                      {lot.paidCuotas} <span className="text-xs opacity-20 not-italic ml-1">/ {lot.totalCuotas}</span>
-                    </p>
-                  </div>
-                  <div className="rounded-2xl p-5 md:p-6 bg-white/[0.02] border border-white/5">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-20 mb-2">Saldo Remanente</p>
-                    <p className={`text-2xl font-black tracking-tighter ${lot.pendingBalance > 0 ? "text-orange-400" : "text-emerald-400"}`}>
-                      {formatCLP(lot.pendingBalance)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Status Dashboard & Action */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-8 pt-6 border-t border-white/5">
-                  <div className="flex flex-wrap gap-4">
-                    {lot.penaltyAmount > 0 && !lot.isMoraFrozen && (
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-400/10 border border-red-400/20 text-red-400 text-[10px] font-black uppercase tracking-widest animate-pulse">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        Interés Acumulado: {formatCLP(lot.penaltyAmount)} ({lot.lateDays} {lot.lateDays === 1 ? "día" : "días"} × {formatCLP(lot.dailyPenalty)}/día)
-                      </div>
-                    )}
-                    {lot.isMoraFrozen && (
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-400/10 border border-blue-400/20 text-blue-400 text-[10px] font-black uppercase tracking-widest">
-                        <Clock className="w-3.5 h-3.5" />
-                        Mora Congelada por Administración
-                      </div>
-                    )}
-                    {lot.nextDueDate && (
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-widest text-white/50">
-                        <Calendar className="w-3.5 h-3.5" />
-                        Próximo Pago: {formatDate(lot.nextDueDate)} 
-                        {lot.nextInstallmentNumber && ` (CUOTA ${lot.nextInstallmentNumber} - ${lot.nextInstallmentMonth})`}
-                      </div>
-                    )}
-                  </div>
-
-                  <Link
-                    href={`/user/pay/${lot.reservationId}`}
-                    className="w-full sm:w-auto min-w-[220px] py-5 rounded-2xl btn-metallic-gold text-[10px] flex items-center justify-center gap-4 active:scale-95 group/btn"
-                  >
-                    <CreditCard className="w-5 h-5 transition-transform group-hover/btn:-rotate-12" />
-                    Ejecutar Pago
-                    <ArrowRight className="w-5 h-5 transition-transform group-hover/btn:translate-x-1" />
-                  </Link>
-                </div>
-
-                {/* Documents Section */}
-                {lot.documents && lot.documents.length > 0 && (
-                  <div className="pt-10 border-t border-white/5 animate-slide-up">
-                    <div className="flex items-center gap-3 mb-6">
-                      <ShieldCheck className="w-4 h-4 text-accent" />
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Centro de Documentos</h4>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {lot.documents.map((doc: any, dIdx: number) => (
-                        <a 
-                          key={doc.id || dIdx}
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-accent/30 transition-all group/doc"
-                        >
-                          <div className="flex items-center gap-4 overflow-hidden">
-                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover/doc:bg-accent/10 transition-colors">
-                              <Building2 className="w-5 h-5 text-white/30 group-hover/doc:text-accent" />
-                            </div>
-                            <div className="overflow-hidden">
-                              <p className="text-[10px] font-black text-white uppercase tracking-wider truncate mb-0.5">{doc.name}</p>
-                              <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">
-                                {formatDate(doc.uploadedAt || doc.created_at)}
-                              </p>
-                            </div>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-white/10 group-hover/doc:text-accent group-hover/doc:translate-x-1 transition-all" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
+      {/* Top Cards Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Tu Propiedad Card */}
+        <div className="lg:col-span-4 bg-white border border-slate-150 rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <span className="text-xs font-bold text-slate-450 uppercase tracking-widest">Tu Propiedad</span>
+              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                <Home className="w-4 h-4" />
               </div>
             </div>
+            <h3 className="text-xl font-bold text-blue-700 mb-1">{lot.projectName} - Lote {lot.lotNumber}</h3>
+            <p className="text-xs text-slate-500 font-medium">
+              {lot.lotStage ? `Departamento ${lot.lotStage}` : "Terreno Residencial"}
+            </p>
           </div>
-        ))}
+
+          <div className="mt-8">
+            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
+              lot.isUpToDate 
+                ? "bg-emerald-50 text-emerald-600" 
+                : "bg-orange-50 text-orange-655"
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${lot.isUpToDate ? "bg-emerald-500" : "bg-orange-500"}`} />
+              {lot.isUpToDate ? "Al día" : "Pago Pendiente"}
+            </span>
+          </div>
+        </div>
+
+        {/* Estado de tu Plan Card */}
+        <div className="lg:col-span-8 bg-white border border-slate-150 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex-1 space-y-4">
+            <div>
+              <span className="text-xs font-bold text-slate-450 uppercase tracking-widest">Estado de tu Plan</span>
+            </div>
+            
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-blue-600 tracking-tight">{lot.acquisitionProgress}%</span>
+              <span className="text-sm font-semibold text-slate-550">{lot.paidCuotas} de {lot.totalCuotas} cuotas pagadas</span>
+            </div>
+
+            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+              <div 
+                className="bg-blue-600 h-full rounded-full transition-all duration-[1s]"
+                style={{ width: `${lot.acquisitionProgress}%` }}
+              />
+            </div>
+
+            <p className="text-xs text-slate-500 italic">
+              Vas por buen camino. Te quedan {lot.totalCuotas - lot.paidCuotas} cuotas.
+            </p>
+          </div>
+
+          {/* Pay Next Installment Box */}
+          <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 md:min-w-[320px] flex flex-col justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold text-blue-650 uppercase tracking-wider">
+                {lot.paidCuotas >= lot.totalCuotas ? "Plan Completado" : `Próxima Cuota: ${lot.nextInstallmentMonth || "N/A"}`}
+              </p>
+              {lot.paidCuotas < lot.totalCuotas && (
+                <p className="text-2xl font-extrabold text-blue-700 tracking-tight mt-1">
+                  {formatCLP(lot.upcomingInstallments?.find((c: any) => c.number === lot.paidCuotas + 1)?.amount || lot.valor_cuota)}
+                </p>
+              )}
+            </div>
+
+            {lot.paidCuotas < lot.totalCuotas && (
+              <Link
+                href={`/user/pay/${lot.reservationId}`}
+                className="flex items-center justify-center gap-2 w-full py-3 bg-[#0f9f6e] hover:bg-[#0e8f62] text-white font-bold text-sm rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Confirmar Pago
+              </Link>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Historial de Pagos Table */}
+      <div className="bg-white border border-slate-150 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100">
+          <h3 className="text-base font-bold text-slate-800">Historial de Pagos</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                <th className="px-6 py-4 font-semibold">Cuota</th>
+                <th className="px-6 py-4 font-semibold">Fecha</th>
+                <th className="px-6 py-4 font-semibold">Monto</th>
+                <th className="px-6 py-4 font-semibold">Estado</th>
+                <th className="px-6 py-4 font-semibold text-right sm:text-left">Comprobante</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm text-slate-800">
+              {paymentHistory.slice((historyPage - 1) * 5, historyPage * 5).map((item, idx) => {
+                const isPaid = item.estado === "Pagado";
+                return (
+                  <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
+                    <td className="px-6 py-4 font-bold text-slate-800">{item.cuota}</td>
+                    <td className="px-6 py-4 text-slate-600 font-medium">{item.fecha}</td>
+                    <td className="px-6 py-4 font-bold text-slate-800">{item.monto}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                        isPaid ? "text-emerald-600" : "text-amber-600"
+                      }`}>
+                        {isPaid ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                        {item.estado}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right sm:text-left">
+                      {isPaid ? (
+                        item.comprobante ? (
+                          <button
+                            onClick={() => downloadDocument(item.comprobante, `comprobante_${item.cuota.replace('#', '')}`)}
+                            className="text-blue-600 hover:text-blue-800 transition-colors p-1 rounded hover:bg-blue-50 inline-flex items-center justify-center cursor-pointer"
+                            title="Descargar Comprobante"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">No disponible</span>
+                        )
+                      ) : (
+                        <span className="text-xs text-slate-450 italic font-medium">Próximamente</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {paymentHistory.length > 5 && (
+          <div className="bg-slate-50/50 p-4 border-t border-slate-100 flex items-center justify-between gap-4">
+            <button
+              onClick={() => setHistoryPage(prev => Math.max(prev - 1, 1))}
+              disabled={historyPage === 1}
+              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-655 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
+            >
+              Anterior
+            </button>
+            <span className="text-xs text-slate-500 font-bold">
+              Página {historyPage} de {Math.ceil(paymentHistory.length / 5)}
+            </span>
+            <button
+              onClick={() => setHistoryPage(prev => Math.min(prev + 1, Math.ceil(paymentHistory.length / 5)))}
+              disabled={historyPage === Math.ceil(paymentHistory.length / 5)}
+              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-655 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
+            >
+              Siguiente
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Documentos Importantes Card */}
+      <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-sm">
+        <h3 className="text-base font-bold text-slate-800 mb-6">Documentos Importantes</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Card 1: Contrato */}
+          <div className="bg-slate-50/50 border border-slate-150 hover:border-blue-200 transition-all rounded-2xl p-6 flex flex-col items-center text-center">
+            <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mb-4 shadow-sm">
+              <FileText className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800 mb-1">Contrato de Compraventa</h4>
+            {contratoDoc ? (
+              <button
+                onClick={() => downloadDocument(contratoDoc.url, contratoDoc.name, contratoDoc.fileType)}
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar
+              </button>
+            ) : (
+              <Link
+                href="/user/documents"
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1"
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar
+              </Link>
+            )}
+          </div>
+
+          {/* Card 2: Certificado */}
+          <div className="bg-slate-50/50 border border-slate-150 hover:border-blue-200 transition-all rounded-2xl p-6 flex flex-col items-center text-center">
+            <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mb-4 shadow-sm">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800 mb-1">Certificado Cuotas al Día</h4>
+            {certificadoDoc ? (
+              <button
+                onClick={() => downloadDocument(certificadoDoc.url, certificadoDoc.name, certificadoDoc.fileType)}
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar
+              </button>
+            ) : (
+              <Link
+                href="/user/documents"
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1"
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar
+              </Link>
+            )}
+          </div>
+
+          {/* Card 3: Ficha */}
+          <div className="bg-slate-50/50 border border-slate-150 hover:border-blue-200 transition-all rounded-2xl p-6 flex flex-col items-center text-center">
+            <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mb-4 shadow-sm">
+              <Compass className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800 mb-1">Ficha Técnica del Inmueble</h4>
+            {fichaDoc ? (
+              <button
+                onClick={() => downloadDocument(fichaDoc.url, fichaDoc.name, fichaDoc.fileType)}
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar
+              </button>
+            ) : (
+              <Link
+                href="/user/documents"
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1"
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+
+
     </div>
   );
 }

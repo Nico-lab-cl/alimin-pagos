@@ -1,24 +1,21 @@
 "use client";
-
 import { useEffect, useState, use } from "react";
 import { getUserLots, uploadPaymentReceipt } from "@/actions/user";
 import { formatCLP } from "@/lib/utils";
 import { 
-  Building2, 
+  Home as HomeIcon, 
   CreditCard, 
   Upload, 
   CheckCircle, 
   Loader2, 
   Calendar, 
   ArrowLeft, 
-  Zap, 
   Copy, 
-  Info,
-  ShieldCheck,
-  Building,
+  ShieldCheck, 
+  Building2, 
   ArrowRight,
-  ChevronRight,
-  FileCheck
+  FileCheck,
+  AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -32,19 +29,15 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const [paymentType, setPaymentType] = useState<"PIE" | "INSTALLMENT">("INSTALLMENT");
   const [installmentsCount, setInstallmentsCount] = useState(1);
-  const [amount, setAmount] = useState(0);
   const [receiptBase64, setReceiptBase64] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
     getUserLots().then((result) => {
       const found = (result.lots || []).find((l: any) => l.reservationId === id);
       if (found) {
         setLot(found);
-        setAmount(found.valor_cuota);
-        // Default strictly to INSTALLMENT
-        setPaymentType("INSTALLMENT");
       }
       setLoading(false);
     });
@@ -53,31 +46,50 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     if (lot) {
       if (lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
-        const mandatoryCount = Math.max(1, lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length);
-        const actualCount = Math.max(installmentsCount, mandatoryCount);
-        if (actualCount !== installmentsCount) {
-          setInstallmentsCount(actualCount);
+        const overdueCount = lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length;
+        const mandatoryCount = Math.max(1, overdueCount);
+        if (installmentsCount < mandatoryCount) {
+          setInstallmentsCount(mandatoryCount);
         }
-        const sum = lot.upcomingInstallments.slice(0, actualCount).reduce((acc: number, curr: any) => acc + curr.amount, 0);
-        setAmount(sum);
-      } else {
-        setAmount((lot.valor_cuota || 0) * installmentsCount);
       }
     }
-  }, [paymentType, installmentsCount, lot]);
+  }, [lot, installmentsCount]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error("El archivo es demasiado grande (máximo 10MB)");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setReceiptBase64(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      processFile(file);
+    }
+  };
+
+  const processFile = (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("El archivo es demasiado grande (máximo 10MB)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setReceiptBase64(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -94,20 +106,21 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        try {
-          document.execCommand('copy');
-        } catch (err) {
-          console.error('Fallback copy failed', err);
-          throw new Error('Copy failed');
-        } finally {
-          textArea.remove();
-        }
+        document.execCommand('copy');
+        textArea.remove();
       }
       toast.success(`${label} copiado al portapapeles`);
     } catch (err) {
       toast.error("No se pudo copiar al portapapeles");
-      console.error(err);
     }
+  };
+
+  const getAmount = () => {
+    if (!lot) return 0;
+    if (lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
+      return lot.upcomingInstallments.slice(0, installmentsCount).reduce((acc: number, curr: any) => acc + curr.amount, 0);
+    }
+    return (lot.valor_cuota || 0) * installmentsCount;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,10 +131,11 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     }
 
     setUploading(true);
+    const amount = getAmount();
     const result = await uploadPaymentReceipt({
       reservationId: id,
       amount,
-      scope: paymentType,
+      scope: "INSTALLMENT",
       receiptBase64,
       installmentsCount,
     });
@@ -136,35 +150,45 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     setUploading(false);
   };
 
+  const formatDateMockup = (dateInput: any) => {
+    if (!dateInput) return "—";
+    const date = new Date(dateInput);
+    const day = String(date.getDate()).padStart(2, '0');
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-accent" />
-        <p className="text-xs font-black uppercase tracking-[0.3em] opacity-20">Preparando Consola de Pago...</p>
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-450">Preparando Consola de Pago...</p>
       </div>
     );
   }
 
   if (!lot) {
     return (
-      <div className="text-center py-40">
-        <p className="text-white/40 uppercase font-black tracking-widest">Activo no encontrado</p>
-        <Link href="/user" className="text-accent mt-4 inline-block font-black uppercase tracking-widest border-b border-accent/20">Volver al Portal</Link>
+      <div className="text-center py-40 bg-white border border-slate-150 rounded-3xl max-w-md mx-auto shadow-sm">
+        <p className="text-slate-400 font-bold uppercase tracking-wider">Lote no encontrado</p>
+        <Link href="/user" className="text-blue-600 font-bold mt-4 inline-block hover:underline">Volver al Portal</Link>
       </div>
     );
   }
 
   if (success) {
     return (
-      <div className="max-w-2xl mx-auto py-32 text-center animate-fade-in">
-        <div className="w-24 h-24 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-10 shadow-[0_0_50px_rgba(16,185,129,0.2)]">
-          <CheckCircle className="w-12 h-12 text-emerald-500" />
+      <div className="max-w-2xl mx-auto py-24 text-center bg-white border border-slate-150 rounded-3xl shadow-sm px-6">
+        <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-8 shadow-sm">
+          <CheckCircle className="w-10 h-10 text-emerald-600" />
         </div>
-        <h2 className="text-5xl font-black text-white italic tracking-tighter uppercase mb-6 leading-none">Pago <span className="text-emerald-500">Recibido</span></h2>
-        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/30 max-w-sm mx-auto leading-relaxed mb-12">
-          Tu comprobante ha sido ingresado al sistema de auditoría. Serás notificado una vez que la validación sea procesada (máximo 24 hrs hábiles).
+        <h2 className="text-3xl font-extrabold text-blue-800 tracking-tight mb-4">Comprobante Enviado</h2>
+        <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed mb-8">
+          Tu comprobante ha sido ingresado al sistema. Revisaremos y confirmaremos tu pago en menos de 24 horas.
         </p>
-        <Link href="/user" className="px-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-white/10 transition-all flex items-center gap-4 justify-center w-fit mx-auto">
+        <Link href="/user" className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2 shadow-sm">
           Volver a Mis Activos
           <ArrowRight className="w-4 h-4" />
         </Link>
@@ -172,310 +196,242 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     );
   }
 
+  const overdueCount = lot.upcomingInstallments?.filter((c: any) => c.isOverdue || c.hasPenalty).length || 0;
+  const mandatoryCount = Math.max(1, overdueCount);
+
+  // Breakdown Calculations
+  const selectedInstallments = lot.upcomingInstallments?.slice(0, installmentsCount) || [];
+  const baseAmount = selectedInstallments.reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
+  const penaltyAmount = selectedInstallments.reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0);
+  const totalAmount = baseAmount + penaltyAmount;
+
+  // Split penalty into displays matching mockup style
+  const adminCharge = 5000;
+  const interestCharge = Math.max(0, penaltyAmount - adminCharge);
+  const displayAdminCharge = penaltyAmount >= adminCharge ? adminCharge : penaltyAmount;
+
+  // Default copyable BCI Bank Details (Mockup standard)
+  const bankName = lot.bank?.name || "Banco BCI";
+  const bankType = lot.bank?.type || "Corriente";
+  const bankAccount = lot.bank?.account || "12345678";
+  const bankHolder = lot.bank?.holder || "Alimin SpA";
+  const bankRut = lot.bank?.rut || "76.543.210-1";
+  const bankEmail = lot.bank?.email || "inmobiliaria@aliminspa.cl";
+
   return (
-    <div className="max-w-6xl mx-auto space-y-12 animate-fade-in">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Back Button */}
-      <Link href="/user" className="flex items-center gap-3 text-white/40 hover:text-white transition-all w-fit group">
-        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-        <span className="text-[10px] font-black uppercase tracking-[0.3em]">Cancelar Operación</span>
+      <Link href="/user" className="flex items-center gap-2 text-slate-400 hover:text-slate-700 transition-all w-fit group text-xs font-bold uppercase tracking-wider">
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+        <span>Volver a Mis Activos</span>
       </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Left: Configuration & Details */}
-        <div className="space-y-10">
+      {/* Property Header Card */}
+      <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
+            <HomeIcon className="w-5 h-5" />
+          </div>
           <div>
-            <div className="flex items-center gap-3 mb-4">
-              <Zap className="w-5 h-5 text-accent animate-pulse" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Pasarela de Verificación</p>
-            </div>
-            <h2 className="text-5xl lg:text-6xl font-black text-white tracking-tighter uppercase italic leading-none mb-4">
-              Cargar <span className="text-white/20">Pago</span>
-            </h2>
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 leading-relaxed">
-              Propiedad en <span className="text-white/60">{lot.projectName}</span> — Lote <span className="text-accent">#{lot.lotNumber}</span>
+            <h3 className="text-sm font-bold text-slate-800">{lot.projectName} - Lote {lot.lotNumber}</h3>
+            <p className="text-xs text-slate-500 font-medium">
+              {lot.lotStage ? `Departamento ${lot.lotStage}` : "Terreno Residencial"}
             </p>
           </div>
+        </div>
+        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
+          lot.isUpToDate ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-655"
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${lot.isUpToDate ? "bg-emerald-500" : "bg-orange-500"}`} />
+          {lot.isUpToDate ? "Al día" : "Pago Pendiente"}
+        </span>
+      </div>
 
-          <div className="rounded-[2.5rem] glass-panel p-6 md:p-10 space-y-10">
-            {/* Removed PIE option as all pies are paid */}
-            <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase tracking-widest text-white/20">Propósito del Abono</label>
-              <div className="bg-accent/10 border border-accent/20 p-4 rounded-2xl flex items-center gap-4">
-                <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-                  <CreditCard className="w-4 h-4 text-[#061010]" />
-                </div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-accent">Pago de Cuota Mensual</p>
-              </div>
+      <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-4">
+        <div>
+          <label htmlFor="installmentsSelect" className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
+            Selecciona la cantidad de cuotas a pagar:
+          </label>
+          <div className="relative">
+            <select
+              id="installmentsSelect"
+              value={installmentsCount}
+              onChange={(e) => setInstallmentsCount(Number(e.target.value))}
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 focus:outline-none cursor-pointer appearance-none"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 1rem center",
+                backgroundSize: "1.25rem"
+              }}
+            >
+              {Array.from(
+                { length: Math.min(12, lot.upcomingInstallments?.length || 1) - mandatoryCount + 1 },
+                (_, i) => {
+                  const q = mandatoryCount + i;
+                  const selectedObjects = lot.upcomingInstallments?.slice(0, q) || [];
+                  const amountForQ = selectedObjects.reduce((acc: number, c: any) => acc + c.amount, 0);
+                  
+                  return (
+                    <option key={q} value={q} className="font-bold text-slate-800 bg-white">
+                      {q === 1 ? "1 Cuota" : `${q} Cuotas`} — {formatCLP(amountForQ)}
+                    </option>
+                  );
+                }
+              )}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Mora Warn Box */}
+      {penaltyAmount > 0 && (
+        <div className="p-5 rounded-2xl bg-orange-50/50 border border-orange-100 text-slate-800 space-y-3">
+          <div className="flex items-center gap-2 text-orange-600 font-bold text-sm">
+            <AlertTriangle className="w-5 h-5" />
+            <span>Tienes un saldo de mora pendiente</span>
+          </div>
+
+          <div className="text-xs font-medium space-y-1.5 pl-7">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Interés por mora ({lot.lateDays} días)</span>
+              <span className="font-bold text-slate-800">{formatCLP(interestCharge)}</span>
             </div>
-
-            {/* Installments List */}
-            {paymentType === "INSTALLMENT" && lot.upcomingInstallments && lot.upcomingInstallments.length > 0 && (() => {
-              const overdueCount = lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length;
-              const mandatoryCount = Math.max(1, overdueCount);
-              
-              return (
-                <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-white/20">Selecciona las Cuotas a Pagar</label>
-                  <span className="text-xl font-black text-white italic tracking-tighter">{installmentsCount} {installmentsCount === 1 ? 'Cuota' : 'Cuotas'}</span>
-                </div>
-                <div className="grid gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                  {lot.upcomingInstallments.map((cuota: any, idx: number) => {
-                    const isSelected = idx < installmentsCount;
-                    const isMandatory = idx < overdueCount;
-
-                    return (
-                      <button
-                        key={cuota.number}
-                        type="button"
-                        onClick={() => {
-                          if (isMandatory && isSelected && installmentsCount === idx + 1) {
-                            toast.error("Las cuotas atrasadas son de pago obligatorio");
-                            return;
-                          }
-                          let newCount = (idx + 1 === installmentsCount) ? idx : idx + 1;
-                          if (newCount < mandatoryCount) {
-                            toast.error("Las cuotas atrasadas son de pago obligatorio");
-                            newCount = mandatoryCount;
-                          }
-                          setInstallmentsCount(newCount);
-                        }}
-                        className={`flex items-center justify-between p-6 rounded-2xl border transition-all ${
-                          isMandatory ? "cursor-not-allowed opacity-90" : "cursor-pointer"
-                        } ${
-                          isSelected 
-                            ? "bg-accent/10 border-accent/40 text-white shadow-[0_0_15px_rgba(212,168,75,0.1)]" 
-                            : "bg-white/[0.02] border-white/5 text-white/50 hover:bg-white/[0.05]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors ${isSelected ? "bg-accent border-accent text-[#061010]" : "border-white/20"}`}>
-                            {isSelected && <CheckCircle className="w-4 h-4" />}
-                          </div>
-                          <div className="text-left">
-                            <div className="flex items-center gap-2 mb-1">
-                              {cuota.number !== 0 && (
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-none text-white/40">
-                                  Cuota {cuota.number}
-                                </p>
-                              )}
-                              {isMandatory && (
-                                <span className="text-[8px] font-black uppercase tracking-widest bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                  Obligatorio
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm font-black italic">{cuota.monthName}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className={`text-lg font-black tracking-tighter ${isSelected ? "text-accent" : "text-white/80"}`}>
-                            {formatCLP(cuota.amount)}
-                          </p>
-                          {cuota.hasPenalty && (
-                            <div className="mt-1 flex flex-col items-end">
-                              {cuota.lateDays != null && (
-                                <p className="text-[8px] font-bold uppercase text-red-400 tracking-widest bg-red-500/10 px-2 py-0.5 rounded-full">Incluye Mora ({cuota.lateDays} {cuota.lateDays === 1 ? 'Día' : 'Días'})</p>
-                              )}
-                              <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest mt-1">Interés Diario: {formatCLP(cuota.dailyPenalty)}</p>
-                              <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest">Interés Total: {formatCLP(cuota.penaltyAmount)}</p>
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            );
-            })()}
-
-            {/* Fallback Slider (If no upcomingInstallments for some reason) */}
-            {paymentType === "INSTALLMENT" && (!lot.upcomingInstallments || lot.upcomingInstallments.length === 0) && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-white/20">Cantidad de Cuotas</label>
-                  <span className="text-xl font-black text-white italic tracking-tighter">{installmentsCount} {installmentsCount === 1 ? 'Cuota' : 'Cuotas'}</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="12"
-                  value={installmentsCount}
-                  onChange={(e) => setInstallmentsCount(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-white/5 appearance-none cursor-pointer rounded-full accent-accent"
-                />
-              </div>
-            )}
-
-            {/* Summary Box */}
-            <div className="p-6 md:p-8 rounded-[2rem] bg-white/[0.03] border border-white/5 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Cálculo de Transacción</span>
-                <div className="px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-[9px] font-black text-accent uppercase tracking-widest">CLP</div>
-              </div>
-              <p className="text-4xl md:text-5xl font-black text-white tracking-tighter italic text-glow">
-                {formatCLP(amount)}
-              </p>
-              
-              {/* Detailed Breakdown */}
-              <div className="pt-3 border-t border-white/5 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">
-                    Abono Base ({installmentsCount}x Cuotas)
-                  </span>
-                  <span className="text-sm font-black text-white/60">
-                    {formatCLP(
-                      lot.upcomingInstallments
-                        .slice(0, installmentsCount)
-                        .reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0)
-                    )}
-                  </span>
-                </div>
-                
-                {paymentType === "INSTALLMENT" && lot.upcomingInstallments.slice(0, installmentsCount).some((c: any) => c.hasPenalty) && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-red-400/60">Intereses y Mora Acumulada</span>
-                    <span className="text-sm font-black text-red-400">
-                      + {formatCLP(
-                        lot.upcomingInstallments
-                          .slice(0, installmentsCount)
-                          .reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0)
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="pt-4 border-t border-white/5 flex items-center gap-3">
-                <ShieldCheck className="w-4 h-4 text-emerald-400 opacity-50" />
-                <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.15em]">Operación Protegida & Cifrada</p>
-              </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Recargo administrativo</span>
+              <span className="font-bold text-slate-800">{formatCLP(displayAdminCharge)}</span>
+            </div>
+            <div className="flex justify-between pt-1.5 border-t border-orange-100 font-bold text-sm">
+              <span className="text-slate-700">Subtotal mora</span>
+              <span className="text-slate-800">{formatCLP(penaltyAmount)}</span>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Right: Bank Details & Upload */}
-        <div className="space-y-8">
-          {/* Bank Info */}
-          <div className="rounded-[2.5rem] bg-white/[0.02] border border-white/5 p-6 md:p-10 space-y-8 relative overflow-hidden group">
-            <Building className="absolute -bottom-10 -right-10 w-48 h-48 opacity-5 text-white group-hover:scale-110 transition-transform duration-1000" />
-            
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 relative z-10">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center border border-accent/20">
-                  <Building2 className="w-5 h-5 text-accent" />
-                </div>
-                <h3 className="text-xl font-black italic tracking-tighter uppercase text-white/80">Datos de Transferencia</h3>
+      {/* Summary Box */}
+      <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-3">
+        {selectedInstallments.map((cuota: any, idx: number) => (
+          <div key={idx} className="flex justify-between text-xs font-medium text-slate-500">
+            <span>Cuota {cuota.number} de {lot.totalCuotas}</span>
+            <span className="font-bold text-slate-800">{formatCLP(cuota.baseAmount || cuota.amount)}</span>
+          </div>
+        ))}
+        
+        {penaltyAmount > 0 && (
+          <div className="flex justify-between text-xs font-medium text-slate-500">
+            <span>Mora pendiente</span>
+            <span className="font-bold text-slate-800">{formatCLP(penaltyAmount)}</span>
+          </div>
+        )}
+
+        <div className="pt-3 border-t border-slate-100 flex justify-between items-center font-bold">
+          <span className="text-xs text-slate-700">TOTAL A PAGAR</span>
+          <span className="text-lg text-blue-700 font-extrabold tracking-tight">{formatCLP(totalAmount)}</span>
+        </div>
+      </div>
+
+      {/* Bank Transfer Box */}
+      <div className="bg-[#f0f7ff]/40 border border-blue-100 rounded-2xl p-5 space-y-4">
+        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Realiza tu transferencia a estos datos</h4>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            { label: "BANCO", value: bankName },
+            { label: "TIPO DE CUENTA", value: `${bankType} #${bankAccount}` },
+            { label: "RUT", value: bankRut },
+            { label: "NOMBRE", value: bankHolder }
+          ].map((item, i) => (
+            <div key={i} className="bg-white border border-slate-150 rounded-xl p-4 flex items-center justify-between shadow-sm">
+              <div>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{item.label}</span>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{item.value}</p>
               </div>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  const dataToCopy = `Institución: ${lot.bank?.name}\nTipo Cuenta: ${lot.bank?.type}\nNº Cuenta: ${lot.bank?.account}\nTitular: ${lot.bank?.holder}\nRUT Receptor: ${lot.bank?.rut}\nEmail Destino: ${lot.bank?.email}`;
-                  handleCopy(dataToCopy, "Todos los datos bancarios");
-                }}
-                className="px-4 py-2.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[9px] uppercase font-black tracking-widest hover:bg-accent hover:text-black transition-all flex items-center gap-2 w-fit"
+                onClick={() => handleCopy(item.value, item.label)}
+                className="w-9 h-9 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-150 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                title="Copiar"
               >
-                <Copy className="w-3.5 h-3.5" /> Copiar Todo
+                <Copy className="w-4 h-4" />
               </button>
             </div>
+          ))}
+        </div>
 
-            <div className="grid gap-4">
-              {[
-                { label: "Institución", value: lot.bank?.name, copy: true },
-                { label: "Tipo Cuenta", value: lot.bank?.type, copy: true },
-                { label: "Nº Cuenta", value: lot.bank?.account, copy: true },
-                { label: "Titular", value: lot.bank?.holder, copy: true },
-                { label: "RUT Receptor", value: lot.bank?.rut, copy: true },
-                { label: "Email Destino", value: lot.bank?.email, copy: true },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-4 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 group/row">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 mb-1">{item.label}</p>
-                    <p className="text-sm font-black text-white italic group-hover/row:text-accent transition-colors">{item.value || "No especificado"}</p>
-                  </div>
-                  {item.copy ? (
-                    <button 
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); handleCopy(item.value, item.label); }}
-                      className="p-3 rounded-xl bg-white/5 text-white/30 hover:bg-accent hover:text-black transition-all"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <button 
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); handleCopy(item.value, item.label); }}
-                      className="p-3 rounded-xl bg-white/5 text-white/30 hover:bg-white/10 hover:text-white transition-all opacity-0 group-hover/row:opacity-100 focus:opacity-100"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Upload Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="relative">
-              <input
-                type="file"
-                id="receipt"
-                accept="image/*,.pdf"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <label
-                htmlFor="receipt"
-                className={`
-                  flex flex-col items-center justify-center py-10 md:py-16 border-2 border-dashed rounded-[2.5rem] cursor-pointer transition-all duration-500
-                  ${receiptBase64 ? 'border-accent bg-accent/[0.03]' : 'border-white/10 hover:border-accent/40 bg-white/[0.02]'}
-                `}
-              >
-                {receiptBase64 ? (
-                  <div className="text-center animate-fade-in">
-                    <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center mx-auto mb-6 shadow-2xl">
-                      <FileCheck className="w-10 h-10 text-[#061010]" />
-                    </div>
-                    <p className="text-xs font-black text-accent uppercase tracking-widest leading-none">Comprobante Cargado</p>
-                    <p className="text-[10px] text-white/20 mt-3 font-bold uppercase tracking-widest">(Toca para reemplazar)</p>
-                  </div>
-                ) : (
-                  <div className="text-center opacity-40 group-hover:opacity-100 transition-opacity">
-                    <Upload className="w-12 h-12 mx-auto mb-6 animate-float" />
-                    <p className="text-xs font-black text-white uppercase tracking-widest leading-none">Subir Comprobante</p>
-                    <p className="text-[9px] text-white/30 mt-3 font-bold uppercase tracking-widest">JPG, PNG o PDF (Max 10MB)</p>
-                  </div>
-                )}
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={uploading || !receiptBase64}
-              className={`
-                w-full py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-4 transition-all duration-500 relative overflow-hidden
-                ${receiptBase64 
-                  ? 'bg-white text-black hover:bg-accent hover:shadow-[0_20px_40px_rgba(212,168,75,0.3)] hover:-translate-y-1' 
-                  : 'bg-white/5 text-white/10 cursor-not-allowed border border-white/5'}
-              `}
-            >
-              {uploading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  Confirmar & Finalizar
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
+        <div className="text-xs font-bold text-blue-650 flex items-center gap-1.5 pl-1">
+          <span>ℹ</span>
+          <span>Transfiere exactamente el monto indicado para facilitar la conciliación</span>
         </div>
       </div>
+
+      {/* Receipt File Upload */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="relative">
+          <input
+            type="file"
+            id="receipt"
+            accept="image/*,.pdf"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <div
+            onDragEnter={handleDrag}
+            onDragOver={handleDrag}
+            onDragLeave={handleDrag}
+            onDrop={handleDrop}
+            className={`
+              flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 bg-white
+              ${receiptBase64 ? 'border-blue-600' : 'border-slate-200 hover:border-blue-300'}
+              ${dragActive ? 'border-blue-600 bg-blue-50/5' : ''}
+            `}
+          >
+            <label htmlFor="receipt" className="w-full h-full flex flex-col items-center justify-center cursor-pointer">
+              {receiptBase64 ? (
+                <div className="text-center animate-fade-in">
+                  <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4 border border-emerald-250">
+                    <FileCheck className="w-7 h-7 text-emerald-600" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-700">Comprobante Cargado</p>
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium">(Haz clic o arrastra para reemplazar)</p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-4 border border-slate-200 text-slate-400">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-700">Arrastra tu archivo o haz clic aquí</p>
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium">Soporta PDF, JPG, PNG (máx. 5MB)</p>
+                </div>
+              )}
+            </label>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={uploading || !receiptBase64}
+          className={`
+            w-full py-4 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-sm
+            ${receiptBase64 
+              ? 'bg-blue-600 hover:bg-blue-700 active:scale-[0.99] cursor-pointer' 
+              : 'bg-slate-200 text-slate-400 cursor-not-allowed'}
+          `}
+        >
+          {uploading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Enviando Comprobante...</span>
+            </>
+          ) : (
+            <span>Enviar Comprobante de Pago</span>
+          )}
+        </button>
+      </form>
+
+      <p className="text-[10px] text-slate-400 font-bold text-center uppercase tracking-wide">
+        🕒 El equipo revisará y confirmará tu pago en menos de 24 horas
+      </p>
     </div>
   );
 }

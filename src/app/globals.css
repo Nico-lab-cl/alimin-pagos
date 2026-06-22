@@ -12,6 +12,15 @@
   --color-warning: #f59e0b;
   --color-error: #ef4444;
 
+  --color-cobalt-blue: #1D4ED8;
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #434655;
+  --color-text-muted: #64748B;
+  --color-border-subtle: #E2E8F0;
+  --color-outline-variant: #c4c5d7;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
   --font-inter: var(--font-inter);
   --font-outfit: var(--font-outfit);
 
@@ -36,6 +45,42 @@
     from { box-shadow: 0 0 5px rgba(212, 168, 75, 0.2); }
     to { box-shadow: 0 0 20px rgba(212, 168, 75, 0.6); }
   }
+}
+
+@utility font-headline-sm {
+  font-family: var(--font-outfit);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+@utility font-headline-md {
+  font-family: var(--font-outfit);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+}
+
+@utility font-body-md {
+  font-family: var(--font-inter);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+@utility font-body-sm {
+  font-family: var(--font-inter);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+@utility font-label-md {
+  font-family: var(--font-inter);
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
 }
 
 :root {
@@ -136,10 +181,6 @@ body {
 }
 
 /* --- Mobile Specific Layout --- */
-
-.mobile-nav-safe {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
-}
 
 @media (max-width: 768px) {
   .glass-card {
