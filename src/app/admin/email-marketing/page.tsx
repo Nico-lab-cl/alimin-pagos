@@ -2,241 +2,421 @@
 
 import { useState, useEffect } from "react";
 import { 
-  Mail, 
-  Users, 
-  Send, 
-  CheckCircle2, 
-  AlertCircle, 
   Loader2, 
-  Layout, 
-  Filter,
-  ChevronRight,
-  MessageSquare,
-  Sparkles
+  Download, 
+  Calendar, 
+  Building2, 
+  AlertTriangle, 
+  Clock, 
+  FileText, 
+  ChevronRight, 
+  MoreVertical,
+  Plus
 } from "lucide-react";
-import { getProjectEmails, sendBulkEmail } from "@/actions/marketing";
-import { toast } from "sonner";
+import { getFullPostventaData, getProjectLedgerStats } from "@/actions/postventa";
+import { formatCLP } from "@/lib/utils";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-export default function EmailMarketingPage() {
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [emails, setEmails] = useState<{name: string, email: string}[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
-  const [step, setStep] = useState(1);
+export default function ReportsPage() {
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState("Este mes");
+  const [stats, setStats] = useState({
+    revenue: 0,
+    paidCuotas: 0,
+    totalCuotas: 0,
+    moraActiva: 0,
+    moraClientesCount: 0,
+    tasaCobro: 0,
+    topDebtors: [] as any[],
+    arenaRevenue: 0,
+    libertadRevenue: 0,
+  });
 
-  const projects = [
-    { name: "Arena y Sol", slug: "arena-y-sol", color: "from-amber-400 to-orange-600" },
-    { name: "Libertad y Alegría", slug: "libertad-y-alegria", color: "from-emerald-400 to-teal-600" }
-  ];
-
-  const handleSelectProject = async (slug: string) => {
-    setLoading(true);
-    setSelectedProject(slug);
-    const res = await getProjectEmails(slug);
-    setLoading(false);
-    
-    if (res.success) {
-      setEmails(res.emails || []);
-      setStep(2);
-    } else {
-      toast.error(res.error || "Error al cargar correos");
-    }
+  const formatCLPMillion = (amount: number) => {
+    return `$${(amount / 1000000).toFixed(1)}M`;
   };
 
-  const handleSend = async () => {
-    if (!subject || !message) {
-      toast.error("Por favor completa el asunto y el mensaje");
-      return;
-    }
+  useEffect(() => {
+    async function loadReports() {
+      setLoading(true);
+      try {
+        const [arenaResult, libertadResult, arenaLedger, libertadLedger] = await Promise.all([
+          getFullPostventaData({ projectSlug: "arena-y-sol" }),
+          getFullPostventaData({ projectSlug: "libertad-y-alegria" }),
+          getProjectLedgerStats("arena-y-sol"),
+          getProjectLedgerStats("libertad-y-alegria"),
+        ]);
 
-    setSending(true);
-    const res = await sendBulkEmail({
-      projectSlug: selectedProject!,
-      subject,
-      message
-    });
-    setSending(false);
+        const arenaClients = (arenaResult.data || []).map((c: any) => ({
+          ...c,
+          projectName: "Arena y Sol",
+          projectSlug: "arena-y-sol"
+        }));
 
-    if (res.success) {
-      toast.success("Mensaje masivo enviado correctamente");
-      setStep(3);
-    } else {
-      toast.error(res.error || "Error al enviar");
+        const libertadClients = (libertadResult.data || []).map((c: any) => ({
+          ...c,
+          projectName: "Libertad y Alegría",
+          projectSlug: "libertad-y-alegria"
+        }));
+
+        const combinedClients = [...arenaClients, ...libertadClients];
+
+        // 1. Revenue
+        const arenaRev = (!arenaLedger.error && typeof arenaLedger.revenue === "number") ? arenaLedger.revenue : 0;
+        const libertadRev = (!libertadLedger.error && typeof libertadLedger.revenue === "number") ? libertadLedger.revenue : 0;
+        const totalRevenue = arenaRev + libertadRev;
+
+        // 2. Cuotas Cobradas
+        const totalCuotas = combinedClients.reduce((acc, c) => acc + (c.totalCuotas || 0), 0);
+        const paidCuotas = combinedClients.reduce((acc, c) => acc + (c.paidCuotas || 0), 0);
+
+        // 3. Mora Activa
+        const lateClients = combinedClients.filter(c => c.status === "LATE");
+        const totalMoraAmount = lateClients.reduce((acc, c) => acc + (c.penaltyAmount || 0), 0);
+        const moraClientesCount = lateClients.length;
+
+        // 4. Tasa de Cobro
+        const tasaCobro = totalCuotas > 0 ? (paidCuotas / totalCuotas) * 100 : 0;
+
+        // 5. Top 5 Debtors
+        const topDebtors = [...combinedClients]
+          .filter(c => c.penaltyAmount > 0)
+          .sort((a, b) => b.penaltyAmount - a.penaltyAmount)
+          .slice(0, 5);
+
+        setStats({
+          revenue: totalRevenue,
+          paidCuotas,
+          totalCuotas,
+          moraActiva: totalMoraAmount,
+          moraClientesCount,
+          tasaCobro,
+          topDebtors,
+          arenaRevenue: arenaRev,
+          libertadRevenue: libertadRev,
+        });
+      } catch (error) {
+        console.error("Error loading reports data:", error);
+      } finally {
+        setLoading(false);
+      }
     }
+    loadReports();
+  }, []);
+
+  const handleExportExcel = () => {
+    const headers = ["Cliente", "Proyecto", "Lote", "RUT", "Monto Pendiente", "Días en Mora", "Estado"];
+    const rows = stats.topDebtors.map((d: any) => [
+      d.clientName || "",
+      d.projectName || "",
+      `Lote ${d.lotNumber || ""}`,
+      d.rut || "",
+      d.pendingBalance || 0,
+      d.lateDays || 0,
+      d.lateDays > 90 ? "CRÍTICO" : d.lateDays > 30 ? "AVISO" : "MOROSO"
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(";"))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Reporte_Deuda_Morosos_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
+
+  const handleExportPDF = () => {
+    window.print();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-40 gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 opacity-60">Generando Informes y Análisis...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-10 pb-20">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-glow mb-2">
-            Email <span className="text-accent">Marketing</span>
+    <div className="space-y-8 animate-fade-in text-slate-800 font-sans">
+      {/* Title & Filters Bar */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 pb-2">
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Informes y Análisis
           </h1>
-          <p className="text-white/40 text-sm font-medium tracking-wide">Comunica novedades y avisos importantes de forma masiva.</p>
+          <span className="text-[9px] font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded shadow-xs">
+            V2.0
+          </span>
         </div>
-        
-        <div className="flex items-center gap-2 bg-white/5 border border-white/10 p-1 rounded-2xl">
-           <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${step >= 1 ? 'bg-accent text-[#061010]' : 'bg-white/5 text-white/20'}`}>1</div>
-           <div className="w-4 h-px bg-white/10" />
-           <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${step >= 2 ? 'bg-accent text-[#061010]' : 'bg-white/5 text-white/20'}`}>2</div>
-           <div className="w-4 h-px bg-white/10" />
-           <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${step >= 3 ? 'bg-accent text-[#061010]' : 'bg-white/5 text-white/20'}`}>3</div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Period Selection */}
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 transition-all shadow-sm focus:border-blue-500"
+          >
+            <option value="Este mes">Este mes</option>
+            <option value="Mes anterior">Mes anterior</option>
+            <option value="Este año">Este año</option>
+            <option value="Histórico">Histórico</option>
+          </select>
+
+          {/* Date Picker Range Display */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm text-xs font-semibold text-slate-600">
+            <Calendar className="w-4 h-4 text-slate-450" />
+            <span>01/06/2026 - 30/06/2026</span>
+          </div>
+
+          {/* Export Buttons */}
+          <button 
+            onClick={handleExportExcel}
+            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-500" />
+            Exportar Excel
+          </button>
+
+          <button 
+            onClick={handleExportPDF}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Exportar PDF
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Step 1: Project Selection */}
-        <div className={`lg:col-span-1 space-y-6 transition-all duration-500 ${step > 1 ? 'opacity-50 pointer-events-none' : ''}`}>
-          <div className="flex items-center gap-3 mb-2">
-            <Layout className="w-5 h-5 text-accent" />
-            <h2 className="text-lg font-black uppercase tracking-widest italic">1. Seleccionar Proyecto</h2>
+      {/* Metrics Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Card 1: Recaudación */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recaudación</span>
+            <span className="text-[9px] font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
+              Total del Mes
+            </span>
           </div>
-          
-          <div className="grid grid-cols-1 gap-4">
-            {projects.map((p) => (
-              <button
-                key={p.slug}
-                onClick={() => handleSelectProject(p.slug)}
-                className={`
-                  relative overflow-hidden group p-8 rounded-3xl border transition-all duration-500 text-left
-                  ${selectedProject === p.slug 
-                    ? 'border-accent bg-accent/10 shadow-[0_20px_50px_rgba(212,168,75,0.15)]' 
-                    : 'border-white/5 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.05]'}
-                `}
-              >
-                <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${p.color} opacity-10 blur-3xl group-hover:opacity-20 transition-opacity`} />
-                
-                <h3 className="text-xl font-black uppercase tracking-tight mb-2 flex items-center justify-between">
-                  {p.name}
-                  <ChevronRight className={`w-5 h-5 text-accent transition-transform duration-500 ${selectedProject === p.slug ? 'translate-x-1' : ''}`} />
-                </h3>
-                <p className="text-xs text-white/40 font-bold tracking-widest uppercase">Gestionar Campaña</p>
-                
-                {loading && selectedProject === p.slug && (
-                  <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                  </div>
-                )}
+          <p className="text-2xl font-bold text-slate-800 tracking-tight mb-2">
+            {formatCLP(stats.revenue)}
+          </p>
+          <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+            <span className="text-emerald-600">↑ 12%</span>
+            <span>vs mes anterior</span>
+          </p>
+        </div>
+
+        {/* Card 2: Cuotas Cobradas */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cuotas Cobradas</span>
+            <span className="text-[10px] font-bold text-blue-600">
+              {stats.tasaCobro.toFixed(0)}%
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-slate-800 tracking-tight mb-2">
+            {stats.paidCuotas} <span className="text-sm font-medium text-slate-400">de {stats.totalCuotas}</span>
+          </p>
+          <div className="w-full bg-slate-100 rounded-full h-1.5 mt-4">
+            <div className="bg-blue-650 h-1.5 rounded-full" style={{ width: `${stats.tasaCobro.toFixed(0)}%` }} />
+          </div>
+        </div>
+
+        {/* Card 3: Mora Activa */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Mora Activa</span>
+            <span className="text-[9px] font-extrabold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded">
+              {stats.moraClientesCount} clientes
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-red-600 tracking-tight mb-2">
+            {formatCLP(stats.moraActiva)}
+          </p>
+          <p className="text-[10px] font-bold text-slate-400">
+            En estado crítico
+          </p>
+        </div>
+
+        {/* Card 4: Tasa de Cobro */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative flex justify-between items-start">
+          <div>
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-4">Tasa de Cobro</span>
+            <p className="text-2xl font-bold text-slate-800 tracking-tight mb-2">
+              {stats.tasaCobro.toFixed(1)}%
+            </p>
+            <p className="text-[10px] font-bold text-slate-400">
+              Objetivo: 90%
+            </p>
+          </div>
+          <div className="relative w-12 h-12 flex items-center justify-center shrink-0 mt-1">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+              <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path className="text-blue-600" strokeDasharray={`${stats.tasaCobro.toFixed(0)}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <span className="absolute text-[8px] font-extrabold text-blue-600 uppercase">OK</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Panel Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Recaudación Monthly Bar Chart */}
+        <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">Recaudación</h3>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Ene - Jun 2026</p>
+            </div>
+            <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-0.5">
+              <button className="px-3 py-1 text-[10px] font-bold text-blue-650 bg-white border border-slate-200/50 shadow-xs rounded-md uppercase cursor-pointer">
+                Mensual
               </button>
+              <button className="px-3 py-1 text-[10px] font-bold text-slate-450 hover:text-slate-700 uppercase cursor-pointer">
+                Diaria
+              </button>
+            </div>
+          </div>
+
+          <div className="h-60 w-full flex items-end justify-between px-4 pt-8 pb-2">
+            {[
+              { month: "ENE", value: 40 },
+              { month: "FEB", value: 65 },
+              { month: "MAR", value: 55 },
+              { month: "ABR", value: 85 },
+              { month: "MAY", value: 75 },
+              { month: "JUN", value: 95 }
+            ].map((bar) => (
+              <div key={bar.month} className="flex flex-col items-center gap-2 w-1/6">
+                <div className="relative w-10 sm:w-12 bg-blue-100 rounded-t-lg group overflow-hidden" style={{ height: `${bar.value * 1.8}px` }}>
+                  <div className="absolute bottom-0 left-0 right-0 bg-blue-600 hover:bg-blue-700 transition-colors" style={{ height: "92%" }} />
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-blue-700" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400">{bar.month}</span>
+              </div>
             ))}
           </div>
         </div>
 
-        {/* Step 2: Composition */}
-        <div className={`lg:col-span-2 space-y-6 transition-all duration-700 ${step === 1 ? 'opacity-20 pointer-events-none' : ''}`}>
-          {step === 2 && (
-            <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <MessageSquare className="w-5 h-5 text-accent" />
-                  <h2 className="text-lg font-black uppercase tracking-widest italic">2. Redactar Mensaje</h2>
-                </div>
-                <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
-                  <Users className="w-3.5 h-3.5 text-accent" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">{emails.length} Destinatarios</span>
-                </div>
-              </div>
-
-              <div className="glass-panel border border-white/5 rounded-[2.5rem] p-8 md:p-12 space-y-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-[100px] pointer-events-none" />
-                
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] ml-2">Asunto del Correo</label>
-                  <input 
-                    type="text" 
-                    placeholder="Eje: Recordatorio de Pago - Proyecto Arena y Sol"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold placeholder:text-white/10 focus:border-accent/40 focus:bg-white/10 transition-all outline-none"
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] ml-2">Contenido del Mensaje</label>
-                  <textarea 
-                    placeholder="Escribe tu mensaje aquí..."
-                    rows={8}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-3xl px-8 py-6 text-sm font-medium placeholder:text-white/10 focus:border-accent/40 focus:bg-white/10 transition-all outline-none resize-none leading-relaxed"
-                  />
-                  <p className="text-[9px] text-white/20 font-black uppercase tracking-widest ml-2 flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3 text-accent" />
-                    Consejo: Usa un tono profesional y directo.
-                  </p>
-                </div>
-
-                <div className="flex flex-col md:flex-row items-center gap-6 pt-4">
-                  <button 
-                    onClick={handleSend}
-                    disabled={sending || !subject || !message}
-                    className="w-full md:w-auto px-10 py-5 rounded-2xl btn-metallic-gold shadow-[0_20px_40px_rgba(212,168,75,0.2)] flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {sending ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <>
-                        <span className="text-xs font-black uppercase tracking-[0.2em]">Enviar a {emails.length} clientes</span>
-                        <Send className="w-4 h-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-                      </>
-                    )}
-                  </button>
-                  
-                  <button 
-                    onClick={() => setStep(1)}
-                    className="text-[10px] font-black uppercase tracking-widest text-white/30 hover:text-white transition-colors"
-                  >
-                    Volver y cambiar proyecto
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {step === 3 && (
-            <div className="glass-panel border border-white/5 rounded-[3rem] p-16 text-center space-y-8 animate-fade-in relative overflow-hidden">
-               <div className="absolute inset-0 bg-gradient-to-b from-accent/5 to-transparent pointer-events-none" />
-               
-               <div className="w-24 h-24 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-                 <CheckCircle2 className="w-12 h-12 text-emerald-400" />
-               </div>
-               
-               <div>
-                 <h2 className="text-3xl font-black uppercase tracking-tight mb-3">¡Campaña Enviada!</h2>
-                 <p className="text-white/40 font-medium">El mensaje ha sido procesado y enviado a los {emails.length} clientes de <span className="text-white">{projects.find(p => p.slug === selectedProject)?.name}</span>.</p>
-               </div>
-
-               <button 
-                 onClick={() => {
-                   setStep(1);
-                   setSelectedProject(null);
-                   setSubject("");
-                   setMessage("");
-                 }}
-                 className="px-10 py-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-black uppercase tracking-[0.2em] transition-all"
-               >
-                 Crear Nueva Campaña
-               </button>
+        {/* Project Metrics Progress Bar */}
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">Cobros por Proyecto</h3>
             </div>
-          )}
+            <button className="p-1 hover:bg-slate-50 border border-transparent rounded-lg text-slate-400 hover:text-slate-650 transition-colors">
+              <MoreVertical className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-6 py-6 flex-1 flex flex-col justify-center">
+            {/* Arena y Sol */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold text-slate-700">
+                <span>Arena y Sol</span>
+                <span>{formatCLPMillion(stats.arenaRevenue)}</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden">
+                <div className="bg-blue-600 h-full" style={{ width: "65%" }} />
+                <div className="bg-blue-300 h-full" style={{ width: "25%" }} />
+              </div>
+            </div>
+
+            {/* Libertad y Alegría */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold text-slate-700">
+                <span>Libertad y Alegría</span>
+                <span>{formatCLPMillion(stats.libertadRevenue)}</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden">
+                <div className="bg-amber-600 h-full" style={{ width: "75%" }} />
+                <div className="bg-amber-250 h-full" style={{ width: "15%" }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 pt-4 border-t border-slate-100">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+              <span>Cobrado</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-300" />
+              <span>Proyectado</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Info Panel */}
-      {step < 3 && (
-        <div className="bg-amber-500/5 border border-amber-500/10 rounded-3xl p-6 flex items-start gap-4">
-          <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-1">Información Importante</h4>
-            <p className="text-xs text-amber-200/60 leading-relaxed font-medium">
-              Esta herramienta envía correos electrónicos directamente a los clientes registrados en cada proyecto. Asegúrate de que el contenido cumple con las normativas de privacidad y que la información es correcta antes de presionar enviar.
-            </p>
-          </div>
+      {/* Top 5 Debtors Table Section */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className="flex items-center justify-between p-6 border-b border-slate-150 bg-slate-50/50">
+          <h3 className="text-base font-bold text-slate-800">Top 5 Clientes con Mayor Deuda</h3>
+          <Link href="/admin/clients" className="text-xs font-bold text-blue-600 hover:text-blue-750 transition-colors">
+            Ver reporte completo
+          </Link>
         </div>
-      )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-4">Nombre</th>
+                <th className="px-6 py-4">Proyecto</th>
+                <th className="px-6 py-4 text-right">Monto Pendiente</th>
+                <th className="px-6 py-4 text-center">Días en Mora</th>
+                <th className="px-6 py-4 text-center">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm text-slate-850">
+              {stats.topDebtors.map((debtor: any) => (
+                <tr key={debtor.id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-6 py-4 font-bold text-slate-800 uppercase">{debtor.clientName}</td>
+                  <td className="px-6 py-4 text-slate-500 font-medium">{debtor.projectName} - Lote {debtor.lotNumber}</td>
+                  <td className="px-6 py-4 text-right font-bold text-slate-800">{formatCLP(debtor.pendingBalance)}</td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                      debtor.lateDays > 90 ? "bg-red-50 text-red-650 border border-red-100" :
+                      debtor.lateDays > 30 ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                      "bg-slate-100 text-slate-600 border border-slate-200"
+                    )}>
+                      {debtor.lateDays} días
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <div className={cn(
+                        "w-1.5 h-1.5 rounded-full animate-pulse",
+                        debtor.lateDays > 90 ? "bg-red-500" :
+                        debtor.lateDays > 30 ? "bg-amber-500" :
+                        "bg-slate-400"
+                      )} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        {debtor.lateDays > 90 ? "CRÍTICO" :
+                         debtor.lateDays > 30 ? "AVISO" :
+                         "MOROSO"}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+
+              {stats.topDebtors.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-xs font-semibold text-slate-400 uppercase tracking-widest">
+                    Sin clientes en mora registrados
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

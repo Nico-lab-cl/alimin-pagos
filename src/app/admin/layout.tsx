@@ -19,7 +19,9 @@ import {
   Search,
   Mail,
   BookOpen,
-  TrendingUp
+  TrendingUp,
+  Settings,
+  BarChart3
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { SearchProvider, useSearch } from "@/context/SearchContext";
@@ -29,7 +31,7 @@ import { toast } from "sonner";
 const menuItems = [
   { 
     href: "/admin", 
-    label: "Panel de Control", 
+    label: "Inicio", 
     icon: LayoutDashboard
   },
   { href: "/admin/clients", label: "Clientes", icon: Users },
@@ -42,7 +44,8 @@ const menuItems = [
     ]
   },
   { href: "/admin/lots", label: "Lotes", icon: Map },
-  { href: "/admin/email-marketing", label: "Informes", icon: Mail },
+  { href: "/admin/email-marketing", label: "Informes", icon: BarChart3 },
+  { href: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -87,14 +90,9 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       `}>
         <div className="h-full flex flex-col p-6">
           {/* Logo Section */}
-          <div className="flex items-center gap-3 mb-10 px-2">
-            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center p-1.5 flex-shrink-0 shadow-sm">
-              <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
-            </div>
-            <div className="flex flex-col justify-center">
-              <h1 className="text-base font-bold tracking-tight text-slate-800 leading-none">Alimin</h1>
-              <p className="text-[9px] font-semibold text-slate-400 uppercase mt-0.5">Portal Admin</p>
-            </div>
+          <div className="flex items-center gap-2 mb-10 px-2">
+            <img src="/logo.png" alt="Alimin Logo" className="w-8 h-8 object-contain" />
+            <h1 className="text-xl font-bold tracking-tight text-blue-650">Alimin</h1>
           </div>
 
           {/* Navigation */}
@@ -105,24 +103,30 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                 <div key={item.href} className="space-y-1">
                   <Link
                     href={item.href}
+                    onClick={(e) => {
+                      if (item.href === "/admin/configuracion") {
+                        e.preventDefault();
+                        toast.info("Módulo de Configuración disponible próximamente");
+                      }
+                    }}
                     className={cn(
                       "group flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200",
                       isActive 
-                        ? "bg-slate-100/80 text-blue-600 font-semibold" 
+                        ? "bg-blue-600 text-white font-semibold shadow-sm" 
                         : "text-slate-650 hover:text-slate-900 hover:bg-slate-50"
                     )}
                   >
                     <div className="flex items-center gap-3">
                       <item.icon className={cn(
                         "w-5 h-5 flex-shrink-0 transition-colors",
-                        isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                        isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"
                       )} />
                       <span className="text-sm font-medium tracking-tight">{item.label}</span>
                     </div>
                     {item.subItems && (
                       <ChevronRight className={cn(
                         "w-4 h-4 opacity-50 transition-transform duration-200",
-                        isActive && "rotate-90"
+                        isActive ? "text-white rotate-90" : "rotate-0"
                       )} />
                     )}
                   </Link>
@@ -155,15 +159,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           {/* Bottom Section */}
           <div className="mt-auto pt-6 border-t border-slate-100 space-y-1">
             <button
-              onClick={() => toast.info("Módulo de Configuración disponible próximamente")}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all text-left cursor-pointer"
-            >
-              <Zap className="w-5 h-5 text-slate-400" />
-              <span>Configuración</span>
-            </button>
-            <button
               onClick={() => toast.info("Soporte Técnico y de Operaciones disponible próximamente")}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all text-left cursor-pointer"
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-650 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all text-left cursor-pointer"
             >
               <Globe className="w-5 h-5 text-slate-400" />
               <span>Soporte</span>
@@ -171,9 +168,9 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-500 hover:text-red-650 hover:bg-red-50 text-sm font-medium transition-all text-left cursor-pointer"
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-600 hover:bg-red-50/50 text-sm font-semibold transition-all text-left cursor-pointer"
             >
-              <LogOut className="w-5 h-5 text-slate-400" />
+              <LogOut className="w-5 h-5 text-red-500" />
               <span>Cerrar Sesión</span>
             </button>
           </div>
