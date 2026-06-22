@@ -392,7 +392,6 @@ export default function ClientsPage() {
               style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
             >
               <option value="ALL">Filtro de Etapas: Todas</option>
-              <option value="MULTILOTE">Multi-Lote</option>
               {testClients.length > 0 && <option value="PRUEBAS">Clientes Pruebas</option>}
               {uniqueStages.map((stage) => (
                 <option key={stage} value={stage}>Etapa {stage}</option>

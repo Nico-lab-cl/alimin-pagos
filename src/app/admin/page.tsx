@@ -170,24 +170,47 @@ export default function AdminDashboard() {
     );
   }
 
+  const formatDateString = (dStr: string) => {
+    if (!dStr) return "";
+    const parts = dStr.split("-");
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dStr;
+  };
+
+  const getPeriodSubtext = () => {
+    if (showCustomDateRange) {
+      if (customStartDate && customEndDate) {
+        return `Rango: ${formatDateString(customStartDate)} al ${formatDateString(customEndDate)}`;
+      }
+      if (customStartDate) return `Desde el ${formatDateString(customStartDate)}`;
+      if (customEndDate) return `Hasta el ${formatDateString(customEndDate)}`;
+      return "Rango personalizado activo";
+    }
+    if (filterMonth === 0) return "Acumulado histórico total";
+    const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    return `Durante ${months[filterMonth - 1]} ${filterYear}`;
+  };
+
   const stats = [
     { 
-      label: "Recaudación Total (YTD)", 
+      label: "Recaudación del Periodo", 
       value: formatCLP(ledgerStats.revenue), 
       icon: Building2, 
       iconColor: "text-slate-700", 
       iconBg: "bg-slate-50",
-      subtext: "↗ +12.5% vs mes anterior",
-      subtextClass: "text-emerald-600"
+      subtext: getPeriodSubtext(),
+      subtextClass: "text-slate-500 font-semibold"
     },
     { 
-      label: "Deuda Vencida (Mora)", 
-      value: formatCLP(ledgerStats.penalty), 
+      label: "Clientes en Mora", 
+      value: clientsList.filter((c: any) => c.status === "LATE").length, 
       icon: AlertTriangle, 
       iconColor: "text-red-500", 
       iconBg: "bg-red-50",
-      subtext: "↗ +2.1% vs mes anterior",
-      subtextClass: "text-red-600"
+      subtext: `De ${clientsList.length} clientes activos`,
+      subtextClass: "text-slate-500 font-semibold"
     },
     { 
       label: "Saldo por Cobrar", 
@@ -195,17 +218,8 @@ export default function AdminDashboard() {
       icon: Clock, 
       iconColor: "text-slate-700", 
       iconBg: "bg-slate-50",
-      subtext: `En ${clientsList.length} lotes activos`,
-      subtextClass: "text-slate-500"
-    },
-    { 
-      label: "Clientes Activos", 
-      value: data?.stats?.total || 0, 
-      icon: Users, 
-      iconColor: "text-slate-700", 
-      iconBg: "bg-slate-50",
-      subtext: "↗ +5 nuevos esta semana",
-      subtextClass: "text-emerald-600"
+      subtext: "Total pendiente del proyecto",
+      subtextClass: "text-slate-500 font-semibold"
     },
   ];
 
@@ -317,7 +331,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Primary Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((s, i) => (
           <div
             key={s.label}
