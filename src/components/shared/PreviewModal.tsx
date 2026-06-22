@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Loader2, Download, ExternalLink, FileText } from "lucide-react";
+import { X, Loader2, Download, FileText } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { downloadDocument } from "@/lib/utils";
 
@@ -53,7 +53,6 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
   const handleLoadSuccess = useCallback(() => {
     clearSafetyTimeout();
     setLoading(false);
-    // Don't set error — the content loaded fine
   }, [clearSafetyTimeout]);
 
   const handleLoadError = useCallback(() => {
@@ -77,7 +76,6 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
       }
 
       // Timeout de seguridad: si en 25s no carga, mostrar error/descarga
-      // (los documentos de promesa pueden ser PDFs pesados)
       timeoutRef.current = setTimeout(() => {
         setLoading(false);
         setError(true);
@@ -100,18 +98,18 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 animate-fade-in">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/90 backdrop-blur-xl"
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Content Container */}
-      <div className="relative w-full h-full max-w-6xl bg-[#0a0a0a] rounded-[2.5rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-zoom-in">
+      <div className="relative w-full h-full max-w-6xl bg-white border border-slate-200 rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-zoom-in">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-white/5 bg-white/[0.02]">
+        <div className="flex items-center justify-between px-8 py-5 border-b border-slate-150 bg-slate-50/50">
           <div className="flex flex-col">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Previsualización de Documento</p>
-            <h3 className="text-xl font-black text-white uppercase italic tracking-tighter truncate max-w-[300px] sm:max-w-md">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-600">Previsualización de Documento</p>
+            <h3 className="text-base font-bold text-slate-800 uppercase tracking-tight truncate max-w-[300px] sm:max-w-md">
               {title}
             </h3>
           </div>
@@ -119,14 +117,14 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
           <div className="flex items-center gap-3">
              <button 
               onClick={() => downloadDocument(url, title, fileType)}
-              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:bg-accent hover:text-black transition-all"
+              className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-250 transition-all shadow-sm cursor-pointer"
               title="Descargar"
             >
               <Download className="w-4 h-4" />
             </button>
             <button 
               onClick={onClose}
-              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:bg-red-500/20 hover:text-red-400 transition-all"
+              className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all shadow-sm cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -134,31 +132,31 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
         </div>
 
         {/* Viewer */}
-        <div className="flex-1 relative bg-black/20 overflow-auto">
+        <div className="flex-1 relative bg-slate-50/50 overflow-auto">
           {loading && !error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-20 bg-[#0a0a0a]">
-              <Loader2 className="w-10 h-10 animate-spin text-accent" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Preparando Visor...</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-20 bg-white">
+              <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 opacity-60">Preparando Visor...</p>
             </div>
           )}
 
           {error ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-10 text-center">
-              <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
-                <FileText className="w-10 h-10 text-white/20" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 p-10 text-center bg-white">
+              <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <FileText className="w-8 h-8 text-slate-400" />
               </div>
               <div>
-                <h4 className="text-xl font-black text-white uppercase italic tracking-tighter mb-2">Formato no previsualizable</h4>
-                <p className="text-xs font-bold text-white/20 uppercase tracking-widest leading-relaxed max-w-xs mx-auto">
+                <h4 className="text-base font-bold text-slate-800 uppercase tracking-tight mb-1">Formato no previsualizable</h4>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide leading-relaxed max-w-xs mx-auto">
                   Este archivo (Word, Excel o similar) no se puede mostrar en el navegador. Usa el botón de abajo para descargarlo.
                 </p>
               </div>
               <button 
                 onClick={() => downloadDocument(url, title, fileType)}
-                className="px-8 py-4 bg-accent text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 transition-all flex items-center gap-3 shadow-[0_0_30px_rgba(212,168,75,0.3)]"
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
               >
-                Descargar Archivo Original
-                <Download className="w-3 h-3" />
+                <span>Descargar Archivo Original</span>
+                <Download className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
@@ -167,14 +165,14 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
                 <img 
                   src={url} 
                   alt={title} 
-                  className="max-w-full max-h-full object-contain shadow-2xl rounded-lg animate-fade-in"
+                  className="max-w-full max-h-full object-contain shadow-lg rounded-lg border border-slate-200 bg-white animate-fade-in"
                   onLoad={handleLoadSuccess}
                   onError={handleLoadError}
                 />
               ) : (
                 <iframe 
                   src={`${url}#toolbar=0`} 
-                  className="w-full h-full border-none rounded-lg shadow-2xl animate-fade-in"
+                  className="w-full h-full border border-slate-200 rounded-lg shadow-lg bg-white animate-fade-in"
                   onLoad={handleLoadSuccess}
                   onError={handleLoadError}
                 />
@@ -184,14 +182,14 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
         </div>
 
         {/* Footer / Info */}
-        <div className="px-8 py-4 border-t border-white/5 bg-white/[0.01] flex items-center justify-between">
-            <p className="text-[9px] font-black text-white/10 uppercase tracking-[0.2em]">
+        <div className="px-8 py-4 border-t border-slate-150 bg-slate-50/50 flex items-center justify-between">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
               © 2026 ALIMIN SPA • SISTEMA DE GESTIÓN DE PAGOS
             </p>
             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Servidor Seguro</span>
+                <div className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-bold uppercase tracking-widest border border-emerald-100 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Servidor Seguro</span>
                 </div>
             </div>
         </div>
