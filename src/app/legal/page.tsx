@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { getFullPostventaData } from "@/actions/postventa";
 import { formatCLP, formatDate } from "@/lib/utils";
-import ClientDetailModal from "@/components/admin/ClientDetailModal";
 import { signOut, useSession } from "next-auth/react";
 import {
   Loader2,
@@ -497,15 +496,125 @@ export default function LegalDashboardPage() {
         )}
       </div>
 
-      {/* Modal Detalle Cliente (ReadOnly Mode) */}
+      {/* Modal Desglose de Mora */}
       {selectedClient && (
-        <ClientDetailModal
-          selectedClient={selectedClient}
-          onClose={() => setSelectedClient(null)}
-          onUpdate={() => {}} // No actualiza nada en modo lectura
-          projectSlug={selectedClient.projectSlug}
-          isReadOnly={true}
-        />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Desglose de Mora</h3>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">
+                  {selectedClient.clientName} • LOTE {selectedClient.lotNumber}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedClient(null)}
+                className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar text-slate-700">
+              {/* Resumen de Mora Total */}
+              <div className="bg-red-50/70 border border-red-100 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+                <div>
+                  <p className="text-[10px] text-red-650/70 font-bold uppercase tracking-wider mb-1">Total Multa Vigente</p>
+                  <p className="text-2xl font-black text-red-650">+{formatCLP(selectedClient.penaltyAmount)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-red-650/70 font-bold uppercase tracking-wider mb-1">Atraso Contable</p>
+                  <p className="text-lg font-bold text-red-600">{selectedClient.lateDays} Días</p>
+                </div>
+              </div>
+
+              {/* Detalle Lote e Info General */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Información del Contrato</h4>
+                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-700">
+                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-xs">
+                    <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Proyecto</span>
+                    <span className="text-slate-800 uppercase">{selectedClient.projectName}</span>
+                  </div>
+                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-xs">
+                    <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Unidad Catastral</span>
+                    <span className="text-slate-800 uppercase">Lote {selectedClient.lotNumber}</span>
+                  </div>
+                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-xs">
+                    <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Cuotas Pagadas</span>
+                    <span className="text-slate-800">{selectedClient.paidCuotas} de {selectedClient.totalCuotas}</span>
+                  </div>
+                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-xs">
+                    <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Valor de la Cuota</span>
+                    <span className="text-slate-800">{formatCLP(selectedClient.valor_cuota)}/mes</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mora Histórica Fija */}
+              {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED") && selectedClient.manual_penalty > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 text-amber-600">
+                    <ShieldAlert className="w-4 h-4" />
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider">Mora Histórica (Acuerdo Fijo)</h4>
+                  </div>
+                  <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 space-y-3">
+                    <p className="text-[10px] font-semibold text-amber-700/80 leading-normal uppercase tracking-wide">
+                      El cliente tiene un monto de penalización fijo acordado y configurado manualmente. Este monto se suma al total de la deuda.
+                    </p>
+                    <div className="flex items-center justify-between bg-amber-50 border border-amber-250 rounded-xl px-4 py-3 shadow-xs">
+                      <span className="text-[10px] font-bold text-amber-850 uppercase tracking-wider">Monto Fijo Pactado</span>
+                      <span className="text-sm font-bold text-amber-700">{formatCLP(selectedClient.manual_penalty)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Desglose de Cuotas Vencidas */}
+              {selectedClient.overdueInstallments && selectedClient.overdueInstallments.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-1.5 text-red-500">
+                    <AlertTriangle className="w-4 h-4" />
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider">Detalle de Cuotas Vencidas (Mora Diaria)</h4>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedClient.overdueInstallments.map((inst: any) => (
+                      <div key={inst.number} className="bg-slate-50/50 border border-slate-150 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors shadow-xs">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Cuota {inst.number}</span>
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">{inst.monthName}</span>
+                          </div>
+                          <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wide">
+                            Venció el {formatDate(inst.dueDate)}
+                          </p>
+                        </div>
+                        <div className="text-right flex flex-col items-end gap-1.5">
+                          <span className="text-sm font-bold text-red-650">+{formatCLP(inst.penaltyAmount)}</span>
+                          <span className="text-[8px] font-bold text-red-650 bg-red-50 px-2 py-0.5 rounded border border-red-100 uppercase tracking-wider">
+                            {inst.lateDays} {inst.lateDays === 1 ? 'día' : 'días'} de atraso
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+              <button 
+                onClick={() => setSelectedClient(null)}
+                className="px-6 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer shadow-xs border border-slate-250"
+              >
+                Cerrar Detalle
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
