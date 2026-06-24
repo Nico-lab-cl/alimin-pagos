@@ -21,6 +21,45 @@ import {
   FileText
 } from "lucide-react";
 import Link from "next/link";
+import { getInstallmentDueDate } from "@/lib/financials";
+
+const MONTHS_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
+function getInstallmentMonthStr(receipt: any): string {
+  if (!receipt || receipt.scope === "PIE") return "";
+  
+  const installmentStartDate = receipt.reservation?.installment_start_date;
+  if (!installmentStartDate) return "";
+  
+  const startNum = receipt.nominal_installment_number || receipt.reservation?.installments_paid || 1;
+  const count = receipt.installments_count || 1;
+  const dueDay = receipt.reservation?.due_day ?? receipt.reservation?.project?.due_day_of_month ?? 5;
+  
+  try {
+    const startDate = getInstallmentDueDate(installmentStartDate, startNum, dueDay);
+    const startMonth = MONTHS_ES[startDate.getUTCMonth()];
+    const startYear = startDate.getUTCFullYear();
+    
+    if (count > 1) {
+      const endDate = getInstallmentDueDate(installmentStartDate, startNum + count - 1, dueDay);
+      const endMonth = MONTHS_ES[endDate.getUTCMonth()];
+      const endYear = endDate.getUTCFullYear();
+      if (startYear === endYear) {
+        return `${startMonth} - ${endMonth} ${startYear}`;
+      } else {
+        return `${startMonth} ${startYear} - ${endMonth} ${endYear}`;
+      }
+    }
+    
+    return `${startMonth} ${startYear}`;
+  } catch (err) {
+    console.error("Error calculating installment month:", err);
+    return "";
+  }
+}
 
 export default function ReceiptsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -439,7 +478,12 @@ export default function ReceiptsPage() {
                   {/* Column 3: Cuota */}
                   <div className="col-span-1 text-slate-650 text-xs font-bold md:text-center">
                     <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cuota:</span>
-                    {quotaText}
+                    <div>{quotaText}</div>
+                    {receipt.scope !== "PIE" && (
+                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                        {getInstallmentMonthStr(receipt)}
+                      </div>
+                    )}
                   </div>
 
                   {/* Column 4: Monto */}
@@ -660,6 +704,11 @@ export default function ReceiptsPage() {
                   <span className="text-blue-600 block mt-0.5 font-bold">
                     {selectedReceipt.scope === "PIE" ? "Ingreso Inicial" : `Cuota ${String(selectedReceipt.nominal_installment_number || selectedReceipt.reservation?.installments_paid || 1).padStart(2, '0')} / ${String(selectedReceipt.lot?.cuotas || 24).padStart(2, '0')}`}
                   </span>
+                  {selectedReceipt.scope !== "PIE" && (
+                    <span className="text-slate-500 block mt-0.5 text-xs font-semibold">
+                      {getInstallmentMonthStr(selectedReceipt)}
+                    </span>
+                  )}
                 </div>
                 <div className="col-span-2 pt-2 border-t border-slate-100">
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Monto Depositado</span>

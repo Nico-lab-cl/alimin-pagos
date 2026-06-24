@@ -805,6 +805,8 @@ export async function getAllReceipts(projectSlug: string) {
             email: true,
             phone: true,
             rut: true,
+            installment_start_date: true,
+            due_day: true,
             documents: {
               select: {
                 id: true,
@@ -815,6 +817,7 @@ export async function getAllReceipts(projectSlug: string) {
               select: {
                 name: true,
                 slug: true,
+                due_day_of_month: true,
               }
             }
           },
