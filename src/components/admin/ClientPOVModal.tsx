@@ -646,9 +646,16 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
                   const selectedObjects = data.upcomingInstallments?.slice(0, q) || [];
                   const amountForQ = selectedObjects.reduce((acc: number, c: any) => acc + c.amount, 0);
                   
+                  // Filter out historical debt / Cuota 0 to get real cuotas count
+                  const realCuotasCount = selectedObjects.filter((c: any) => c.number > 0).length;
+                  const hasPenalty = selectedObjects.some((c: any) => (c.penaltyAmount && c.penaltyAmount > 0) || c.hasPenalty);
+                  
+                  const labelText = realCuotasCount === 1 ? "1 Cuota" : `${realCuotasCount} Cuotas`;
+                  const finalLabel = hasPenalty ? `${labelText} + Mora` : labelText;
+
                   return (
                     <option key={q} value={q} className="font-bold text-slate-850 bg-white">
-                      {q === 1 ? "1 Cuota" : `${q} Cuotas`} — {formatCLP(amountForQ)}
+                      {finalLabel} — {formatCLP(amountForQ)}
                     </option>
                   );
                 }
@@ -739,12 +746,22 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
 
       {/* Summary Box */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
-        {selectedObjects.map((cuota: any, idx: number) => (
-          <div key={idx} className="flex justify-between text-xs font-medium text-slate-500">
-            <span>Cuota {cuota.number} de {data.totalCuotas}</span>
-            <span className="font-bold text-slate-850">{formatCLP(cuota.baseAmount || cuota.amount)}</span>
-          </div>
-        ))}
+        {selectedObjects.map((cuota: any, idx: number) => {
+          if (cuota.isHistorical || cuota.number === 0) {
+            return (
+              <div key={idx} className="flex justify-between text-xs font-medium text-slate-500">
+                <span>Intereses Anteriores (Mora Histórica)</span>
+                <span className="font-bold text-slate-850">{formatCLP(cuota.penaltyAmount || cuota.amount)}</span>
+              </div>
+            );
+          }
+          return (
+            <div key={idx} className="flex justify-between text-xs font-medium text-slate-500">
+              <span>Cuota {cuota.number} de {data.totalCuotas}</span>
+              <span className="font-bold text-slate-850">{formatCLP(cuota.baseAmount || cuota.amount)}</span>
+            </div>
+          );
+        })}
         
         {penaltyAmount > 0 && (
           <div className="flex justify-between text-xs font-medium text-slate-500">
