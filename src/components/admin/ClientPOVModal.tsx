@@ -193,12 +193,24 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: Ta
       payDate = new Date(matchingReceipt.created_at);
     }
 
+    // Search for a matching digital receipt in data.documents
+    let comprobanteDigital: string | null = null;
+    if (matchingReceipt) {
+      const systemDoc = data.documents?.find((d: any) => 
+        d.name?.toLowerCase().includes(`comprobante_pago_${matchingReceipt.id.substring(0, 6).toLowerCase()}`)
+      );
+      if (systemDoc) {
+        comprobanteDigital = `/api/documents/${systemDoc.id}`;
+      }
+    }
+
     paymentHistory.push({
       cuota: `Cuota #${String(i).padStart(2, '0')}`,
       fecha: formatDateMockup(payDate),
       monto: formatCLP(matchingReceipt?.amount_clp || data.valor_cuota),
       estado: "Pagado",
-      comprobante: matchingReceipt?.receipt_url || null,
+      comprobanteDigital,
+      comprobanteCliente: matchingReceipt ? `/api/documents/${matchingReceipt.id}` : null,
     });
   }
 
@@ -330,14 +342,27 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: Ta
                     </td>
                     <td className="px-6 py-3.5 text-right sm:text-left">
                       {isPaid ? (
-                        item.comprobante ? (
-                          <button
-                            onClick={() => downloadDocument(item.comprobante, `comprobante_${item.cuota.replace('#', '')}`)}
-                            className="text-blue-600 hover:text-blue-800 transition-colors p-1 rounded hover:bg-blue-50 inline-flex items-center justify-center cursor-pointer"
-                            title="Descargar Comprobante"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
+                        (item.comprobanteDigital || item.comprobanteCliente) ? (
+                          <div className="flex items-center gap-2 justify-end sm:justify-start">
+                            {item.comprobanteDigital && (
+                              <button
+                                onClick={() => downloadDocument(item.comprobanteDigital, `comprobante_digital_${item.cuota.replace('#', '')}.pdf`, "application/pdf")}
+                                className="text-blue-655 hover:text-blue-800 transition-colors p-1.5 rounded-lg hover:bg-blue-50 inline-flex items-center justify-center cursor-pointer border border-blue-100 bg-blue-50/30"
+                                title="Descargar Comprobante Digital (PDF)"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-blue-600" />
+                              </button>
+                            )}
+                            {item.comprobanteCliente && (
+                              <button
+                                onClick={() => downloadDocument(item.comprobanteCliente, `comprobante_cliente_${item.cuota.replace('#', '')}`)}
+                                className="text-[#0f9f6e] hover:text-[#0e8f62] transition-colors p-1.5 rounded-lg hover:bg-emerald-50 inline-flex items-center justify-center cursor-pointer border border-emerald-100 bg-emerald-50/30"
+                                title="Descargar Comprobante del Cliente"
+                              >
+                                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs text-slate-400 italic">No disponible</span>
                         )

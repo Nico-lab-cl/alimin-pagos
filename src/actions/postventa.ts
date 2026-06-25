@@ -2035,6 +2035,49 @@ export async function getClientPOV(reservationId: string) {
       documents = [...newDocs, ...documents];
     }
 
+    // Approved Payment Receipts
+    if (res.receipts && res.receipts.length > 0) {
+      const receiptDocs = res.receipts.map((r: any) => {
+        let ext = "pdf";
+        let fileType = "application/pdf";
+        if (r.receipt_url && r.receipt_url.startsWith("data:")) {
+          const parts = r.receipt_url.split(";");
+          if (parts[0]) {
+            fileType = parts[0].substring(5);
+            if (fileType === "image/png") ext = "png";
+            else if (fileType === "image/jpeg") ext = "jpg";
+            else if (fileType === "image/webp") ext = "webp";
+            else if (fileType === "application/pdf") ext = "pdf";
+          }
+        }
+        
+        let docName = "Comprobante de Pago";
+        if (r.scope === "PIE") {
+          docName = `Comprobante_Pago_Pie.${ext}`;
+        } else {
+          docName = r.nominal_installment_range
+            ? `Comprobante_Pago_Cuotas_${r.nominal_installment_range}.${ext}`
+            : r.nominal_installment_number
+              ? `Comprobante_Pago_Cuota_${r.nominal_installment_number}.${ext}`
+              : `Comprobante_Pago_Cuota.${ext}`;
+        }
+
+        return {
+          name: docName,
+          category: "Comprobantes",
+          uploadedAt: r.processed_at || r.created_at,
+          fileType: fileType,
+          url: `/api/documents/${r.id}`,
+        };
+      });
+      documents = [...documents, ...receiptDocs];
+    }
+
+    // Sort combined documents by date descending
+    documents.sort(
+      (a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime()
+    );
+
     const formatMonth = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'UTC' });
     const nextInstallmentMonth = nextDueDate ? formatMonth.format(nextDueDate).toUpperCase() : null;
 
