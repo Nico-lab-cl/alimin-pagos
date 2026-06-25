@@ -1681,7 +1681,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 </div>
                 <div className="flex justify-between items-center border-t border-slate-50 pt-2.5">
                   <span className="text-slate-550">Monto Total Pagado</span>
-                  <span className="font-bold text-blue-600">{formatCLP(selectedClient.pie + (selectedClient.paidCuotas * selectedClient.valor_cuota))}</span>
+                  <span className="font-bold text-blue-600">{formatCLP(selectedClient.totalPaid)}</span>
                 </div>
                 <div className="flex justify-between items-center border-t border-slate-50 pt-2.5">
                   <span className="text-slate-550">Saldo Pendiente</span>
