@@ -364,6 +364,7 @@ export async function getUserLots() {
         projectName: project.name,
         projectSlug: project.slug,
         lotNumber: lot.number,
+        clientName: res.name,
         lotStage: lot.stage,
         area_m2: lot.area_m2,
         totalToPay,
