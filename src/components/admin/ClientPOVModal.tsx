@@ -29,7 +29,8 @@ import {
   MessageSquare,
   Home,
   FileCheck,
-  ArrowRight
+  ArrowRight,
+  ShieldAlert
 } from "lucide-react";
 
 interface ClientPOVModalProps {
@@ -460,6 +461,7 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
   const [receiptBase64, setReceiptBase64] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showLegalModal, setShowLegalModal] = useState(false);
 
   useEffect(() => {
     if (data.upcomingInstallments) {
@@ -633,26 +635,80 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
 
       {/* Mora Box */}
       {penaltyAmount > 0 && (
-        <div className="p-5 rounded-2xl bg-orange-50/50 border border-orange-100 text-slate-800 space-y-3">
-          <div className="flex items-center gap-2 text-orange-600 font-bold text-sm">
-            <AlertTriangle className="w-5 h-5" />
-            <span>Tienes un saldo de mora pendiente</span>
-          </div>
+        <div className="space-y-3">
+          <div className="p-5 rounded-2xl bg-orange-50/50 border border-orange-100 text-slate-800 space-y-4">
+            <div className="flex items-center gap-2 text-orange-655 font-bold text-sm">
+              <AlertTriangle className="w-5 h-5 text-orange-600" />
+              <span>Tienes un saldo de mora pendiente</span>
+            </div>
 
-          <div className="text-xs font-medium space-y-1.5 pl-7">
-            <div className="flex justify-between">
-              <span className="text-slate-500 font-semibold">Interés por mora ({data.lateDays} días)</span>
-              <span className="font-bold text-slate-800">{formatCLP(interestCharge)}</span>
+            {/* List of overdue installments */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">
+                Cuotas Vencidas (Mora de {formatCLP(data.dailyPenalty || 1500)}/día)
+              </p>
+              {selectedObjects.filter((cuota: any) => cuota.hasPenalty || cuota.penaltyAmount > 0).map((cuota: any, idx: number) => {
+                if (cuota.isHistorical) {
+                  return (
+                    <div key={idx} className="p-4 bg-red-50/30 border border-red-100/60 rounded-xl flex items-center justify-between shadow-sm">
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">
+                          {cuota.monthName.toUpperCase()}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                          Cargos acumulados previos
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-extrabold text-red-650">
+                          {formatCLP(cuota.penaltyAmount)}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 tracking-wider">
+                          Mora acumulada
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={idx} className="p-4 bg-red-50/30 border border-red-100/60 rounded-xl flex items-center justify-between shadow-sm">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">
+                        Cuota {cuota.number} - {cuota.monthName.toUpperCase()}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                        Venció el {formatDateMockup(cuota.dueDate)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-extrabold text-red-650">
+                        {formatCLP(cuota.penaltyAmount)}
+                      </p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 tracking-wider">
+                        {cuota.lateDays} días de atraso
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500 font-semibold">Recargo administrativo</span>
-              <span className="font-bold text-slate-800">{formatCLP(displayAdminCharge)}</span>
-            </div>
-            <div className="flex justify-between pt-1.5 border-t border-orange-100 font-bold text-sm">
+
+            {/* Subtotal Mora */}
+            <div className="pt-3 border-t border-orange-100 flex justify-between items-center font-bold text-sm">
               <span className="text-slate-700">Subtotal mora</span>
               <span className="text-slate-800">{formatCLP(penaltyAmount)}</span>
             </div>
           </div>
+
+          {/* Importante Button */}
+          <button
+            type="button"
+            onClick={() => setShowLegalModal(true)}
+            className="w-full py-3 px-4 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200/60 text-orange-700 text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+          >
+            <AlertTriangle className="w-4 h-4 text-orange-655" />
+            IMPORTANTE: INFORMACIÓN LEGAL SOBRE EL PAGO DE MORAS
+          </button>
         </div>
       )}
 
@@ -785,9 +841,58 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
         </button>
       </div>
 
-      <p className="text-[10px] text-slate-450 font-bold text-center uppercase tracking-wide">
+      <p className="text-[10px] text-slate-455 font-bold text-center uppercase tracking-wide">
         🕒 El equipo revisará y confirmará tu pago en menos de 24 horas
       </p>
+
+      {/* Legal Modal */}
+      {showLegalModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4 animate-fade-in text-left">
+          <div className="bg-white border border-slate-250 rounded-3xl p-6 md:p-8 max-w-xl w-full shadow-2xl relative space-y-6">
+            <button
+              onClick={() => setShowLegalModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl text-slate-450 hover:bg-slate-50 hover:text-slate-700 transition-all cursor-pointer border border-transparent hover:border-slate-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 text-orange-655 font-bold border-b border-slate-100 pb-4">
+              <ShieldAlert className="w-6 h-6 text-orange-600" />
+              <h3 className="text-base md:text-lg font-black uppercase tracking-tight text-slate-800">Aspectos Legales Importantes</h3>
+            </div>
+
+            <div className="space-y-5 overflow-y-auto max-h-[350px] pr-2 text-slate-700 text-xs md:text-sm font-semibold leading-relaxed">
+              <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-150">
+                <h4 className="font-extrabold text-slate-800 text-xs md:text-sm">
+                  Artículo 1559 del Código Civil: Intereses moratorios
+                </h4>
+                <p className="text-slate-600 text-[11px] md:text-xs font-medium">
+                  Establece que los intereses moratorios siguen corriendo hasta el pago íntegro de la obligación. Si el pago no incluye los intereses, la obligación no está extinguida y los intereses continuúan devengándose.
+                </p>
+              </div>
+
+              <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-150">
+                <h4 className="font-extrabold text-slate-800 text-xs md:text-sm">
+                  Artículo 1595 del Código Civil: Imputación del pago
+                </h4>
+                <p className="text-slate-600 text-[11px] md:text-xs font-medium">
+                  Cuando hay capital e intereses, el pago se imputa primero a los intereses y luego al capital. Esto significa que si alguien paga solo la cuota sin los intereses, esta cubriendo los intereses.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLegalModal(false)}
+                className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all cursor-pointer shadow-md"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
