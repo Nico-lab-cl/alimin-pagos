@@ -273,18 +273,15 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 (_, i) => {
                   const q = mandatoryCount + i;
                   const selectedObjects = lot.upcomingInstallments?.slice(0, q) || [];
-                  const amountForQ = selectedObjects.reduce((acc: number, c: any) => acc + c.amount, 0);
                   
-                  // Filter out historical debt / Cuota 0 to get real cuotas count
-                  const realCuotasCount = selectedObjects.filter((c: any) => c.number > 0).length;
-                  const hasPenalty = selectedObjects.some((c: any) => (c.penaltyAmount && c.penaltyAmount > 0) || c.hasPenalty);
-                  
-                  const labelText = realCuotasCount === 1 ? "1 Cuota" : `${realCuotasCount} Cuotas`;
-                  const finalLabel = hasPenalty ? `${labelText} + Mora` : labelText;
+                  // Filter out historical debt / Cuota 0 to get real cuotas count and base amount
+                  const realCuotas = selectedObjects.filter((c: any) => c.number > 0);
+                  const realCuotasCount = realCuotas.length;
+                  const realCuotasBaseAmount = realCuotas.reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
                   
                   return (
                     <option key={q} value={q} className="font-bold text-slate-800 bg-white">
-                      {finalLabel} — {formatCLP(amountForQ)}
+                      {realCuotasCount === 1 ? "1 Cuota" : `${realCuotasCount} Cuotas`} ({formatCLP(realCuotasBaseAmount)})
                     </option>
                   );
                 }
@@ -375,27 +372,31 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
 
       {/* Summary Box */}
       <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-3">
-        {selectedInstallments.map((cuota: any, idx: number) => {
-          if (cuota.isHistorical || cuota.number === 0) {
-            return (
-              <div key={idx} className="flex justify-between text-xs font-medium text-slate-500">
-                <span>Intereses Anteriores (Mora Histórica)</span>
-                <span className="font-bold text-slate-800">{formatCLP(cuota.penaltyAmount || cuota.amount)}</span>
-              </div>
-            );
-          }
-          return (
-            <div key={idx} className="flex justify-between text-xs font-medium text-slate-500">
-              <span>Cuota {cuota.number} de {lot.totalCuotas}</span>
-              <span className="font-bold text-slate-800">{formatCLP(cuota.baseAmount || cuota.amount)}</span>
-            </div>
-          );
-        })}
+        {/* Selected Real Cuotas */}
+        {selectedInstallments.filter((c: any) => c.number > 0).map((cuota: any, idx: number) => (
+          <div key={idx} className="flex justify-between text-xs font-medium text-slate-500">
+            <span>Cuota {cuota.number} de {lot.totalCuotas}</span>
+            <span className="font-bold text-slate-800">{formatCLP(cuota.baseAmount || cuota.amount)}</span>
+          </div>
+        ))}
         
-        {penaltyAmount > 0 && (
+        {/* Intereses de Mora (Auto Penalty of selected real cuotas) */}
+        {selectedInstallments.filter((c: any) => c.number > 0).reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0) > 0 && (
           <div className="flex justify-between text-xs font-medium text-slate-500">
-            <span>Mora pendiente</span>
-            <span className="font-bold text-slate-800">{formatCLP(penaltyAmount)}</span>
+            <span>Intereses de Mora (Cuotas Vencidas)</span>
+            <span className="font-bold text-red-650">
+              {formatCLP(selectedInstallments.filter((c: any) => c.number > 0).reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0))}
+            </span>
+          </div>
+        )}
+
+        {/* Mora Histórica (Historical/Manual penalty) */}
+        {(selectedInstallments.find((c: any) => c.number === 0 || c.isHistorical)?.amount || 0) > 0 && (
+          <div className="flex justify-between text-xs font-medium text-slate-500">
+            <span>Intereses Anteriores (Mora Histórica)</span>
+            <span className="font-bold text-red-650">
+              {formatCLP(selectedInstallments.find((c: any) => c.number === 0 || c.isHistorical)?.amount || 0)}
+            </span>
           </div>
         )}
 
