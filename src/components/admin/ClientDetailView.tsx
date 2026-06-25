@@ -165,7 +165,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           date: d.created_at,
           url: `/api/documents/${d.id}`,
           fileType: d.file_type,
-          type: 'table'
+          type: d.type || 'table'
         }));
         
         const legacyDocs = (selectedClient.manual_documents || []).map((d: any, i: number) => ({

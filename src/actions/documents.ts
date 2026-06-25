@@ -74,7 +74,70 @@ export async function getReservationDocuments(reservationId: string) {
       orderBy: { created_at: "desc" },
     });
 
-    return { success: true, documents };
+    const receipts = await prisma.paymentReceipt.findMany({
+      where: {
+        reservation_id: reservationId,
+        status: "APPROVED",
+      },
+      select: {
+        id: true,
+        receipt_url: true,
+        scope: true,
+        nominal_installment_number: true,
+        nominal_installment_range: true,
+        created_at: true,
+        processed_at: true,
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    const receiptDocs = receipts.map((r: any) => {
+      let ext = "pdf";
+      let fileType = "application/pdf";
+      if (r.receipt_url && r.receipt_url.startsWith("data:")) {
+        const parts = r.receipt_url.split(";");
+        if (parts[0]) {
+          fileType = parts[0].substring(5);
+          if (fileType === "image/png") ext = "png";
+          else if (fileType === "image/jpeg") ext = "jpg";
+          else if (fileType === "image/webp") ext = "webp";
+          else if (fileType === "application/pdf") ext = "pdf";
+        }
+      }
+      
+      let docName = "Comprobante de Pago";
+      if (r.scope === "PIE") {
+        docName = `Comprobante_Pago_Pie.${ext}`;
+      } else {
+        docName = r.nominal_installment_range
+          ? `Comprobante_Pago_Cuotas_${r.nominal_installment_range}.${ext}`
+          : r.nominal_installment_number
+            ? `Comprobante_Pago_Cuota_${r.nominal_installment_number}.${ext}`
+            : `Comprobante_Pago_Cuota.${ext}`;
+      }
+
+      return {
+        id: r.id,
+        name: docName,
+        file_type: fileType,
+        created_at: r.processed_at || r.created_at,
+        type: "receipt",
+      };
+    });
+
+    const tableDocs = documents.map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      file_type: d.file_type,
+      created_at: d.created_at,
+      type: "table",
+    }));
+
+    const combined = [...tableDocs, ...receiptDocs].sort(
+      (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    );
+
+    return { success: true, documents: combined };
   } catch (error) {
     console.error("[ACTION] Error listing documents:", error);
     return { error: "Error al listar documentos", documents: [] };

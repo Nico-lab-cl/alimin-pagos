@@ -31,23 +31,58 @@ export async function GET(
       fileTypeField = document.file_type;
       reservationId = document.reservation_id;
     } else {
-      // Check if this is a legacy document request
-      const nameParam = url.searchParams.get("name");
-      if (nameParam) {
-        const reservation = await prisma.reservation.findUnique({
-          where: { id },
-          select: { id: true, user_id: true, manual_documents: true }
-        });
-        if (reservation && reservation.manual_documents) {
-          const docs = Array.isArray(reservation.manual_documents)
-            ? reservation.manual_documents
-            : JSON.parse(reservation.manual_documents as string);
-          const legacyDoc = docs.find((d: any) => d.name === nameParam);
-          if (legacyDoc) {
-            documentName = legacyDoc.name;
-            base64Content = legacyDoc.base64 || legacyDoc.content || legacyDoc.base64_content || (legacyDoc.url?.startsWith("data:") ? legacyDoc.url : "");
-            fileTypeField = legacyDoc.fileType || legacyDoc.file_type || null;
-            reservationId = reservation.id;
+      // Check if this is a payment receipt
+      const receipt = await prisma.paymentReceipt.findUnique({
+        where: { id },
+      });
+      if (receipt) {
+        let ext = "pdf";
+        let fileType = "application/pdf";
+        if (receipt.receipt_url && receipt.receipt_url.startsWith("data:")) {
+          const parts = receipt.receipt_url.split(";");
+          if (parts[0]) {
+            fileType = parts[0].substring(5);
+            if (fileType === "image/png") ext = "png";
+            else if (fileType === "image/jpeg") ext = "jpg";
+            else if (fileType === "image/webp") ext = "webp";
+            else if (fileType === "application/pdf") ext = "pdf";
+          }
+        }
+        
+        let docName = "Comprobante de Pago";
+        if (receipt.scope === "PIE") {
+          docName = `Comprobante_Pago_Pie.${ext}`;
+        } else {
+          docName = receipt.nominal_installment_range
+            ? `Comprobante_Pago_Cuotas_${receipt.nominal_installment_range}.${ext}`
+            : receipt.nominal_installment_number
+              ? `Comprobante_Pago_Cuota_${receipt.nominal_installment_number}.${ext}`
+              : `Comprobante_Pago_Cuota.${ext}`;
+        }
+
+        documentName = docName;
+        base64Content = receipt.receipt_url;
+        fileTypeField = fileType;
+        reservationId = receipt.reservation_id;
+      } else {
+        // Check if this is a legacy document request
+        const nameParam = url.searchParams.get("name");
+        if (nameParam) {
+          const reservation = await prisma.reservation.findUnique({
+            where: { id },
+            select: { id: true, user_id: true, manual_documents: true }
+          });
+          if (reservation && reservation.manual_documents) {
+            const docs = Array.isArray(reservation.manual_documents)
+              ? reservation.manual_documents
+              : JSON.parse(reservation.manual_documents as string);
+            const legacyDoc = docs.find((d: any) => d.name === nameParam);
+            if (legacyDoc) {
+              documentName = legacyDoc.name;
+              base64Content = legacyDoc.base64 || legacyDoc.content || legacyDoc.base64_content || (legacyDoc.url?.startsWith("data:") ? legacyDoc.url : "");
+              fileTypeField = legacyDoc.fileType || legacyDoc.file_type || null;
+              reservationId = reservation.id;
+            }
           }
         }
       }
