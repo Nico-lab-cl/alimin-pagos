@@ -342,7 +342,7 @@ export default function AlertsPage() {
                             <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded-md border border-white/5">{inst.monthName}</span>
                           </div>
                           <p className="text-[10px] text-red-400/80 font-bold uppercase tracking-widest">
-                            Venció el {formatDate(inst.dueDate)}
+                            Venció el {formatDate(inst.interestStartDate || inst.dueDate)}
                           </p>
                         </div>
                         <div className="text-right flex flex-col items-end gap-1.5">

@@ -121,7 +121,7 @@ export async function getFullPostventaData({
       let nextDueDate: Date | null = null;
       let lateDays = 0;
       let penaltyAmount = 0;
-      let overdueInstallments: { number: number; dueDate: string; monthName: string; lateDays: number; penaltyAmount: number }[] = [];
+      let overdueInstallments: { number: number; dueDate: string; interestStartDate: string; monthName: string; lateDays: number; penaltyAmount: number }[] = [];
       const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
@@ -214,9 +214,13 @@ export async function getFullPostventaData({
           if (autoPenaltyForThis > 0) {
             const days = Math.round(autoPenaltyForThis / activeDailyPenalty);
             const monthRaw = formatMonthAdmin.format(currentDue);
+            const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
+            const interestStart = new Date(currentDue);
+            interestStart.setDate(interestStart.getDate() + graceDays);
             overdueInstallments.push({
               number: installmentNumber,
               dueDate: currentDue.toISOString(),
+              interestStartDate: interestStart.toISOString(),
               monthName: monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1),
               lateDays: days,
               penaltyAmount: autoPenaltyForThis,

@@ -1120,7 +1120,7 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                                   <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">{inst.monthName}</span>
                                 </div>
                                 <p className="text-[10px] text-red-500 font-bold uppercase tracking-wider">
-                                  Venció el {formatDate(inst.dueDate)}
+                                  Venció el {formatDate(inst.interestStartDate || inst.dueDate)}
                                 </p>
                               </div>
                               <div className="text-right flex flex-col items-end gap-1.5">

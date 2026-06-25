@@ -1601,7 +1601,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                                   </span>
                                 </div>
                                 <p className="text-[10px] text-red-500 font-semibold">
-                                  Venció el {formatDate(inst.dueDate)}
+                                  Venció el {formatDate(inst.interestStartDate || inst.dueDate)}
                                 </p>
                               </div>
                               <div className="text-right flex flex-col items-end gap-1.5">
