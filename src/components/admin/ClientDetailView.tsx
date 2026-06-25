@@ -6,7 +6,7 @@ import {
   ArrowLeft, Bell, HelpCircle, User, FileText, Calendar, Building, Clock, 
   AlertTriangle, Phone, CheckCircle2, ChevronRight, ChevronDown, Download, Plus, 
   Mail, Settings, MoreVertical, MessageSquare, Send, ShieldAlert, History, Zap, Loader2,
-  Trash2, Eye, X, Save
+  Trash2, Eye, X, Save, Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -224,7 +224,15 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       } else {
         setIsFrozen(!isFrozen);
         toast.success(!isFrozen ? "Mora congelada correctamente" : "Mora activada correctamente");
+        
+        // Add a system note
+        const noteText = !isFrozen 
+          ? "Cuenta congelada: Se pausó la acumulación de intereses de mora para este cliente."
+          : "Cuenta reactivada: Se reanudó la acumulación automática de intereses de mora.";
+        await addClientNote(selectedClient.id, noteText, "Registro");
+        
         onUpdate();
+        fetchNotesAndHistory();
       }
     } catch (e) {
       toast.error("Error al guardar estado de mora");
@@ -309,6 +317,12 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
   const handleSaveMora = async () => {
     setIsSavingMoraSettings(true);
     try {
+      const prevStatus = selectedClient.mora_status || "ACTIVO";
+      const prevMode = selectedClient.penalty_mode || "AUTO";
+      const prevManual = selectedClient.manual_penalty || 0;
+      const prevStart = selectedClient.debt_start_date ? new Date(selectedClient.debt_start_date).toISOString().split("T")[0] : "";
+      const prevEnd = selectedClient.debt_end_date ? new Date(selectedClient.debt_end_date).toISOString().split("T")[0] : "";
+
       const res = await updateClientFinancials(selectedClient.id, selectedClient.lotId, {
         mora_status: moraForm.mora_status,
         mora_frozen: moraForm.mora_status === "CONGELADO",
@@ -323,6 +337,29 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       } else {
         toast.success("Configuración de mora aplicada con éxito");
         setShowMoraModal(false);
+        setIsFrozen(moraForm.mora_status === "CONGELADO");
+
+        // Construct descriptive system note of what changed
+        let changes = [];
+        if (prevStatus !== moraForm.mora_status) {
+          changes.push(`Estado de mora: de "${prevStatus}" a "${moraForm.mora_status}"`);
+        }
+        if (prevMode !== moraForm.penalty_mode) {
+          changes.push(`Modo de cálculo: de "${prevMode}" a "${moraForm.penalty_mode}"`);
+        }
+        if (Number(prevManual) !== Number(moraForm.manual_penalty)) {
+          changes.push(`Multa fija: de ${formatCLP(prevManual)} a ${formatCLP(moraForm.manual_penalty)}`);
+        }
+        if (prevStart !== (moraForm.debt_start_date || "")) {
+          changes.push(`Inicio de deuda: de "${prevStart || 'no definida'}" a "${moraForm.debt_start_date || 'no definida'}"`);
+        }
+        if (prevEnd !== (moraForm.debt_end_date || "")) {
+          changes.push(`Fin de deuda: de "${prevEnd || 'no definida'}" a "${moraForm.debt_end_date || 'no definida'}"`);
+        }
+
+        const noteText = `Ajustes de mora actualizados. Cambios aplicados:\n${changes.join("\n") || "Ningún cambio en los parámetros de mora."}`;
+        await addClientNote(selectedClient.id, noteText, "Registro");
+
         onUpdate();
         fetchNotesAndHistory();
       }
@@ -658,34 +695,43 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-slate-200 gap-6 overflow-x-auto whitespace-nowrap pb-1 no-scrollbar scroll-smooth">
-        <button
-          onClick={() => setActiveTab("GENERAL")}
-          className={cn(
-            "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
-            activeTab === "GENERAL" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
-          )}
-        >
-          Datos Generales
-        </button>
-        <button
-          onClick={() => setActiveTab("FINANCES")}
-          className={cn(
-            "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
-            activeTab === "FINANCES" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
-          )}
-        >
-          Finanzas y Mora
-        </button>
-        <button
-          onClick={() => setActiveTab("LOG")}
-          className={cn(
-            "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
-            activeTab === "LOG" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
-          )}
-        >
-          Bitácora
-        </button>
+      <div className="flex border-b border-slate-200 justify-between items-center pb-1 gap-4">
+        <div className="flex gap-6 overflow-x-auto whitespace-nowrap pb-0.5 no-scrollbar scroll-smooth">
+          <button
+            onClick={() => setActiveTab("GENERAL")}
+            className={cn(
+              "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
+              activeTab === "GENERAL" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
+            )}
+          >
+            Datos Generales
+          </button>
+          <button
+            onClick={() => setActiveTab("FINANCES")}
+            className={cn(
+              "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
+              activeTab === "FINANCES" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
+            )}
+          >
+            Finanzas y Mora
+          </button>
+          <button
+            onClick={() => setActiveTab("LOG")}
+            className={cn(
+              "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
+              activeTab === "LOG" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
+            )}
+          >
+            Bitácora
+          </button>
+        </div>
+
+        {isFrozen && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-250 text-slate-500 text-[10px] font-bold tracking-wider -mt-3 flex-shrink-0 shadow-sm">
+            <Lock className="w-3 h-3 text-slate-400" />
+            <span>MORA CONGELADA</span>
+          </div>
+        )}
       </div>
 
       {/* Content Render based on active tab */}
