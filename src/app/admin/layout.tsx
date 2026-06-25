@@ -13,6 +13,7 @@ import {
   Menu, 
   X,
   ChevronRight,
+  ChevronLeft,
   Zap,
   Globe,
   Bell,
@@ -75,6 +76,21 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const [allClients, setAllClients] = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Load collapse state from local storage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("admin_sidebar_collapsed");
+    if (saved === "true") {
+      setIsCollapsed(true);
+    }
+  }, []);
+
+  const toggleCollapse = () => {
+    const nextState = !isCollapsed;
+    setIsCollapsed(nextState);
+    localStorage.setItem("admin_sidebar_collapsed", String(nextState));
+  };
 
   // Load all clients for search autocomplete on mount
   useEffect(() => {
@@ -139,20 +155,38 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex overflow-hidden font-outfit">
       {/* Sidebar Placeholder - Desktop Only */}
-      <div className="hidden lg:block lg:w-64 flex-shrink-0" />
+      <div className={cn(
+        "hidden lg:block flex-shrink-0 transition-all duration-300",
+        isCollapsed ? "w-20" : "w-64"
+      )} />
 
       {/* Sidebar - Desktop & Mobile */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50
-        bg-white border-r border-slate-200/80
-        transition-all duration-300
-        ${isOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0 lg:w-64"}
-      `}>
-        <div className="h-full flex flex-col p-6">
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200/80 transition-all duration-300",
+        isOpen 
+          ? "translate-x-0 w-64" 
+          : isCollapsed 
+            ? "-translate-x-full lg:translate-x-0 lg:w-20" 
+            : "-translate-x-full lg:translate-x-0 lg:w-64"
+      )}>
+        <div className={cn("h-full flex flex-col p-6 transition-all duration-300", isCollapsed && "lg:px-4")}>
           {/* Logo Section */}
-          <div className="flex items-center gap-2 mb-10 px-2">
-            <img src="/logo.png" alt="Alimin Logo" className="w-8 h-8 object-contain" />
-            <h1 className="text-xl font-bold tracking-tight text-blue-650">Alimin</h1>
+          <div className={cn("flex items-center justify-between mb-10 px-2", isCollapsed && "lg:px-0 lg:justify-center lg:flex-col lg:gap-3")}>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="Alimin Logo" className="w-8 h-8 object-contain" />
+              {!isCollapsed && <h1 className="text-xl font-bold tracking-tight text-blue-650 animate-fade-in">Alimin</h1>}
+            </div>
+            
+            <button
+              onClick={toggleCollapse}
+              className={cn(
+                "hidden lg:flex p-1.5 rounded-lg hover:bg-slate-100 border border-slate-200/50 text-slate-400 hover:text-slate-600 transition-all cursor-pointer shadow-sm",
+                isCollapsed && "lg:mt-2"
+              )}
+              title={isCollapsed ? "Expandir menú" : "Colapsar menú"}
+            >
+              {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </button>
           </div>
 
           {/* Navigation */}
@@ -173,17 +207,19 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                       "group flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200",
                       isActive 
                         ? "bg-blue-600 text-white font-semibold shadow-sm" 
-                        : "text-slate-650 hover:text-slate-900 hover:bg-slate-50"
+                        : "text-slate-650 hover:text-slate-900 hover:bg-slate-50",
+                      isCollapsed && "lg:px-0 lg:justify-center"
                     )}
+                    title={isCollapsed ? item.label : undefined}
                   >
                     <div className="flex items-center gap-3">
                       <item.icon className={cn(
                         "w-5 h-5 flex-shrink-0 transition-colors",
                         isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"
                       )} />
-                      <span className="text-sm font-medium tracking-tight">{item.label}</span>
+                      {!isCollapsed && <span className="text-sm font-medium tracking-tight animate-fade-in">{item.label}</span>}
                     </div>
-                    {item.subItems && (
+                    {item.subItems && !isCollapsed && (
                       <ChevronRight className={cn(
                         "w-4 h-4 opacity-50 transition-transform duration-200",
                         isActive ? "text-white rotate-90" : "rotate-0"
@@ -191,7 +227,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                     )}
                   </Link>
                   
-                  {item.subItems && isActive && (
+                  {item.subItems && isActive && !isCollapsed && (
                     <div className="pl-6 mt-1 space-y-1">
                       {item.subItems.map((sub) => {
                         const isSubActive = pathname === sub.href;
@@ -201,7 +237,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                             href={sub.href}
                             className={cn(
                               "flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs font-medium transition-all",
-                              isSubActive ? "text-blue-600 bg-blue-50/50 font-semibold" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                              isSubActive ? "text-blue-600 bg-blue-50/50 font-semibold" : "text-slate-550 hover:text-slate-800 hover:bg-slate-50"
                             )}
                           >
                             <sub.icon className="w-4 h-4 flex-shrink-0" />
@@ -220,18 +256,26 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="mt-auto pt-6 border-t border-slate-100 space-y-1">
             <button
               onClick={() => toast.info("Soporte Técnico y de Operaciones disponible próximamente")}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-650 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all text-left cursor-pointer"
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-655 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all text-left cursor-pointer",
+                isCollapsed && "lg:px-0 lg:justify-center"
+              )}
+              title={isCollapsed ? "Soporte" : undefined}
             >
-              <Globe className="w-5 h-5 text-slate-400" />
-              <span>Soporte</span>
+              <Globe className="w-5 h-5 text-slate-400 flex-shrink-0" />
+              {!isCollapsed && <span className="animate-fade-in">Soporte</span>}
             </button>
             
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-600 hover:bg-red-50/50 text-sm font-semibold transition-all text-left cursor-pointer"
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-600 hover:bg-red-50/50 text-sm font-semibold transition-all text-left cursor-pointer",
+                isCollapsed && "lg:px-0 lg:justify-center"
+              )}
+              title={isCollapsed ? "Cerrar Sesión" : undefined}
             >
-              <LogOut className="w-5 h-5 text-red-500" />
-              <span>Cerrar Sesión</span>
+              <LogOut className="w-5 h-5 text-red-500 flex-shrink-0" />
+              {!isCollapsed && <span className="animate-fade-in">Cerrar Sesión</span>}
             </button>
           </div>
         </div>
@@ -272,7 +316,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               onFocus={() => setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-850 placeholder-slate-400 focus:border-blue-500 outline-none transition-all font-medium"
+              className="w-full bg-slate-55 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-850 placeholder-slate-400 focus:border-blue-500 outline-none transition-all font-medium"
             />
             
             {showDropdown && searchResults.length > 0 && (
@@ -301,12 +345,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
           
           <div className="flex items-center gap-6">
-            <button className="relative p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-550 hover:text-slate-800 transition-all shadow-sm">
+            <button className="relative p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-550 hover:text-slate-850 transition-all shadow-sm">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />
             </button>
             
-            <button className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-550 hover:text-slate-800 transition-all shadow-sm">
+            <button className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-550 hover:text-slate-850 transition-all shadow-sm">
               <BookOpen className="w-4 h-4" />
             </button>
           </div>
