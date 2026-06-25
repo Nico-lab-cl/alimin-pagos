@@ -76,21 +76,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const [allClients, setAllClients] = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  // Load collapse state from local storage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("admin_sidebar_collapsed");
-    if (saved === "true") {
-      setIsCollapsed(true);
-    }
-  }, []);
-
-  const toggleCollapse = () => {
-    const nextState = !isCollapsed;
-    setIsCollapsed(nextState);
-    localStorage.setItem("admin_sidebar_collapsed", String(nextState));
-  };
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const isCollapsed = !isSidebarHovered;
 
   // Load all clients for search autocomplete on mount
   useEffect(() => {
@@ -157,36 +144,29 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       {/* Sidebar Placeholder - Desktop Only */}
       <div className={cn(
         "hidden lg:block flex-shrink-0 transition-all duration-300",
-        isCollapsed ? "w-20" : "w-64"
+        isSidebarHovered ? "w-64" : "w-20"
       )} />
 
       {/* Sidebar - Desktop & Mobile */}
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200/80 transition-all duration-300",
-        isOpen 
-          ? "translate-x-0 w-64" 
-          : isCollapsed 
-            ? "-translate-x-full lg:translate-x-0 lg:w-20" 
-            : "-translate-x-full lg:translate-x-0 lg:w-64"
-      )}>
+      <aside
+        onMouseEnter={() => setIsSidebarHovered(true)}
+        onMouseLeave={() => setIsSidebarHovered(false)}
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200/80 transition-all duration-300",
+          isOpen 
+            ? "translate-x-0 w-64" 
+            : isSidebarHovered 
+              ? "-translate-x-full lg:translate-x-0 lg:w-64" 
+              : "-translate-x-full lg:translate-x-0 lg:w-20"
+        )}
+      >
         <div className={cn("h-full flex flex-col p-6 transition-all duration-300", isCollapsed && "lg:px-4")}>
           {/* Logo Section */}
-          <div className={cn("flex items-center justify-between mb-10 px-2", isCollapsed && "lg:px-0 lg:justify-center lg:flex-col lg:gap-3")}>
+          <div className={cn("flex items-center justify-between mb-10 px-2", isCollapsed && "lg:px-0 lg:justify-center")}>
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="Alimin Logo" className="w-8 h-8 object-contain" />
-              {!isCollapsed && <h1 className="text-xl font-bold tracking-tight text-blue-650 animate-fade-in">Alimin</h1>}
+              {!isCollapsed && <h1 className="text-xl font-bold tracking-tight text-blue-650 whitespace-nowrap animate-fade-in">Alimin</h1>}
             </div>
-            
-            <button
-              onClick={toggleCollapse}
-              className={cn(
-                "hidden lg:flex p-1.5 rounded-lg hover:bg-slate-100 border border-slate-200/50 text-slate-400 hover:text-slate-600 transition-all cursor-pointer shadow-sm",
-                isCollapsed && "lg:mt-2"
-              )}
-              title={isCollapsed ? "Expandir menú" : "Colapsar menú"}
-            >
-              {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-            </button>
           </div>
 
           {/* Navigation */}
