@@ -853,7 +853,7 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
                       return (
                         <tr key={idx} className="hover:bg-slate-50/30 font-medium">
                           <td className="px-4 py-3 font-bold text-slate-800">Cuota #{cuota.number}</td>
-                          <td className="px-4 py-3 text-slate-500">{formatDateMockup(cuota.dueDate)}</td>
+                          <td className="px-4 py-3 text-slate-500">{formatDateMockup(cuota.interestStartDate || cuota.dueDate)}</td>
                           <td className="px-4 py-3 text-red-655 font-bold">{cuota.lateDays} días</td>
                           <td className="px-4 py-3 text-slate-500 text-right">{formatCLP(cuota.dailyPenalty || data.dailyPenalty || 1500)}</td>
                           <td className="px-4 py-3 font-bold text-red-655 text-right">{formatCLP(cuota.penaltyAmount)}</td>

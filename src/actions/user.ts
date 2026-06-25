@@ -244,6 +244,24 @@ export async function getUserLots() {
           graceEnd.setDate(currentDue.getDate() + graceDays);
           graceEnd.setHours(23, 59, 59, 999);
 
+          let interestStartDate = new Date(currentDue);
+          interestStartDate.setDate(currentDue.getDate() + graceDays + 1);
+
+          const appliedDebtStartDate = (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null);
+          if (appliedDebtStartDate) {
+            const dStart = new Date(appliedDebtStartDate);
+            if (dStart >= currentDue) {
+              interestStartDate = dStart;
+            }
+          }
+
+          if (project.penalty_start_date) {
+            const cutoff = new Date(project.penalty_start_date);
+            if (interestStartDate < cutoff) {
+              interestStartDate = cutoff;
+            }
+          }
+
           if (currentDate >= currentDue && installmentPenaltyAmount === 0 && !res.mora_frozen && currentDate <= graceEnd) {
             isGracePeriod = true;
           }
@@ -254,6 +272,7 @@ export async function getUserLots() {
           upcomingInstallments.push({
             number: installmentNumber,
             dueDate: currentDue.toISOString(),
+            interestStartDate: interestStartDate.toISOString(),
             baseAmount: installmentBaseAmount,
             amount: finalAmount,
             monthName: monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1),
