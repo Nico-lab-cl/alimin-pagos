@@ -556,7 +556,9 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
 
   const baseAmount = selectedInstallments.filter((c: any) => !c.isHistorical).reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
   const penaltyAmount = selectedInstallments.reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0);
-  const totalAmount = baseAmount + penaltyAmount;
+  const totalAmount = baseAmount + penaltyAmount + moraHistorica;
+
+  const hasMoraOrPenalty = penaltyAmount > 0 || moraHistorica > 0;
 
   const handleSubmit = async () => {
     if (!receiptBase64) {
@@ -620,7 +622,7 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
   const bankEmail = data.bank?.email || "inmobiliaria@aliminspa.cl";
 
   return (
-    <div className={penaltyAmount > 0 ? "w-full space-y-6 animate-fade-in" : "max-w-3xl mx-auto space-y-6 animate-fade-in"}>
+    <div className={hasMoraOrPenalty ? "w-full space-y-6 animate-fade-in" : "max-w-3xl mx-auto space-y-6 animate-fade-in"}>
       {/* Property Header Card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -635,14 +637,14 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
           </div>
         </div>
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-          data.isUpToDate && penaltyAmount === 0 ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-655"
+          data.isUpToDate && !hasMoraOrPenalty ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-655"
         }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${data.isUpToDate && penaltyAmount === 0 ? "bg-emerald-500" : "bg-orange-500"}`} />
-          {data.isUpToDate && penaltyAmount === 0 ? "Al día" : "Pago Pendiente"}
+          <span className={`w-1.5 h-1.5 rounded-full ${data.isUpToDate && !hasMoraOrPenalty ? "bg-emerald-500" : "bg-orange-500"}`} />
+          {data.isUpToDate && !hasMoraOrPenalty ? "Al día" : "Pago Pendiente"}
         </span>
       </div>
 
-      {penaltyAmount > 0 ? (
+      {hasMoraOrPenalty ? (
         <div className="space-y-6 animate-fade-in">
           {/* Header titles */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">

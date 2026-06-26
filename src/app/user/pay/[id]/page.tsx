@@ -234,7 +234,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
 
   const baseAmount = selectedInstallments.filter((c: any) => !c.isHistorical).reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
   const penaltyAmount = selectedInstallments.reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0);
-  const totalAmount = baseAmount + penaltyAmount;
+  const totalAmount = baseAmount + penaltyAmount + moraHistorica;
 
   // Split penalty into displays matching mockup style
   const adminCharge = 5000;
@@ -249,8 +249,10 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   const bankRut = lot.bank?.rut || "76.543.210-1";
   const bankEmail = lot.bank?.email || "inmobiliaria@aliminspa.cl";
 
+  const hasMoraOrPenalty = penaltyAmount > 0 || moraHistorica > 0;
+
   return (
-    <div className={penaltyAmount > 0 ? "max-w-7xl mx-auto space-y-6 animate-fade-in" : "max-w-4xl mx-auto space-y-6 animate-fade-in"}>
+    <div className={hasMoraOrPenalty ? "max-w-7xl mx-auto space-y-6 animate-fade-in" : "max-w-4xl mx-auto space-y-6 animate-fade-in"}>
       {/* Back Button */}
       <Link href="/user" className="flex items-center gap-2 text-slate-400 hover:text-slate-700 transition-all w-fit group text-xs font-bold uppercase tracking-wider">
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
@@ -271,14 +273,14 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           </div>
         </div>
         <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
-          lot.isUpToDate && penaltyAmount === 0 ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-655"
+          lot.isUpToDate && !hasMoraOrPenalty ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-655"
         }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${lot.isUpToDate && penaltyAmount === 0 ? "bg-emerald-500" : "bg-orange-500"}`} />
-          {lot.isUpToDate && penaltyAmount === 0 ? "Al día" : "Pago Pendiente"}
+          <span className={`w-1.5 h-1.5 rounded-full ${lot.isUpToDate && !hasMoraOrPenalty ? "bg-emerald-500" : "bg-orange-500"}`} />
+          {lot.isUpToDate && !hasMoraOrPenalty ? "Al día" : "Pago Pendiente"}
         </span>
       </div>
 
-      {penaltyAmount > 0 ? (
+      {hasMoraOrPenalty ? (
         <div className="space-y-6">
           {/* Header titles */}
           <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm">
@@ -773,6 +775,13 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 <span className="font-bold text-slate-800">{formatCLP(cuota.baseAmount || cuota.amount)}</span>
               </div>
             ))}
+
+            {moraHistorica > 0 && (
+              <div className="flex justify-between text-xs font-medium text-red-600">
+                <span>Mora histórica (acuerdo fijo)</span>
+                <span className="font-bold">{formatCLP(moraHistorica)}</span>
+              </div>
+            )}
             
             <div className="pt-3 border-t border-slate-100 flex justify-between items-center font-bold">
               <span className="text-xs text-slate-700">TOTAL A PAGAR</span>
