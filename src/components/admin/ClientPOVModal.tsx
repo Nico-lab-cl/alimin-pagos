@@ -554,7 +554,7 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
   const historicalMoraItem = selectedInstallments.find((c: any) => c.number === 0 || c.isHistorical);
   const moraHistorica = historicalMoraItem ? (historicalMoraItem.penaltyAmount || historicalMoraItem.amount || 0) : 0;
 
-  const baseAmount = selectedInstallments.reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
+  const baseAmount = selectedInstallments.filter((c: any) => !c.isHistorical).reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
   const penaltyAmount = selectedInstallments.reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0);
   const totalAmount = baseAmount + penaltyAmount;
 
