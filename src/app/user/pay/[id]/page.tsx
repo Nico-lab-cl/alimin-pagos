@@ -19,9 +19,7 @@ import {
   X,
   ShieldAlert,
   ChevronLeft,
-  ChevronRight,
-  Minus,
-  Plus
+  ChevronRight
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -291,8 +289,49 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm">
             <h2 className="text-xl font-bold text-slate-800">Resumen de pago</h2>
             <p className="text-xs text-slate-500 font-semibold mt-1">
-              {lot.clientName || "Cliente"} · {overdueCount > 0 ? (overdueCount === 1 ? "1 cuota vencida" : `${overdueCount} cuotas vencidas`) : "Al día con mora pendiente"}
+              {lot.clientName || "Cliente"} · {overdueCount > 0 ? (overdueCount === 1 ? "1 cuota vencida" : `${overdueCount} cuotas vencidas`) : "Cuotas al día"}{moraHistorica > 0 ? " · Mora pendiente" : ""}
             </p>
+          </div>
+
+          {/* Cuotas Selector Dropdown */}
+          <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-2">
+            <label htmlFor="cuotasSelect" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Selecciona cuántas cuotas pagar{overdueCount > 0 ? ` (mínimo ${overdueCount} vencida${overdueCount > 1 ? 's' : ''})` : ''}
+            </label>
+            <div className="relative">
+              <select
+                id="cuotasSelect"
+                value={installmentsCount}
+                onChange={(e) => { setInstallmentsCount(Number(e.target.value)); setCarouselStartIndex(0); setActiveIdx(0); setShowingTotal(false); }}
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 focus:outline-none cursor-pointer appearance-none"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 1rem center",
+                  backgroundSize: "1.25rem"
+                }}
+              >
+                {Array.from(
+                  { length: maxInstallmentsCount - mandatoryCount + 1 },
+                  (_, i) => {
+                    const q = mandatoryCount + i;
+                    const selectedObjects = lot.upcomingInstallments?.slice(0, q) || [];
+                    const realCuotas = selectedObjects.filter((c: any) => c.number > 0);
+                    const realCount = realCuotas.length;
+                    const realBase = realCuotas.reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
+                    const realPenalty = realCuotas.reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0);
+                    const hist = selectedObjects.find((c: any) => c.number === 0 || c.isHistorical);
+                    const histMora = hist ? (hist.penaltyAmount || hist.amount || 0) : 0;
+                    const total = realBase + realPenalty + histMora;
+                    return (
+                      <option key={q} value={q}>
+                        {realCount} {realCount === 1 ? 'Cuota' : 'Cuotas'} — {formatCLP(total)}{histMora > 0 ? ' (incl. mora histórica)' : ''}
+                      </option>
+                    );
+                  }
+                )}
+              </select>
+            </div>
           </div>
 
           {/* Cards Section */}
@@ -432,46 +471,6 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 ))}
               </div>
             )}
-
-            {/* +/- Cuotas selector */}
-            <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cuotas a pagar</p>
-                <p className="text-xs font-semibold text-slate-700 mt-0.5">
-                  {overdueCount > 0 && (
-                    <span className="text-red-600 font-bold">{overdueCount} obligatoria{overdueCount > 1 ? 's' : ''}</span>
-                  )}
-                  {realCuotasForCards.length - Math.max(1, overdueCount) > 0 && (
-                    <span className="text-slate-500">
-                      {overdueCount > 0 ? ' + ' : ''}
-                      {realCuotasForCards.length - Math.max(1, overdueCount)} adicional{realCuotasForCards.length - Math.max(1, overdueCount) > 1 ? 'es' : ''}
-                    </span>
-                  )}
-                  {overdueCount === 0 && realCuotasForCards.length - Math.max(1, overdueCount) === 0 && (
-                    <span>{realCuotasForCards.length} cuota{realCuotasForCards.length !== 1 ? 's' : ''}</span>
-                  )}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setInstallmentsCount(prev => Math.max(mandatoryCount, prev - 1)); setCarouselStartIndex(0); }}
-                  disabled={installmentsCount <= mandatoryCount}
-                  className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-sm font-extrabold text-slate-800 min-w-[1.5rem] text-center">{realCuotasForCards.length}</span>
-                <button
-                  type="button"
-                  onClick={() => setInstallmentsCount(prev => Math.min(maxInstallmentsCount, prev + 1))}
-                  disabled={installmentsCount >= maxInstallmentsCount}
-                  className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Details Panel & Summary Bar Layout */}
