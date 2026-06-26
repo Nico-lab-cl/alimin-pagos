@@ -32,7 +32,9 @@ import {
   ArrowRight,
   ShieldAlert,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Minus,
+  Plus
 } from "lucide-react";
 
 interface ClientPOVModalProps {
@@ -514,7 +516,10 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
   }, []);
 
   const overdueCount = data.upcomingInstallments?.filter((c: any) => c.isOverdue || c.hasPenalty).length || 0;
-  const mandatoryCount = Math.max(1, overdueCount);
+  const hasHistoricalItem = data.upcomingInstallments?.some((c: any) => c.number === 0 || c.isHistorical) || false;
+  const histOffset = hasHistoricalItem ? 1 : 0;
+  const mandatoryCount = histOffset + Math.max(1, overdueCount);
+  const maxInstallmentsCount = histOffset + (data.upcomingInstallments?.filter((c: any) => c.number > 0).length || 1);
 
   useEffect(() => {
     if (data.upcomingInstallments && data.upcomingInstallments.length > 0) {
@@ -522,7 +527,7 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
         setInstallmentsCount(mandatoryCount);
       }
     }
-  }, [data.upcomingInstallments, installmentsCount, mandatoryCount]);
+  }, [data.upcomingInstallments, mandatoryCount]);
 
   const handleCopy = async (text: string, label: string) => {
     if (!text) return;
@@ -650,7 +655,7 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <h2 className="text-xl font-bold text-slate-800">Resumen de pago</h2>
             <p className="text-xs text-slate-550 font-semibold mt-1">
-              {data.clientName || "Cliente"} · {overdueCount === 1 ? "1 cuota vencida" : `${overdueCount} cuotas vencidas`}
+              {data.clientName || "Cliente"} · {overdueCount > 0 ? (overdueCount === 1 ? "1 cuota vencida" : `${overdueCount} cuotas vencidas`) : "Al día con mora pendiente"}
             </p>
           </div>
 
@@ -791,6 +796,46 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
                 ))}
               </div>
             )}
+
+            {/* +/- Cuotas selector */}
+            <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cuotas a pagar</p>
+                <p className="text-xs font-semibold text-slate-700 mt-0.5">
+                  {overdueCount > 0 && (
+                    <span className="text-red-600 font-bold">{overdueCount} obligatoria{overdueCount > 1 ? 's' : ''}</span>
+                  )}
+                  {realCuotasForCards.length - Math.max(1, overdueCount) > 0 && (
+                    <span className="text-slate-500">
+                      {overdueCount > 0 ? ' + ' : ''}
+                      {realCuotasForCards.length - Math.max(1, overdueCount)} adicional{realCuotasForCards.length - Math.max(1, overdueCount) > 1 ? 'es' : ''}
+                    </span>
+                  )}
+                  {overdueCount === 0 && realCuotasForCards.length - Math.max(1, overdueCount) === 0 && (
+                    <span>{realCuotasForCards.length} cuota{realCuotasForCards.length !== 1 ? 's' : ''}</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setInstallmentsCount(prev => Math.max(mandatoryCount, prev - 1)); setCarouselStartIndex(0); }}
+                  disabled={installmentsCount <= mandatoryCount}
+                  className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-sm font-extrabold text-slate-800 min-w-[1.5rem] text-center">{realCuotasForCards.length}</span>
+                <button
+                  type="button"
+                  onClick={() => setInstallmentsCount(prev => Math.min(maxInstallmentsCount, prev + 1))}
+                  disabled={installmentsCount >= maxInstallmentsCount}
+                  className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Details Panel & Summary Bar Layout */}

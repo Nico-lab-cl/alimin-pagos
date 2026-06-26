@@ -19,7 +19,9 @@ import {
   X,
   ShieldAlert,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Minus,
+  Plus
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -69,16 +71,15 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   }, [id]);
 
   useEffect(() => {
-    if (lot) {
-      if (lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
-        const overdueCount = lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length;
-        const mandatoryCount = Math.max(1, overdueCount);
-        if (installmentsCount < mandatoryCount) {
-          setInstallmentsCount(mandatoryCount);
-        }
+    if (lot && lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
+      const hasHist = lot.upcomingInstallments.some((c: any) => c.number === 0 || c.isHistorical);
+      const overdue = lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length;
+      const minCount = (hasHist ? 1 : 0) + Math.max(1, overdue);
+      if (installmentsCount < minCount) {
+        setInstallmentsCount(minCount);
       }
     }
-  }, [lot, installmentsCount]);
+  }, [lot]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -222,7 +223,11 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   }
 
   const overdueCount = lot.upcomingInstallments?.filter((c: any) => c.isOverdue || c.hasPenalty).length || 0;
-  const mandatoryCount = Math.max(1, overdueCount);
+  const hasHistoricalItem = lot.upcomingInstallments?.some((c: any) => c.number === 0 || c.isHistorical) || false;
+  const histOffset = hasHistoricalItem ? 1 : 0;
+  // mandatoryCount = historical slot (if any) + all overdue cuotas (min 1 real cuota)
+  const mandatoryCount = histOffset + Math.max(1, overdueCount);
+  const maxInstallmentsCount = histOffset + (lot.upcomingInstallments?.filter((c: any) => c.number > 0).length || 1);
 
   // Breakdown Calculations
   const selectedInstallments = lot.upcomingInstallments?.slice(0, installmentsCount) || [];
@@ -286,7 +291,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm">
             <h2 className="text-xl font-bold text-slate-800">Resumen de pago</h2>
             <p className="text-xs text-slate-500 font-semibold mt-1">
-              {lot.clientName || "Cliente"} · {overdueCount === 1 ? "1 cuota vencida" : `${overdueCount} cuotas vencidas`}
+              {lot.clientName || "Cliente"} · {overdueCount > 0 ? (overdueCount === 1 ? "1 cuota vencida" : `${overdueCount} cuotas vencidas`) : "Al día con mora pendiente"}
             </p>
           </div>
 
@@ -427,6 +432,46 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 ))}
               </div>
             )}
+
+            {/* +/- Cuotas selector */}
+            <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cuotas a pagar</p>
+                <p className="text-xs font-semibold text-slate-700 mt-0.5">
+                  {overdueCount > 0 && (
+                    <span className="text-red-600 font-bold">{overdueCount} obligatoria{overdueCount > 1 ? 's' : ''}</span>
+                  )}
+                  {realCuotasForCards.length - Math.max(1, overdueCount) > 0 && (
+                    <span className="text-slate-500">
+                      {overdueCount > 0 ? ' + ' : ''}
+                      {realCuotasForCards.length - Math.max(1, overdueCount)} adicional{realCuotasForCards.length - Math.max(1, overdueCount) > 1 ? 'es' : ''}
+                    </span>
+                  )}
+                  {overdueCount === 0 && realCuotasForCards.length - Math.max(1, overdueCount) === 0 && (
+                    <span>{realCuotasForCards.length} cuota{realCuotasForCards.length !== 1 ? 's' : ''}</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setInstallmentsCount(prev => Math.max(mandatoryCount, prev - 1)); setCarouselStartIndex(0); }}
+                  disabled={installmentsCount <= mandatoryCount}
+                  className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-sm font-extrabold text-slate-800 min-w-[1.5rem] text-center">{realCuotasForCards.length}</span>
+                <button
+                  type="button"
+                  onClick={() => setInstallmentsCount(prev => Math.min(maxInstallmentsCount, prev + 1))}
+                  disabled={installmentsCount >= maxInstallmentsCount}
+                  className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Details Panel & Summary Bar Layout */}
