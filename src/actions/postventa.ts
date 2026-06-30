@@ -423,9 +423,12 @@ export async function updateReservation(
   }
 
   try {
-    await prisma.reservation.update({
-      where: { id: reservationId },
-      data,
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+      await tx.reservation.update({
+        where: { id: reservationId },
+        data,
+      });
     });
 
     memoryCache.deleteByPrefix("postventa_");
@@ -482,20 +485,21 @@ export async function approveReceipt(receiptId: string) {
 
     // Update reservation state and Ledger
     if (receipt.scope === "PIE") {
-      await prisma.$transaction([
-        prisma.reservation.update({
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+        await tx.reservation.update({
           where: { id: receipt.reservation_id },
           data: { pie_status: "PAID" },
-        }),
-        prisma.financialLedger.create({
+        });
+        await tx.financialLedger.create({
           data: {
             reservation_id: receipt.reservation_id,
             amount_clp: receipt.amount_clp,
             category: "PIE",
             description: "Pago de Pie Aprobado"
           }
-        })
-      ]);
+        });
+      });
     } else if (receipt.scope === "INSTALLMENT") {
       // Get reservation with lot to calculate expected amount
       const res = receipt.reservation;
@@ -523,67 +527,60 @@ export async function approveReceipt(receiptId: string) {
         let penaltyOwed = 0;
         if (res.penalty_mode === "FIXED" && res.manual_penalty) {
           penaltyOwed = res.manual_penalty;
-        } else {
-          // If purely AUTO, they owe whatever the system demanded at the time they uploaded the receipt
-          // But since we don't have historical snapshot, we assume if they paid extra, it was for the penalty
-          // and if they didn't, the shortfall becomes the new fixed penalty if we need to carry it over.
-          // To be safe, if they owe a dynamic amount, whatever wasn't paid of the dynamic amount becomes FIXED.
-          // Wait, the client usually pays exactly the requested amount.
-          // Let's assume shortfall is intended for the old manual penalty, or if not enough, we just carry the remainder.
-          // The user specifically said "si no cumple con el interes acomulado se le suma lo restante a los intereses que vaya acomulando".
         }
+        
         // Since calculating exact historical AUTO penalty here is complex, we just calculate raw shortfall vs current total expected (base + fixed).
         const totalExpected = totalExpectedPerCuota + currentPenalty;
         const shortfall = totalExpected - paid;
-
-        const operations = [];
 
         let nextPenaltyMode = "AUTO";
         if (shortfall > 0) {
           nextPenaltyMode = res.penalty_mode === "MIXED" ? "MIXED" : "FIXED";
         }
 
-        operations.push(prisma.reservation.update({
-          where: { id: receipt.reservation_id },
-          data: {
-            installments_paid: {
-              increment: receipt.installments_count || 1,
+        await prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+          await tx.reservation.update({
+            where: { id: receipt.reservation_id },
+            data: {
+              installments_paid: {
+                increment: receipt.installments_count || 1,
+              },
+              next_payment_date: null,
+              manual_penalty: shortfall > 0 ? shortfall : null,
+              penalty_mode: nextPenaltyMode,
+              debt_start_date: null,
+              debt_end_date: null,
             },
-            next_payment_date: null,
-            manual_penalty: shortfall > 0 ? shortfall : null,
-            penalty_mode: nextPenaltyMode,
-            debt_start_date: null,
-            debt_end_date: null,
-          },
-        }));
+          });
 
-        if (cuotaPaidAmount > 0) {
-          operations.push(prisma.financialLedger.create({
-            data: {
-              reservation_id: receipt.reservation_id,
-              amount_clp: cuotaPaidAmount,
-              category: "CUOTA",
-              description: `Pago Cuota x${receipt.installments_count || 1} Aprobado`
-            }
-          }));
-        }
+          if (cuotaPaidAmount > 0) {
+            await tx.financialLedger.create({
+              data: {
+                reservation_id: receipt.reservation_id,
+                amount_clp: cuotaPaidAmount,
+                category: "CUOTA",
+                description: `Pago Cuota x${receipt.installments_count || 1} Aprobado`
+              }
+            });
+          }
 
-        if (penaltyPaidAmount > 0) {
-          operations.push(prisma.financialLedger.create({
-            data: {
-              reservation_id: receipt.reservation_id,
-              amount_clp: penaltyPaidAmount,
-              category: "PENALTY",
-              description: `Pago Mora Aprobada`
-            }
-          }));
-        }
-
-        await prisma.$transaction(operations);
+          if (penaltyPaidAmount > 0) {
+            await tx.financialLedger.create({
+              data: {
+                reservation_id: receipt.reservation_id,
+                amount_clp: penaltyPaidAmount,
+                category: "PENALTY",
+                description: `Pago Mora Aprobada`
+              }
+            });
+          }
+        });
       } else {
         // Fallback if reservation not found
-        await prisma.$transaction([
-          prisma.reservation.update({
+        await prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+          await tx.reservation.update({
             where: { id: receipt.reservation_id },
             data: {
               installments_paid: {
@@ -595,18 +592,17 @@ export async function approveReceipt(receiptId: string) {
               debt_start_date: null,
               debt_end_date: null,
             },
-          }),
-          prisma.financialLedger.create({
+          });
+          await tx.financialLedger.create({
             data: {
               reservation_id: receipt.reservation_id,
               amount_clp: receipt.amount_clp,
               category: "CUOTA",
               description: `Pago Cuota (Fallback) Aprobado`
             }
-          })
-        ]);
+          });
+        });
       }
-
     }
 
     // Auto-generate Digital Payment Receipt PDF
@@ -925,13 +921,16 @@ export async function updateFinancialLedgerAmount(
 
     // Update Reservation installments_paid count if changed
     if (entry.category === "CUOTA" && diff !== 0) {
-      await prisma.reservation.update({
-        where: { id: entry.reservation_id },
-        data: {
-          installments_paid: {
-            increment: diff
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+        await tx.reservation.update({
+          where: { id: entry.reservation_id },
+          data: {
+            installments_paid: {
+              increment: diff
+            }
           }
-        }
+        });
       });
     }
 
@@ -1472,26 +1471,25 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
     if (data.extra_paid_amount !== undefined) reservationUpdateData.extra_paid_amount = Number(data.extra_paid_amount);
     if (data.installment_ranges !== undefined) reservationUpdateData.installment_ranges = data.installment_ranges;
 
-    const operations: any[] = [];
-    if (Object.keys(lotUpdateData).length > 0) {
-      operations.push(
-        prisma.lot.update({
-          where: { id: Number(lotId) || lotId },
-          data: lotUpdateData
-        })
-      );
-    }
-    if (Object.keys(reservationUpdateData).length > 0) {
-      operations.push(
-        prisma.reservation.update({
-          where: { id: reservationId },
-          data: reservationUpdateData
-        })
-      );
-    }
+    const hasLotUpdate = Object.keys(lotUpdateData).length > 0;
+    const hasReservationUpdate = Object.keys(reservationUpdateData).length > 0;
 
-    if (operations.length > 0) {
-      await prisma.$transaction(operations);
+    if (hasLotUpdate || hasReservationUpdate) {
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+        if (hasLotUpdate) {
+          await tx.lot.update({
+            where: { id: Number(lotId) || lotId },
+            data: lotUpdateData
+          });
+        }
+        if (hasReservationUpdate) {
+          await tx.reservation.update({
+            where: { id: reservationId },
+            data: reservationUpdateData
+          });
+        }
+      });
     }
 
     memoryCache.deleteByPrefix("postventa_");
@@ -1647,10 +1645,9 @@ export async function registerManualPayment(
       const totalExpected = totalExpectedPerCuota + currentPenalty;
       const shortfall = totalExpected - paid;
 
-      const operations = [];
-
-      operations.push(
-        prisma.reservation.update({
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+        await tx.reservation.update({
           where: { id: reservationId },
           data: {
             installments_paid: {
@@ -1662,12 +1659,10 @@ export async function registerManualPayment(
             debt_start_date: null,
             debt_end_date: null,
           },
-        })
-      );
+        });
 
-      if (cuotaPaidAmount > 0) {
-        operations.push(
-          prisma.financialLedger.create({
+        if (cuotaPaidAmount > 0) {
+          await tx.financialLedger.create({
             data: {
               reservation_id: reservationId,
               amount_clp: cuotaPaidAmount,
@@ -1675,13 +1670,11 @@ export async function registerManualPayment(
               description: `Pago Manual Cuota x${data.installmentsCount}`,
               paid_at: paymentDate,
             },
-          })
-        );
-      }
+          });
+        }
 
-      if (penaltyPaidAmount > 0) {
-        operations.push(
-          prisma.financialLedger.create({
+        if (penaltyPaidAmount > 0) {
+          await tx.financialLedger.create({
             data: {
               reservation_id: reservationId,
               amount_clp: penaltyPaidAmount,
@@ -1689,13 +1682,11 @@ export async function registerManualPayment(
               description: `Pago Manual Mora`,
               paid_at: paymentDate,
             },
-          })
-        );
-      }
+          });
+        }
 
-      if (data.receiptUrl) {
-        operations.push(
-          prisma.paymentReceipt.create({
+        if (data.receiptUrl) {
+          await tx.paymentReceipt.create({
             data: {
               id: receiptId,
               reservation_id: reservationId,
@@ -1712,11 +1703,9 @@ export async function registerManualPayment(
                   ? `${nextInstNum}-${nextInstNum + data.installmentsCount - 1}`
                   : null,
             },
-          })
-        );
-      }
-
-      await prisma.$transaction(operations);
+          });
+        }
+      });
     }
 
     // Auto-generate Digital Payment Receipt PDF for Manual Payment
@@ -2430,11 +2419,14 @@ export async function deletePaymentReceipt(receiptId: string) {
     // Revert reservation state if approved
     if (receipt.status === "APPROVED") {
       if (receipt.scope === "INSTALLMENT") {
-        await prisma.reservation.update({
-          where: { id: receipt.reservation_id },
-          data: {
-            installments_paid: { decrement: receipt.installments_count || 1 },
-          },
+        await prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+          await tx.reservation.update({
+            where: { id: receipt.reservation_id },
+            data: {
+              installments_paid: { decrement: receipt.installments_count || 1 },
+            },
+          });
         });
       } else if (receipt.scope === "PIE") {
         await prisma.reservation.update({
@@ -2757,19 +2749,22 @@ export async function updateLot(
     const lot = await prisma.lot.findUnique({ where: { id: lotId } });
     if (!lot) return { error: "Lote no encontrado" };
 
-    await prisma.lot.update({
-      where: { id: lotId },
-      data: {
-        ...(data.status !== undefined && { status: data.status }),
-        ...(data.price_total_clp !== undefined && { price_total_clp: data.price_total_clp }),
-        ...(data.reservation_amount_clp !== undefined && { reservation_amount_clp: data.reservation_amount_clp }),
-        ...(data.pie !== undefined && { pie: data.pie }),
-        ...(data.cuotas !== undefined && { cuotas: data.cuotas }),
-        ...(data.valor_cuota !== undefined && { valor_cuota: data.valor_cuota }),
-        ...(data.last_installment_amount !== undefined && { last_installment_amount: data.last_installment_amount }),
-        ...(data.area_m2 !== undefined && { area_m2: data.area_m2 }),
-        ...(data.stage !== undefined && { stage: data.stage || null }),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+      await tx.lot.update({
+        where: { id: lotId },
+        data: {
+          ...(data.status !== undefined && { status: data.status }),
+          ...(data.price_total_clp !== undefined && { price_total_clp: data.price_total_clp }),
+          ...(data.reservation_amount_clp !== undefined && { reservation_amount_clp: data.reservation_amount_clp }),
+          ...(data.pie !== undefined && { pie: data.pie }),
+          ...(data.cuotas !== undefined && { cuotas: data.cuotas }),
+          ...(data.valor_cuota !== undefined && { valor_cuota: data.valor_cuota }),
+          ...(data.last_installment_amount !== undefined && { last_installment_amount: data.last_installment_amount }),
+          ...(data.area_m2 !== undefined && { area_m2: data.area_m2 }),
+          ...(data.stage !== undefined && { stage: data.stage || null }),
+        },
+      });
     });
 
     await prisma.auditLog.create({
@@ -2908,14 +2903,17 @@ export async function assignLotOwner(data: {
     });
 
     // Update lot status to sold and sync financial data
-    await prisma.lot.update({
-      where: { id: lot.id },
-      data: {
-        status: "sold",
-        ...(data.cuotas !== undefined && { cuotas: data.cuotas }),
-        ...(data.valor_cuota !== undefined && { valor_cuota: data.valor_cuota }),
-        ...(data.last_installment_value !== undefined && { last_installment_amount: data.last_installment_value }),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+      await tx.lot.update({
+        where: { id: lot.id },
+        data: {
+          status: "sold",
+          ...(data.cuotas !== undefined && { cuotas: data.cuotas }),
+          ...(data.valor_cuota !== undefined && { valor_cuota: data.valor_cuota }),
+          ...(data.last_installment_value !== undefined && { last_installment_amount: data.last_installment_value }),
+        },
+      });
     });
 
     // Audit log
