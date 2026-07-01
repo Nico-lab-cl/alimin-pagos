@@ -734,43 +734,33 @@ export default function ClientsPage() {
                           <button
                             onClick={async () => {
                               try {
-                                let pass = c.temp_password;
-                                
-                                if (!pass) {
-                                  toast.loading("Generando contraseña...", { id: `gen-pass-${c.id}` });
-                                  const res = await generateTemporaryPassword(c.id);
-                                  if (res.success) {
-                                    pass = res.tempPassword;
-                                    toast.success("Contraseña generada", { id: `gen-pass-${c.id}` });
-                                    
-                                    setData((prev: any) => {
-                                      if (!prev) return prev;
-                                      return {
-                                        ...prev,
-                                        data: prev.data.map((item: any) => 
-                                          item.id === c.id ? { ...item, temp_password: res.tempPassword } : item
-                                        )
-                                      };
-                                    });
-                                  } else {
-                                    toast.error(res.error || "Error al generar contraseña", { id: `gen-pass-${c.id}` });
-                                    return;
-                                  }
+                                toast.loading("Generando nueva contraseña...", { id: `gen-pass-${c.id}` });
+                                const res = await generateTemporaryPassword(c.id);
+                                if (!res.success) {
+                                  toast.error(res.error || "Error al generar contraseña", { id: `gen-pass-${c.id}` });
+                                  return;
                                 }
-
-                                if (pass) {
-                                  toast.success(`Acceso: ${c.clientName}`, {
-                                    description: `Usuario: ${c.clientEmail}\nClave: ${pass}`,
-                                    duration: 15000,
-                                    action: {
-                                      label: "Copiar Clave",
-                                      onClick: () => {
-                                        navigator.clipboard.writeText(pass);
-                                        toast.success("Copiada");
-                                      }
+                                toast.dismiss(`gen-pass-${c.id}`);
+                                setData((prev: any) => {
+                                  if (!prev) return prev;
+                                  return {
+                                    ...prev,
+                                    data: prev.data.map((item: any) =>
+                                      item.id === c.id ? { ...item, temp_password: res.tempPassword } : item
+                                    )
+                                  };
+                                });
+                                toast.success(`Acceso: ${c.clientName}`, {
+                                  description: `Usuario: ${c.clientEmail}\nClave: ${res.tempPassword}\n✅ WhatsApp enviado al cliente`,
+                                  duration: 15000,
+                                  action: {
+                                    label: "Copiar Clave",
+                                    onClick: () => {
+                                      navigator.clipboard.writeText(res.tempPassword!);
+                                      toast.success("Copiada");
                                     }
-                                  });
-                                }
+                                  }
+                                });
                               } catch (err) {
                                 console.error("Error in password click:", err);
                                 toast.error("Error al gestionar credenciales");

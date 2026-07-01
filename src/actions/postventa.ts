@@ -2371,7 +2371,7 @@ export async function generateTemporaryPassword(reservationId: string) {
   try {
     const reservation = await prisma.reservation.findUnique({
       where: { id: reservationId },
-      include: { user: true }
+      include: { user: true, project: true }
     });
 
     if (!reservation) return { error: "Reserva no encontrada" };
@@ -2389,6 +2389,82 @@ export async function generateTemporaryPassword(reservationId: string) {
         activated_at: new Date()
       }
     });
+
+    // Send WhatsApp + email notification via n8n (same as initial activation)
+    const webhookUrl = reservation.project?.slug === "libertad-y-alegria"
+      ? "https://n8n.aliminlomasdelmar.com/webhook/8aa897b9-d275-401c-a32b-333bbc0b20ee"
+      : "https://n8n.aliminlomasdelmar.com/webhook/517e9ba2-64af-4b34-b926-c9265cbfed88";
+
+    const subject = `🔑 Tus nuevas credenciales de acceso al Portal de Pagos de ${reservation.project?.name}`;
+    const htmlTemplate = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; }
+        .header { background: linear-gradient(135deg, #1a5f2a 0%, #2d8f4a 100%); color: #fff; padding: 35px 30px; text-align: center; }
+        .header img { max-width: 130px; height: auto; margin-bottom: 15px; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        .content { padding: 40px 30px; }
+        .greeting { font-size: 22px; color: #1a5f2a; margin-bottom: 20px; font-weight: 600; }
+        .login-card { background: #f8faf8; border: 1px solid #e0e0e0; border-radius: 12px; padding: 30px; margin: 25px 0; border-left: 5px solid #1a5f2a; }
+        .login-item { margin-bottom: 15px; }
+        .login-item:last-child { margin-bottom: 0; }
+        .login-label { color: #777; font-size: 13px; text-transform: uppercase; display: block; margin-bottom: 5px; font-weight: bold; }
+        .login-value { color: #333; font-size: 16px; font-weight: 600; font-family: 'Courier New', monospace; background: #fff; padding: 8px 12px; border-radius: 4px; border: 1px solid #eee; display: inline-block; min-width: 200px; }
+        .btn-container { text-align: center; margin: 40px 0; }
+        .btn-portal { background-color: #1a5f2a; color: #ffffff !important; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 10px rgba(26,95,42,0.2); }
+        .security-note { background: #fff3e0; border-radius: 8px; padding: 15px 20px; font-size: 14px; color: #666; margin-top: 30px; }
+        .footer { background: #1a5f2a; color: #fff; padding: 30px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://lh3.googleusercontent.com/d/1yWAhY7_vZVJOVwyxZsgILoKd58_na516" alt="ALIMIN Logo">
+            <h1>Portal de Pagos</h1>
+        </div>
+        <div class="content">
+            <p class="greeting">¡Hola ${reservation.name}!</p>
+            <p>Hemos generado nuevas credenciales de acceso para tu cuenta en el Portal de Pagos de <strong>${reservation.project?.name}</strong>.</p>
+            <div class="login-card">
+                <div class="login-item">
+                    <span class="login-label">Usuario / Correo:</span>
+                    <span class="login-value">${reservation.user.email}</span>
+                </div>
+                <div class="login-item">
+                    <span class="login-label">Contraseña Temporal:</span>
+                    <span class="login-value">${tempPassword}</span>
+                </div>
+            </div>
+            <div class="btn-container">
+                <a href="https://pagos.aliminspa.cl" class="btn-portal">IR A MI PORTAL</a>
+            </div>
+            <div class="security-note">
+                <p style="margin: 0;"><strong>🔐 Nota de seguridad:</strong> El sistema te solicitará cambiar esta contraseña temporal al ingresar.</p>
+            </div>
+        </div>
+        <div class="footer">
+            <p><strong>ALIMIN SPA</strong><br>Gestión Inmobiliaria y Financiera</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+    fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        asunto: subject,
+        nombre: reservation.name,
+        correo: reservation.user.email,
+        contraseña: tempPassword,
+        proyecto: reservation.project?.name,
+        html: htmlTemplate
+      })
+    }).catch(err => console.error("Error triggering password reset webhook:", err));
 
     memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");
