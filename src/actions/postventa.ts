@@ -1514,9 +1514,25 @@ export async function toggleMultiLot(reservationId: string, status: boolean) {
   }
 
   try {
+    const before = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: { is_multilote: true },
+    });
+
     await prisma.reservation.update({
       where: { id: reservationId },
       data: { is_multilote: status }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "Reservation",
+        entity_id: reservationId,
+        details: `Estado Multi-Lote cambiado de "${before?.is_multilote ?? false}" a "${status}"`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
     });
 
     memoryCache.deleteByPrefix("postventa_");
@@ -1541,9 +1557,27 @@ export async function toggleAlContado(reservationId: string, isAlContado: boolea
   }
 
   try {
+    const before = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: { status: true },
+    });
+
+    const newStatus = isAlContado ? "COMPLETED" : "active";
+
     await prisma.reservation.update({
       where: { id: reservationId },
-      data: { status: isAlContado ? "COMPLETED" : "active" }
+      data: { status: newStatus }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "Reservation",
+        entity_id: reservationId,
+        details: `Estado Al Contado cambiado: status de "${before?.status || "active"}" a "${newStatus}" (afecta saldo pendiente y mora mostrados al cliente)`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
     });
 
     memoryCache.deleteByPrefix("postventa_");

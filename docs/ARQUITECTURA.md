@@ -515,7 +515,7 @@ flowchart LR
 
 8. **`debug: true` forzado en `auth.ts`** — imprime información sensible en logs. Desactivar en producción.
 9. **`daily_notifications.ts` debe estar agendado.** Si no hay cron activo, no se envían alertas de mora. Verificar el scheduler.
-10. **Sin `AuditLog` en algunas mutaciones** (p. ej. `toggleAlContado`, `toggleMultiLot`). Considerar registrarlas para trazabilidad completa.
+10. ~~Sin `AuditLog` en algunas mutaciones (p. ej. `toggleAlContado`, `toggleMultiLot`)~~ — **Resuelto.** Ambas funciones ahora registran el estado anterior/nuevo en `AuditLog` con `user_id`/`user_email` de quien hizo el cambio.
 
 ## Guía: cómo agregar funcionalidad sin dañar los datos
 
