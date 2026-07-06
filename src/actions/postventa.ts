@@ -468,25 +468,19 @@ export async function approveReceipt(receiptId: string) {
 
     if (!receipt) return { error: "Comprobante no encontrado" };
 
-    await prisma.paymentReceipt.update({
-      where: { id: receiptId },
-      data: { status: "APPROVED", processed_at: new Date() },
-    });
-
-    // Send Notification
-    if (receipt.reservation.user.fcm_token) {
-      const { sendPushNotification } = await import("@/lib/notifications");
-      sendPushNotification({
-        token: receipt.reservation.user.fcm_token,
-        title: "¡Pago Aprobado!",
-        body: `Tu pago de ${new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(receipt.amount_clp)} ha sido procesado con éxito.`,
-      });
-    }
+    // IMPORTANTE: el marcado del recibo como APROBADO se hace DENTRO de la misma
+    // transacción que actualiza la reserva (incremento de cuotas / pie) + ledger.
+    // Así es atómico: si el incremento falla (p.ej. por los triggers de protección
+    // financiera), el recibo tampoco queda aprobado y no se desincroniza en silencio.
 
     // Update reservation state and Ledger
     if (receipt.scope === "PIE") {
       await prisma.$transaction(async (tx) => {
         await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+        await tx.paymentReceipt.update({
+          where: { id: receiptId },
+          data: { status: "APPROVED", processed_at: new Date() },
+        });
         await tx.reservation.update({
           where: { id: receipt.reservation_id },
           data: { pie_status: "PAID" },
@@ -540,6 +534,10 @@ export async function approveReceipt(receiptId: string) {
 
         await prisma.$transaction(async (tx) => {
           await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+          await tx.paymentReceipt.update({
+            where: { id: receiptId },
+            data: { status: "APPROVED", processed_at: new Date() },
+          });
           await tx.reservation.update({
             where: { id: receipt.reservation_id },
             data: {
@@ -580,6 +578,10 @@ export async function approveReceipt(receiptId: string) {
         // Fallback if reservation not found
         await prisma.$transaction(async (tx) => {
           await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+          await tx.paymentReceipt.update({
+            where: { id: receiptId },
+            data: { status: "APPROVED", processed_at: new Date() },
+          });
           await tx.reservation.update({
             where: { id: receipt.reservation_id },
             data: {
@@ -603,6 +605,17 @@ export async function approveReceipt(receiptId: string) {
           });
         });
       }
+    }
+
+    // Notificación: se envía solo si la transacción anterior tuvo éxito (si hubiese
+    // fallado, ya habríamos salido por el catch y el recibo seguiría PENDIENTE).
+    if (receipt.reservation.user.fcm_token) {
+      const { sendPushNotification } = await import("@/lib/notifications");
+      sendPushNotification({
+        token: receipt.reservation.user.fcm_token,
+        title: "¡Pago Aprobado!",
+        body: `Tu pago de ${new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(receipt.amount_clp)} ha sido procesado con éxito.`,
+      });
     }
 
     // Auto-generate Digital Payment Receipt PDF
