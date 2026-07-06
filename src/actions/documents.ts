@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { memoryCache } from "@/lib/cache";
+import { deletePaymentReceipt, logSystemNote } from "@/actions/postventa";
 
 /**
  * Uploads a document associated with a reservation.
@@ -145,7 +146,10 @@ export async function getReservationDocuments(reservationId: string) {
 }
 
 /**
- * Deletes a document.
+ * Deletes a document. Handles both "digital" documents (contrato, certificado,
+ * ficha técnica, comprobantes generados por el sistema) and comprobantes bancarios
+ * (recibos de pago subidos por el cliente o ingresados manualmente por postventa).
+ * Toda eliminación queda registrada en la Bitácora del cliente.
  */
 export async function deleteDocument(documentId: string) {
   console.log(`[ACTION] deleteDocument called for ID: ${documentId}`);
@@ -157,21 +161,78 @@ export async function deleteDocument(documentId: string) {
   }
 
   try {
-    const doc = await prisma.reservationDocument.delete({
+    // 1. Documento "digital" (contrato, certificado, ficha técnica, comprobante generado, etc.)
+    const tableDoc = await prisma.reservationDocument.findUnique({
       where: { id: documentId },
     });
 
-    console.log(`[ACTION] deleteDocument SUCCESS for: ${doc.id}`);
+    if (tableDoc) {
+      await prisma.reservationDocument.delete({ where: { id: documentId } });
+      await logSystemNote(tableDoc.reservation_id, `Documento eliminado: "${tableDoc.name}".`, "ReservationDocument");
 
-    // Invalidate user data cache so deleted document disappears instantly
+      console.log(`[ACTION] deleteDocument SUCCESS (table) for: ${tableDoc.id}`);
+      memoryCache.deleteByPrefix("user_data_");
+      revalidatePath("/admin/clients");
+      revalidatePath("/user/documents");
+      return { success: true };
+    }
+
+    // 2. Comprobante bancario (PaymentReceipt): reutiliza la lógica de reversión
+    // financiera (revierte cuotas/ledger si estaba aprobado) y ya deja su propio
+    // registro en la Bitácora.
+    const receipt = await prisma.paymentReceipt.findUnique({
+      where: { id: documentId },
+    });
+
+    if (receipt) {
+      return await deletePaymentReceipt(documentId);
+    }
+
+    return { error: "Documento no encontrado" };
+  } catch (error) {
+    console.error("[ACTION] Error deleting document:", error);
+    return { error: "Error al eliminar el documento" };
+  }
+}
+
+/**
+ * Deletes a legacy document stored as a JSON entry on reservation.manual_documents
+ * (formato anterior a la tabla ReservationDocument). Queda registrado en la Bitácora.
+ */
+export async function deleteLegacyDocument(reservationId: string, docName: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: { manual_documents: true },
+    });
+    if (!reservation?.manual_documents) return { error: "Documento no encontrado" };
+
+    const docs = Array.isArray(reservation.manual_documents)
+      ? reservation.manual_documents
+      : JSON.parse(reservation.manual_documents as unknown as string);
+
+    const filtered = (docs as any[]).filter((d: any) => d.name !== docName);
+    if (filtered.length === (docs as any[]).length) return { error: "Documento no encontrado" };
+
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { manual_documents: filtered },
+    });
+    await logSystemNote(reservationId, `Documento heredado eliminado: "${docName}".`, "Reservation");
+
     memoryCache.deleteByPrefix("user_data_");
-
     revalidatePath("/admin/clients");
     revalidatePath("/user/documents");
 
     return { success: true };
   } catch (error) {
-    console.error("[ACTION] Error deleting document:", error);
+    console.error("[ACTION] Error deleting legacy document:", error);
     return { error: "Error al eliminar el documento" };
   }
 }

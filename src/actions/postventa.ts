@@ -2524,6 +2524,58 @@ export async function generateTemporaryPassword(reservationId: string) {
   }
 }
 
+/**
+ * Agrega una nota de sistema visible en la Bitácora del cliente y su espejo en AuditLog.
+ * Usado por acciones administrativas (p.ej. eliminación de documentos/comprobantes) que
+ * deben quedar registradas en el historial de actividad del cliente.
+ */
+export async function logSystemNote(reservationId: string, text: string, entity: string = "Reservation") {
+  const session = await auth();
+  const user = session?.user as any;
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: { notes: true },
+    });
+
+    let currentNotes: any[] = [];
+    if (reservation?.notes) {
+      try {
+        currentNotes = JSON.parse(reservation.notes);
+      } catch {
+        currentNotes = [];
+      }
+    }
+
+    const newNote = {
+      id: Math.random().toString(36).substring(7),
+      text,
+      type: "Registro",
+      date: new Date().toISOString(),
+      author: user?.name || user?.email || "Sistema",
+    };
+    currentNotes.unshift(newNote);
+
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { notes: JSON.stringify(currentNotes) },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "DELETE",
+        entity,
+        entity_id: reservationId,
+        details: text,
+        user_id: user?.id || null,
+        user_email: user?.email || null,
+      },
+    });
+  } catch (err) {
+    console.error("Error logging system note:", err);
+  }
+}
+
 export async function deletePaymentReceipt(receiptId: string) {
   const session = await auth();
   const user = session?.user as any;
@@ -2539,8 +2591,10 @@ export async function deletePaymentReceipt(receiptId: string) {
 
     if (!receipt) return { error: "Comprobante no encontrado" };
 
+    const wasApproved = receipt.status === "APPROVED";
+
     // Revert reservation state if approved
-    if (receipt.status === "APPROVED") {
+    if (wasApproved) {
       if (receipt.scope === "INSTALLMENT") {
         await prisma.$transaction(async (tx) => {
           await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
@@ -2574,6 +2628,15 @@ export async function deletePaymentReceipt(receiptId: string) {
     await prisma.paymentReceipt.delete({
       where: { id: receiptId },
     });
+
+    const label = receipt.scope === "PIE"
+      ? "Comprobante de Pie"
+      : `Comprobante de Cuota ${receipt.nominal_installment_range || receipt.nominal_installment_number || ""}`.trim();
+    await logSystemNote(
+      receipt.reservation_id,
+      `${label} eliminado (monto $${receipt.amount_clp.toLocaleString("es-CL")}, estado previo: ${receipt.status}).${wasApproved ? " Se revirtió el conteo de cuotas correspondiente." : ""}`,
+      "PaymentReceipt"
+    );
 
     memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");

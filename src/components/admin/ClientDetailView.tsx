@@ -13,7 +13,7 @@ import {
   updateClientProfile, updateClientFinancials, toggleAlContado, 
   registerManualPayment, getFinancialHistory, addClientNote, getClientNotes 
 } from "@/actions/postventa";
-import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
+import { uploadDocument, deleteDocument, deleteLegacyDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
 import { cn } from "@/lib/utils";
@@ -1070,25 +1070,26 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                         >
                           <Download className="w-3 h-3" />
                         </button>
-                        {doc.type === "table" && (
-                          <button
-                            onClick={async () => {
-                              if (confirm("¿Estás seguro de que deseas eliminar este archivo?")) {
-                                const res = await deleteDocument(doc.id);
-                                if (res.success) {
-                                  setDocs(docs.filter((d) => d.id !== doc.id));
-                                  toast.success("Documento eliminado.");
-                                } else {
-                                  toast.error(res.error || "No se pudo eliminar.");
-                                }
+                        <button
+                          onClick={async () => {
+                            if (confirm("¿Estás seguro de que deseas eliminar este archivo? Esta acción quedará registrada en la bitácora.")) {
+                              const res = doc.type === "legacy"
+                                ? await deleteLegacyDocument(selectedClient.id, doc.name)
+                                : await deleteDocument(doc.id);
+                              if (res.success) {
+                                setDocs(docs.filter((d) => d.id !== doc.id));
+                                toast.success("Documento eliminado.");
+                                fetchNotesAndHistory();
+                              } else {
+                                toast.error(res.error || "No se pudo eliminar.");
                               }
-                            }}
-                            className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-550 hover:bg-red-50 hover:text-red-650 transition-colors shadow-sm cursor-pointer"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
+                            }
+                          }}
+                          className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-550 hover:bg-red-50 hover:text-red-650 transition-colors shadow-sm cursor-pointer"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
                   ))
