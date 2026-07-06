@@ -156,12 +156,20 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
 
     setUploading(true);
     const amount = getAmount();
+    // La línea de "Mora Histórica" (number === 0 / isHistorical) NO es una cuota:
+    // se cobra dentro del monto, pero jamás debe contarse como cuota pagada.
+    // Solo las cuotas reales (number > 0) definen installments_count.
+    const realCuotasCount = Math.max(
+      1,
+      (lot.upcomingInstallments?.slice(0, installmentsCount) || [])
+        .filter((c: any) => c.number > 0).length
+    );
     const result = await uploadPaymentReceipt({
       reservationId: id,
       amount,
       scope: "INSTALLMENT",
       receiptBase64,
-      installmentsCount,
+      installmentsCount: realCuotasCount,
     });
 
     if (result.success) {

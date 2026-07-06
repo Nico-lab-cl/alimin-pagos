@@ -570,12 +570,15 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
     }
 
     setUploading(true);
+    // La línea de "Mora Histórica" NO es una cuota: se cobra dentro del monto,
+    // pero solo las cuotas reales (number > 0) definen installments_count.
+    const realCuotasCount = Math.max(1, realCuotasForCards.length);
     const result = await uploadPaymentReceipt({
       reservationId,
       amount: totalAmount,
       scope: "INSTALLMENT",
       receiptBase64,
-      installmentsCount,
+      installmentsCount: realCuotasCount,
     });
 
     if (result.success) {
