@@ -513,7 +513,7 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const overdueCount = data.upcomingInstallments?.filter((c: any) => c.isOverdue || c.hasPenalty).length || 0;
+  const overdueCount = data.upcomingInstallments?.filter((c: any) => c.number > 0 && c.hasPenalty).length || 0;
   const hasHistoricalItem = data.upcomingInstallments?.some((c: any) => c.number === 0 || c.isHistorical) || false;
   const histOffset = hasHistoricalItem ? 1 : 0;
   const mandatoryCount = histOffset + Math.max(1, overdueCount);

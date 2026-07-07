@@ -71,7 +71,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     if (lot && lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
       const hasHist = lot.upcomingInstallments.some((c: any) => c.number === 0 || c.isHistorical);
-      const overdue = lot.upcomingInstallments.filter((c: any) => c.isOverdue || c.hasPenalty).length;
+      const overdue = lot.upcomingInstallments.filter((c: any) => c.number > 0 && c.hasPenalty).length;
       const minCount = (hasHist ? 1 : 0) + Math.max(1, overdue);
       if (installmentsCount < minCount) {
         setInstallmentsCount(minCount);
@@ -228,7 +228,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     );
   }
 
-  const overdueCount = lot.upcomingInstallments?.filter((c: any) => c.isOverdue || c.hasPenalty).length || 0;
+  const overdueCount = lot.upcomingInstallments?.filter((c: any) => c.number > 0 && c.hasPenalty).length || 0;
   const hasHistoricalItem = lot.upcomingInstallments?.some((c: any) => c.number === 0 || c.isHistorical) || false;
   const histOffset = hasHistoricalItem ? 1 : 0;
   // mandatoryCount = historical slot (if any) + all overdue cuotas (min 1 real cuota)
