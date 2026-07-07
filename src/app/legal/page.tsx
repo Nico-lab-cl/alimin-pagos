@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { getFullPostventaData } from "@/actions/postventa";
-import { formatCLP, formatDate } from "@/lib/utils";
+import { getReservationDocuments } from "@/actions/documents";
+import PreviewModal from "@/components/shared/PreviewModal";
+import { formatCLP, formatDate, downloadDocument } from "@/lib/utils";
 import { signOut, useSession } from "next-auth/react";
 import {
   Loader2,
@@ -17,7 +19,10 @@ import {
   Bell,
   Activity,
   ShieldAlert,
-  Download
+  Download,
+  FileText,
+  Eye,
+  FolderOpen
 } from "lucide-react";
 
 export default function LegalDashboardPage() {
@@ -27,6 +32,12 @@ export default function LegalDashboardPage() {
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+
+  // Documentos del cliente (solo lectura: previsualizar / descargar)
+  const [clientDocs, setClientDocs] = useState<any[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState({ url: "", title: "", type: "" });
   
   // Filtering & Pagination State
   const [projectFilter, setProjectFilter] = useState<"ALL" | "arena-y-sol" | "libertad-y-alegria">("ALL");
@@ -177,6 +188,17 @@ export default function LegalDashboardPage() {
     setCurrentPage(1);
     setSelectedClientIds([]);
   }, [search, projectFilter]);
+
+  // Cargar documentos del cliente seleccionado (solo lectura)
+  useEffect(() => {
+    if (!selectedClient) return;
+    setClientDocs([]);
+    setLoadingDocs(true);
+    getReservationDocuments(selectedClient.id)
+      .then((res) => setClientDocs(res.documents || []))
+      .catch((err) => console.error("Error cargando documentos:", err))
+      .finally(() => setLoadingDocs(false));
+  }, [selectedClient?.id]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans relative overflow-x-hidden">
@@ -602,11 +624,71 @@ export default function LegalDashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* Documentos del Cliente (solo lectura) */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-1.5 text-blue-600">
+                  <FolderOpen className="w-4 h-4" />
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider">Documentos del Cliente (Promesa, Contratos y más)</h4>
+                </div>
+
+                {loadingDocs ? (
+                  <div className="flex items-center gap-2 text-slate-400 py-4 px-1">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Cargando documentos...</span>
+                  </div>
+                ) : clientDocs.length === 0 ? (
+                  <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 text-center">
+                    <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sin documentos cargados</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {clientDocs.map((doc: any) => {
+                      const url = `/api/documents/${doc.id}`;
+                      return (
+                        <div key={doc.id} className="bg-slate-50/50 border border-slate-150 rounded-2xl p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors shadow-xs">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate" title={doc.name}>{doc.name}</p>
+                              <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                {doc.created_at ? new Date(doc.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }) : "Sin fecha"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => {
+                                setPreviewData({ url, title: doc.name, type: doc.file_type });
+                                setIsPreviewOpen(true);
+                              }}
+                              className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-450 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm cursor-pointer"
+                              title="Previsualizar"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => downloadDocument(url, doc.name, doc.file_type)}
+                              className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-450 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm cursor-pointer"
+                              title="Descargar"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-            
+
             {/* Footer */}
             <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-              <button 
+              <button
                 onClick={() => setSelectedClient(null)}
                 className="px-6 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer shadow-xs border border-slate-250"
               >
@@ -616,6 +698,15 @@ export default function LegalDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Visor de Documentos (previsualización) */}
+      <PreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        url={previewData.url}
+        title={previewData.title}
+        fileType={previewData.type}
+      />
     </div>
   );
 }
