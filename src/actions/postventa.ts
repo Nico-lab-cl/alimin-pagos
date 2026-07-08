@@ -3211,3 +3211,147 @@ export async function addClientNote(clientId: string, noteText: string, noteType
     return { error: "Error al agregar nota interna" };
   }
 }
+
+/**
+ * Sends a client-facing "Observación" note: saves it in the Bitácora,
+ * creates an in-portal notification for the client, and triggers an
+ * "ALIMIN | IMPORTANTE" email via the n8n webhook.
+ * Does not touch any financial field of the reservation.
+ */
+export async function sendClientObservation(clientId: string, observationText: string) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  const trimmedText = observationText?.trim();
+  if (!trimmedText) {
+    return { error: "La observación no puede estar vacía" };
+  }
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: clientId },
+      include: { user: true, project: true },
+    });
+    if (!reservation) return { error: "Cliente no encontrado" };
+
+    // 1. Append the note to the Bitácora (non-financial field, no trigger involved)
+    let currentNotes: any[] = [];
+    if (reservation.notes) {
+      try {
+        currentNotes = JSON.parse(reservation.notes);
+      } catch {
+        currentNotes = [];
+      }
+    }
+    const newNote = {
+      id: Math.random().toString(36).substring(7),
+      text: trimmedText,
+      type: "Observación",
+      date: new Date().toISOString(),
+      author: adminUser.name || adminUser.email || "Administrador",
+    };
+    currentNotes.unshift(newNote);
+
+    await prisma.reservation.update({
+      where: { id: clientId },
+      data: { notes: JSON.stringify(currentNotes) },
+    });
+
+    // 2. Create the in-portal notification for the client
+    await prisma.notification.create({
+      data: {
+        user_id: reservation.user_id,
+        type: "OBSERVATION",
+        title: "Aviso importante de tu asesor",
+        message: trimmedText,
+      },
+    });
+
+    // 3. Trigger the "ALIMIN | IMPORTANTE" email via n8n (fire-and-forget)
+    const clientName = (reservation.last_name && reservation.last_name !== "null")
+      ? `${reservation.name} ${reservation.last_name}`.trim()
+      : (reservation.user?.name || reservation.name || "Cliente Alimin");
+
+    const escapedText = trimmedText
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br>");
+
+    const htmlTemplate = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; }
+        .header { background: linear-gradient(135deg, #1a5f2a 0%, #2d8f4a 100%); color: #fff; padding: 35px 30px; text-align: center; }
+        .header img { max-width: 130px; height: auto; margin-bottom: 15px; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        .content { padding: 40px 30px; }
+        .greeting { font-size: 22px; color: #1a5f2a; margin-bottom: 20px; font-weight: 600; }
+        .observation-box { background: #f8faf8; border: 1px solid #e0e0e0; border-radius: 12px; padding: 25px; margin: 25px 0; border-left: 5px solid #1a5f2a; font-size: 15px; color: #333; }
+        .btn-container { text-align: center; margin: 40px 0; }
+        .btn-portal { background-color: #1a5f2a; color: #ffffff !important; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 10px rgba(26,95,42,0.2); }
+        .footer { background: #1a5f2a; color: #fff; padding: 30px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://lh3.googleusercontent.com/d/1yWAhY7_vZVJOVwyxZsgILoKd58_na516" alt="ALIMIN Logo">
+            <h1>Aviso Importante</h1>
+        </div>
+        <div class="content">
+            <p class="greeting">¡Hola ${clientName}!</p>
+            <p>Tu asesor de <strong>${reservation.project?.name || "Alimin"}</strong> dejó el siguiente aviso en tu cuenta:</p>
+            <div class="observation-box">${escapedText}</div>
+            <div class="btn-container">
+                <a href="https://pagos.aliminspa.cl" class="btn-portal">IR A MI PORTAL</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p><strong>ALIMIN SPA</strong><br>Gestión Inmobiliaria y Financiera</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+    fetch("https://n8n.aliminlomasdelmar.com/webhook/f71ff8f7-bb15-4487-8199-02ac255fdbb0", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        correo: reservation.email,
+        asunto: "ALIMIN | IMPORTANTE",
+        nombre: clientName,
+        proyecto: reservation.project?.name,
+        html: htmlTemplate,
+      }),
+    }).catch(err => console.error("Error triggering observation email webhook:", err));
+
+    // 4. Audit trail
+    await prisma.auditLog.create({
+      data: {
+        action: "CREATE",
+        entity: "Reservation",
+        entity_id: clientId,
+        details: `Observación enviada al cliente (portal + correo "ALIMIN | IMPORTANTE"): "${trimmedText}"`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true, note: newNote };
+  } catch (error) {
+    console.error("Error sending client observation:", error);
+    return { error: "Error al enviar la observación" };
+  }
+}

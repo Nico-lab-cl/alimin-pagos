@@ -9,9 +9,10 @@ import {
   Trash2, Eye, X, Save, Lock
 } from "lucide-react";
 import { toast } from "sonner";
-import { 
-  updateClientProfile, updateClientFinancials, toggleAlContado, 
-  registerManualPayment, getFinancialHistory, addClientNote, getClientNotes 
+import {
+  updateClientProfile, updateClientFinancials, toggleAlContado,
+  registerManualPayment, getFinancialHistory, addClientNote, getClientNotes,
+  sendClientObservation
 } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, deleteLegacyDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
@@ -382,18 +383,26 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       toast.error("Escribe el contenido de la nota");
       return;
     }
+
+    const isObservation = noteType === "Observación";
+    if (isObservation && !confirm("Esta observación se enviará al portal del cliente y por correo (ALIMIN | IMPORTANTE). ¿Confirmas el envío?")) {
+      return;
+    }
+
     setIsSavingNote(true);
     try {
-      const res = await addClientNote(selectedClient.id, noteText.trim(), noteType);
+      const res = isObservation
+        ? await sendClientObservation(selectedClient.id, noteText.trim())
+        : await addClientNote(selectedClient.id, noteText.trim(), noteType);
       if (res.error) {
         toast.error(res.error);
       } else {
-        toast.success("Nota interna agregada correctamente");
+        toast.success(isObservation ? "Observación enviada al cliente (portal + correo)" : "Nota interna agregada correctamente");
         setNoteText("");
         fetchNotesAndHistory();
       }
     } catch (e) {
-      toast.error("Error al agregar nota");
+      toast.error(isObservation ? "Error al enviar la observación" : "Error al agregar nota");
     } finally {
       setIsSavingNote(false);
     }
@@ -514,6 +523,10 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       
       if (note.type === "Seguimiento telefónico") {
         icon = Phone;
+        bg = "bg-blue-50 text-blue-600 border border-blue-150";
+        badge = "COMUNICACIÓN";
+      } else if (note.type === "Observación") {
+        icon = Mail;
         bg = "bg-blue-50 text-blue-600 border border-blue-150";
         badge = "COMUNICACIÓN";
       } else if (note.type === "Alerta") {
@@ -1834,8 +1847,16 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     <option value="Nota interna">Nota interna</option>
                     <option value="Seguimiento telefónico">Seguimiento telefónico</option>
                     <option value="Alerta">Alerta</option>
+                    <option value="Observación">Observación (avisa al cliente)</option>
                   </select>
                 </div>
+
+                {noteType === "Observación" && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-150 rounded-xl px-3 py-2.5 text-[10px] font-semibold text-amber-700">
+                    <Mail className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>Esta nota se enviará al cliente: le aparece un aviso en su portal y le llega un correo con asunto "ALIMIN | IMPORTANTE". No se puede deshacer.</span>
+                  </div>
+                )}
 
                 <button
                   onClick={handleSaveNote}
@@ -1843,7 +1864,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
                 >
                   {isSavingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  Guardar Nota
+                  {noteType === "Observación" ? "Enviar Observación al Cliente" : "Guardar Nota"}
                 </button>
               </div>
             </div>
