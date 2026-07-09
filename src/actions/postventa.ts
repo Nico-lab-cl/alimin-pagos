@@ -13,6 +13,7 @@ import { memoryCache } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
 import { hash } from "bcryptjs";
 import crypto from "crypto";
+import { ENTITY_GROUPS, getEntityLabel, getEntityGroupKey } from "@/lib/auditLabels";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -3358,21 +3359,23 @@ export async function sendClientObservation(clientId: string, observationText: s
 
 /**
  * Gets audit log entries (read-only). Never writes to Reservation, Lot,
- * PaymentReceipt or FinancialLedger — only SELECTs from audit_logs.
- * "Manual" vs "Automático" is derived from whether user_id is present
+ * PaymentReceipt or FinancialLedger — only SELECTs. The client name lookups
+ * below (Reservation/Lot/FinancialLedger/ReservationDocument) are all plain
+ * findMany() reads, done in bulk to avoid N+1 queries.
+ * "Postventa" vs "Desarrollador" is derived from whether user_id is present
  * (a real admin session triggered it) or not (script/system origin).
  */
 export async function getAuditLogs({
   startDate,
   endDate,
-  entity,
+  entityGroup,
   origin,
   page = 1,
   pageSize = 30,
 }: {
   startDate?: string;
   endDate?: string;
-  entity?: string;
+  entityGroup?: string;
   origin?: "MANUAL" | "AUTOMATICO";
   page?: number;
   pageSize?: number;
@@ -3380,7 +3383,7 @@ export async function getAuditLogs({
   const session = await auth();
   const user = session?.user as any;
   if (!session?.user || user?.role !== "ADMIN") {
-    return { error: "No autorizado", logs: [], total: 0, entities: [] };
+    return { error: "No autorizado", logs: [], total: 0, entityGroups: [] };
   }
 
   try {
@@ -3392,8 +3395,9 @@ export async function getAuditLogs({
       if (endDate) where.created_at.lte = new Date(endDate + "T23:59:59");
     }
 
-    if (entity && entity !== "all") {
-      where.entity = entity;
+    if (entityGroup && entityGroup !== "all") {
+      const group = ENTITY_GROUPS.find((g) => g.key === entityGroup);
+      if (group) where.entity = { in: group.matches };
     }
 
     if (origin === "MANUAL") {
@@ -3413,29 +3417,93 @@ export async function getAuditLogs({
       prisma.auditLog.findMany({
         select: { entity: true },
         distinct: ["entity"],
-        orderBy: { entity: "asc" },
       }),
     ]);
+
+    // Resolve client names in bulk, grouped by entity type (read-only)
+    const idsByGroup: Record<string, string[]> = { RESERVA: [], LOTE: [], CAJA: [], DOCUMENTO: [] };
+    for (const log of logs) {
+      if (!log.entity_id) continue;
+      const key = getEntityGroupKey(log.entity);
+      if (key && idsByGroup[key]) idsByGroup[key].push(log.entity_id);
+    }
+
+    const clientNameById: Record<string, string> = {};
+
+    if (idsByGroup.RESERVA.length) {
+      const reservations = await prisma.reservation.findMany({
+        where: { id: { in: idsByGroup.RESERVA } },
+        select: { id: true, name: true, last_name: true },
+      });
+      reservations.forEach((r) => {
+        clientNameById[r.id] = (r.last_name && r.last_name !== "null") ? `${r.name} ${r.last_name}`.trim() : r.name;
+      });
+    }
+
+    if (idsByGroup.LOTE.length) {
+      const lotIds = idsByGroup.LOTE.map((id) => parseInt(id, 10)).filter((n) => !Number.isNaN(n));
+      const lots = await prisma.lot.findMany({
+        where: { id: { in: lotIds } },
+        select: { id: true, number: true },
+      });
+      lots.forEach((l) => { clientNameById[String(l.id)] = `Lote ${l.number}`; });
+    }
+
+    if (idsByGroup.CAJA.length) {
+      const ledgerEntries = await prisma.financialLedger.findMany({
+        where: { id: { in: idsByGroup.CAJA } },
+        select: { id: true, reservation: { select: { name: true, last_name: true } } },
+      });
+      ledgerEntries.forEach((l) => {
+        if (l.reservation) {
+          clientNameById[l.id] = (l.reservation.last_name && l.reservation.last_name !== "null")
+            ? `${l.reservation.name} ${l.reservation.last_name}`.trim() : l.reservation.name;
+        }
+      });
+    }
+
+    if (idsByGroup.DOCUMENTO.length) {
+      const docs = await prisma.reservationDocument.findMany({
+        where: { id: { in: idsByGroup.DOCUMENTO } },
+        select: { id: true, reservation: { select: { name: true, last_name: true } } },
+      });
+      docs.forEach((d) => {
+        if (d.reservation) {
+          clientNameById[d.id] = (d.reservation.last_name && d.reservation.last_name !== "null")
+            ? `${d.reservation.name} ${d.reservation.last_name}`.trim() : d.reservation.name;
+        }
+      });
+    }
 
     const processedLogs = logs.map((log) => ({
       id: log.id,
       action: log.action,
       entity: log.entity,
+      entityLabel: getEntityLabel(log.entity),
       entity_id: log.entity_id,
+      clientName: log.entity_id ? (clientNameById[log.entity_id] || null) : null,
       details: log.details,
       user_email: log.user_email,
       created_at: log.created_at,
       origin: log.user_id ? "MANUAL" : "AUTOMATICO",
     }));
 
+    // Build entity group filter options only for groups actually present in the data
+    const presentKeys = new Set<string>();
+    distinctEntities.forEach((e) => {
+      const key = getEntityGroupKey(e.entity);
+      if (key) presentKeys.add(key);
+    });
+    const entityGroupOptions = ENTITY_GROUPS.filter((g) => presentKeys.has(g.key)).map((g) => ({ key: g.key, label: g.label }));
+
     return {
       success: true,
       logs: processedLogs,
       total,
-      entities: distinctEntities.map((e) => e.entity),
+      entityGroups: entityGroupOptions,
     };
   } catch (error) {
     console.error("Error getting audit logs:", error);
-    return { error: "Error al cargar auditoría", logs: [], total: 0, entities: [] };
+    return { error: "Error al cargar auditoría", logs: [], total: 0, entityGroups: [] };
   }
 }
