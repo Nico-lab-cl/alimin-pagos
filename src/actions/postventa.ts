@@ -3355,3 +3355,87 @@ export async function sendClientObservation(clientId: string, observationText: s
     return { error: "Error al enviar la observación" };
   }
 }
+
+/**
+ * Gets audit log entries (read-only). Never writes to Reservation, Lot,
+ * PaymentReceipt or FinancialLedger — only SELECTs from audit_logs.
+ * "Manual" vs "Automático" is derived from whether user_id is present
+ * (a real admin session triggered it) or not (script/system origin).
+ */
+export async function getAuditLogs({
+  startDate,
+  endDate,
+  entity,
+  origin,
+  page = 1,
+  pageSize = 30,
+}: {
+  startDate?: string;
+  endDate?: string;
+  entity?: string;
+  origin?: "MANUAL" | "AUTOMATICO";
+  page?: number;
+  pageSize?: number;
+}) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado", logs: [], total: 0, entities: [] };
+  }
+
+  try {
+    const where: any = {};
+
+    if (startDate || endDate) {
+      where.created_at = {};
+      if (startDate) where.created_at.gte = new Date(startDate + "T00:00:00");
+      if (endDate) where.created_at.lte = new Date(endDate + "T23:59:59");
+    }
+
+    if (entity && entity !== "all") {
+      where.entity = entity;
+    }
+
+    if (origin === "MANUAL") {
+      where.user_id = { not: null };
+    } else if (origin === "AUTOMATICO") {
+      where.user_id = null;
+    }
+
+    const [logs, total, distinctEntities] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.findMany({
+        select: { entity: true },
+        distinct: ["entity"],
+        orderBy: { entity: "asc" },
+      }),
+    ]);
+
+    const processedLogs = logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      entity: log.entity,
+      entity_id: log.entity_id,
+      details: log.details,
+      user_email: log.user_email,
+      created_at: log.created_at,
+      origin: log.user_id ? "MANUAL" : "AUTOMATICO",
+    }));
+
+    return {
+      success: true,
+      logs: processedLogs,
+      total,
+      entities: distinctEntities.map((e) => e.entity),
+    };
+  } catch (error) {
+    console.error("Error getting audit logs:", error);
+    return { error: "Error al cargar auditoría", logs: [], total: 0, entities: [] };
+  }
+}
