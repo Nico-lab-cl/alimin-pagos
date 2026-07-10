@@ -21,7 +21,7 @@ export default function ClientsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedStage, setSelectedStage] = useState("ALL");
-  const [lotSort, setLotSort] = useState<"none" | "asc" | "desc">("none");
+  const [sortBy, setSortBy] = useState<"none" | "lot_asc" | "lot_desc" | "mora_desc" | "mora_asc">("none");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"ALL" | "LATE" | "GRACE" | "UPCOMING" | "OK">("ALL");
@@ -139,7 +139,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, selectedStage, selectedProject, activeTab, lotSort]);
+  }, [search, selectedStage, selectedProject, activeTab, sortBy]);
 
   const refreshDocs = async (clientId: string, clientData: any) => {
     setLoadingDocs(true);
@@ -326,9 +326,15 @@ export default function ClientsPage() {
 
     return matchesSearch;
   }).sort((a: any, b: any) => {
-    if (lotSort === "none") return 0;
-    const cmp = naturalLotCompare(a.lotNumber, b.lotNumber);
-    return lotSort === "asc" ? cmp : -cmp;
+    if (sortBy === "lot_asc" || sortBy === "lot_desc") {
+      const cmp = naturalLotCompare(a.lotNumber, b.lotNumber);
+      return sortBy === "lot_asc" ? cmp : -cmp;
+    }
+    if (sortBy === "mora_desc" || sortBy === "mora_asc") {
+      const cmp = (a.penaltyAmount || 0) - (b.penaltyAmount || 0);
+      return sortBy === "mora_desc" ? -cmp : cmp;
+    }
+    return 0;
   });
 
   const handleExportCSV = () => {
@@ -433,16 +439,22 @@ export default function ClientsPage() {
             </select>
           )}
 
-          {/* Lot number sort */}
+          {/* Order by lot number or mora amount */}
           <select
-            value={lotSort}
-            onChange={(e) => setLotSort(e.target.value as "none" | "asc" | "desc")}
-            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[170px]"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[190px]"
             style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
           >
-            <option value="none">Ordenar por Lote: Sin orden</option>
-            <option value="asc">Lote: Menor a mayor</option>
-            <option value="desc">Lote: Mayor a menor</option>
+            <option value="none">Ordenar: Sin orden</option>
+            <optgroup label="Por número de lote">
+              <option value="lot_asc">Lote: Menor a mayor</option>
+              <option value="lot_desc">Lote: Mayor a menor</option>
+            </optgroup>
+            <optgroup label="Por monto de mora">
+              <option value="mora_desc">Mora: Mayor a menor</option>
+              <option value="mora_asc">Mora: Menor a mayor</option>
+            </optgroup>
           </select>
 
           {/* Export button */}
