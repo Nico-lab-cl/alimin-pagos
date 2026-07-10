@@ -141,6 +141,15 @@ export default function ClientsPage() {
     setCurrentPage(1);
   }, [search, selectedStage, selectedProject, activeTab, sortBy]);
 
+  // Al entrar a "En Mora (Crítico)" se ordena automaticamente por mora de mayor
+  // a menor, para priorizar los casos mas urgentes sin que postventa tenga que
+  // recordar tocar el dropdown. Se puede seguir cambiando manualmente despues.
+  useEffect(() => {
+    if (activeTab === "LATE") {
+      setSortBy("mora_desc");
+    }
+  }, [activeTab]);
+
   const refreshDocs = async (clientId: string, clientData: any) => {
     setLoadingDocs(true);
     try {
@@ -765,6 +774,9 @@ export default function ClientsPage() {
                           <div className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
                           {badgeText}
                         </div>
+                        {isLate && c.penaltyAmount > 0 && (
+                          <p className="text-[10px] font-bold text-[#EF4444] mt-1">{formatCLP(c.penaltyAmount)} de mora</p>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <p className={`text-base font-bold italic tracking-tight group-hover:opacity-90 transition-opacity ${balanceColor}`}>{formatCLP(c.pendingBalance)}</p>
