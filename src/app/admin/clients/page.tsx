@@ -21,6 +21,7 @@ export default function ClientsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedStage, setSelectedStage] = useState("ALL");
+  const [lotSort, setLotSort] = useState<"none" | "asc" | "desc">("none");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"ALL" | "LATE" | "GRACE" | "UPCOMING" | "OK">("ALL");
@@ -138,7 +139,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, selectedStage, selectedProject, activeTab]);
+  }, [search, selectedStage, selectedProject, activeTab, lotSort]);
 
   const refreshDocs = async (clientId: string, clientData: any) => {
     setLoadingDocs(true);
@@ -287,6 +288,17 @@ export default function ClientsPage() {
     };
   }, [nonTestClients]);
 
+  // Orden "natural" por numero de lote: extrae la parte numerica (ej. "L04A" -> 4)
+  // para que el orden sea 1,2,3...10 en vez de alfabetico (1,10,2,3...). Ante empate
+  // numerico (ej. L04A vs L04B) desempata alfabeticamente para mantener el sufijo en orden.
+  // Es solo un Array.sort() en memoria sobre datos ya cargados — no llama al servidor.
+  const naturalLotCompare = (a?: string | null, b?: string | null) => {
+    const numA = parseInt((a || "").match(/\d+/)?.[0] || "0", 10);
+    const numB = parseInt((b || "").match(/\d+/)?.[0] || "0", 10);
+    if (numA !== numB) return numA - numB;
+    return (a || "").localeCompare(b || "");
+  };
+
   const filteredClients = rawClients.filter((c: any) => {
     const isTestClient = isTest(c);
     const matchesSearch = !search ||
@@ -294,7 +306,7 @@ export default function ClientsPage() {
       c.clientEmail?.toLowerCase().includes(search.toLowerCase()) ||
       c.rut?.toLowerCase().includes(search.toLowerCase()) ||
       c.lotNumber?.toString().toUpperCase().includes(search.toUpperCase());
-    
+
     if (selectedStage === "PRUEBAS") {
       if (!isTestClient) return false;
     } else {
@@ -313,6 +325,10 @@ export default function ClientsPage() {
     if (activeTab === "OK" && c.status !== "OK" && c.status !== "COMPLETED") return false;
 
     return matchesSearch;
+  }).sort((a: any, b: any) => {
+    if (lotSort === "none") return 0;
+    const cmp = naturalLotCompare(a.lotNumber, b.lotNumber);
+    return lotSort === "asc" ? cmp : -cmp;
   });
 
   const handleExportCSV = () => {
@@ -416,6 +432,18 @@ export default function ClientsPage() {
               ))}
             </select>
           )}
+
+          {/* Lot number sort */}
+          <select
+            value={lotSort}
+            onChange={(e) => setLotSort(e.target.value as "none" | "asc" | "desc")}
+            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[170px]"
+            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
+          >
+            <option value="none">Ordenar por Lote: Sin orden</option>
+            <option value="asc">Lote: Menor a mayor</option>
+            <option value="desc">Lote: Mayor a menor</option>
+          </select>
 
           {/* Export button */}
           <button 
