@@ -597,7 +597,7 @@ export default function ClientsPage() {
                   <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider text-center">Lote</th>
                   <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider">Progreso de Cuotas</th>
                   <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider">Estado de Pago</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider text-right">Saldo Pendiente</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider text-right">{activeTab === "LATE" ? "Mora Acumulada" : "Saldo Pendiente"}</th>
                   <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider text-center">Acciones</th>
                 </tr>
               </thead>
@@ -774,12 +774,11 @@ export default function ClientsPage() {
                           <div className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
                           {badgeText}
                         </div>
-                        {isLate && c.penaltyAmount > 0 && (
-                          <p className="text-[10px] font-bold text-[#EF4444] mt-1">{formatCLP(c.penaltyAmount)} de mora</p>
-                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className={`text-base font-bold italic tracking-tight group-hover:opacity-90 transition-opacity ${balanceColor}`}>{formatCLP(c.pendingBalance)}</p>
+                        <p className={`text-base font-bold italic tracking-tight group-hover:opacity-90 transition-opacity ${balanceColor}`}>
+                          {activeTab === "LATE" ? formatCLP(c.penaltyAmount) : formatCLP(c.pendingBalance)}
+                        </p>
                       </td>
                       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">
