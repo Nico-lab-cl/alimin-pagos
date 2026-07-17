@@ -446,6 +446,69 @@ export async function updateReservation(
 /**
  * Approves a payment receipt.
  */
+/**
+ * Calcula la mora REAL total que un cliente debe hoy (automática + fija),
+ * usando exactamente la misma fórmula que ya se le muestra en pantalla al
+ * cliente y a postventa (getFullPostventaData / getUserLots). Antes, el
+ * cálculo de pagos solo miraba `manual_penalty` (la mora fija guardada) e
+ * ignoraba la mora automática acumulada de clientes en modo AUTO — por eso
+ * un cliente que pagaba justo su cuota, sin cubrir esa mora, se la veía
+ * borrada silenciosamente. Esta función centraliza el cálculo correcto
+ * para que approveReceipt, registerManualPayment y las nuevas funciones de
+ * abono de intereses usen siempre el mismo número real.
+ */
+function calculateCurrentMoraOwed(
+  res: {
+    installments_paid: number | null;
+    lot: { cuotas: number | null };
+    installment_start_date: Date | null;
+    due_day: number | null;
+    mora_frozen: boolean | null;
+    grace_days: number | null;
+    daily_penalty: number | null;
+    penalty_mode: string | null;
+    manual_penalty: number | null;
+    debt_start_date: Date | null;
+    debt_end_date: Date | null;
+    next_payment_date: Date | null;
+  },
+  project: {
+    due_day_of_month: number | null;
+    grace_period_days: number | null;
+    daily_penalty_amount: number | null;
+    penalty_start_date: Date | null;
+  }
+): number {
+  const paidCuotas = res.installments_paid || 0;
+  const totalCuotas = res.lot.cuotas || 0;
+  const fixedMode = res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED";
+  const fixedPenalty = fixedMode && res.manual_penalty ? res.manual_penalty : 0;
+
+  if (paidCuotas >= totalCuotas || !res.installment_start_date) {
+    return fixedPenalty;
+  }
+
+  const currentDate = getChileToday();
+  const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
+
+  const { totalPenaltyAmount: autoPenalty } = calculateAggregatedAutoPenalty(
+    totalCuotas - paidCuotas,
+    paidCuotas,
+    res.installment_start_date,
+    res.due_day ?? project.due_day_of_month ?? 5,
+    currentDate,
+    res.mora_frozen || false,
+    res.grace_days ?? project.grace_period_days ?? 5,
+    activeDailyPenalty,
+    fixedMode ? null : res.debt_start_date,
+    project.penalty_start_date,
+    res.debt_end_date,
+    res.next_payment_date
+  );
+
+  return autoPenalty + fixedPenalty;
+}
+
 export async function approveReceipt(receiptId: string) {
   const session = await auth();
   const user = session?.user as any;
@@ -512,19 +575,15 @@ export async function approveReceipt(receiptId: string) {
         if (range) expectedCuotaBase = Number(range.amount);
 
         const totalExpectedPerCuota = expectedCuotaBase * (receipt.installments_count || 1);
-        const currentPenalty = res.manual_penalty || 0; // The penalty currently registered as fixed if any
+        // Mora REAL total que debe hoy (automática + fija), no solo manual_penalty.
+        // Si el cliente paga justo la cuota sin cubrir esta mora, el faltante
+        // (shortfall) la va a preservar como mora fija en vez de borrarla.
+        const currentPenalty = calculateCurrentMoraOwed(res, res.project);
         // User requested: "primero a la cuota y luego al interes"
         const paid = receipt.amount_clp;
         const cuotaPaidAmount = Math.min(paid, totalExpectedPerCuota);
         const penaltyPaidAmount = Math.max(0, paid - totalExpectedPerCuota);
-        
-        // Calculate new shortfall based on whatever penalty they ACTUALLY owed
-        let penaltyOwed = 0;
-        if (res.penalty_mode === "FIXED" && res.manual_penalty) {
-          penaltyOwed = res.manual_penalty;
-        }
-        
-        // Since calculating exact historical AUTO penalty here is complex, we just calculate raw shortfall vs current total expected (base + fixed).
+
         const totalExpected = totalExpectedPerCuota + currentPenalty;
         const shortfall = totalExpected - paid;
 
@@ -667,6 +726,137 @@ export async function approveReceipt(receiptId: string) {
   } catch (error) {
     console.error("Error approving receipt:", error);
     return { error: "Error al aprobar" };
+  }
+}
+
+/**
+ * Aprueba un comprobante subido por el cliente, pero en vez de repartirlo
+ * cuota-primero-luego-mora, aplica el MONTO COMPLETO directo a la mora
+ * (automática + fija), sin tocar installments_paid. Si el monto supera la
+ * mora que el cliente debe, se topa en la mora total y se informa el
+ * excedente para que postventa lo registre aparte como pago de cuota.
+ * No modifica ningún otro dato de la reserva.
+ */
+export async function approveReceiptAsInterestPayment(receiptId: string) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const receipt = await prisma.paymentReceipt.findUnique({
+      where: { id: receiptId },
+      include: { reservation: { include: { user: true, project: true, lot: true } } },
+    });
+
+    if (!receipt) return { error: "Comprobante no encontrado" };
+    if (receipt.status !== "PENDING") return { error: "Este comprobante ya fue procesado" };
+    if (receipt.scope !== "INSTALLMENT") return { error: "Solo se puede abonar a intereses un comprobante de cuota" };
+
+    const res = receipt.reservation;
+    const currentMora = calculateCurrentMoraOwed(res, res.project);
+
+    if (currentMora <= 0) {
+      return { error: "Este cliente no tiene mora pendiente por abonar" };
+    }
+
+    const paid = receipt.amount_clp;
+    const appliedToMora = Math.min(paid, currentMora);
+    const excess = Math.max(0, paid - currentMora);
+    const remainingMora = currentMora - appliedToMora;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+      await tx.paymentReceipt.update({
+        where: { id: receiptId },
+        data: { status: "APPROVED", processed_at: new Date() },
+      });
+      await tx.reservation.update({
+        where: { id: receipt.reservation_id },
+        data: {
+          manual_penalty: remainingMora > 0 ? remainingMora : null,
+          penalty_mode: remainingMora > 0 ? "MIXED" : "AUTO",
+          debt_start_date: null,
+          debt_end_date: null,
+        },
+      });
+      await tx.financialLedger.create({
+        data: {
+          reservation_id: receipt.reservation_id,
+          amount_clp: appliedToMora,
+          category: "PENALTY",
+          description: "Abono de Intereses Aprobado (Bandeja de Pagos)",
+        },
+      });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "Reservation",
+        entity_id: receipt.reservation_id,
+        details: `Abono de intereses aprobado desde bandeja: $${appliedToMora.toLocaleString("es-CL")} aplicados a mora. Mora restante: $${remainingMora.toLocaleString("es-CL")}.${excess > 0 ? ` Excedente sin aplicar: $${excess.toLocaleString("es-CL")}.` : ""}`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    if (receipt.reservation.user.fcm_token) {
+      const { sendPushNotification } = await import("@/lib/notifications");
+      sendPushNotification({
+        token: receipt.reservation.user.fcm_token,
+        title: "¡Abono a intereses aprobado!",
+        body: `Tu pago de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(appliedToMora)} fue aplicado a tu mora.`,
+      });
+    }
+
+    // Comprobante digital PDF
+    try {
+      const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
+      const clientName = (receipt.reservation.last_name && receipt.reservation.last_name !== "null")
+        ? `${receipt.reservation.name} ${receipt.reservation.last_name}`.trim()
+        : (receipt.reservation.user?.name || receipt.reservation.name || "Cliente Alimin");
+      const rut = receipt.reservation.rut || "No registrado";
+      const email = receipt.reservation.user?.email || receipt.reservation.email || "No registrado";
+      const projectName = receipt.reservation.project?.name || "Alimin SPA";
+      const lotNumber = (receipt.reservation.lot as any)?.number || receipt.lot_id.toString();
+      const stage = receipt.reservation.lot?.stage || "";
+
+      const pdfBase64 = await generateReceiptPDF({
+        clientName,
+        rut,
+        email,
+        projectName,
+        lotNumber,
+        stage,
+        concept: "Abono de Intereses",
+        amount: appliedToMora,
+        date: new Date(),
+        receiptId: receipt.id.substring(0, 8).toUpperCase(),
+      });
+
+      await prisma.reservationDocument.create({
+        data: {
+          reservation_id: receipt.reservation_id,
+          name: `Comprobante_Abono_Intereses_${receipt.id.substring(0, 6)}.pdf`,
+          file_type: "application/pdf",
+          base64_content: `data:application/pdf;base64,${pdfBase64}`,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to generate PDF for interest payment:", err);
+    }
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    memoryCache.deleteByPrefix("receipts_");
+    revalidatePath("/admin");
+
+    return { success: true, appliedToMora, remainingMora, excess };
+  } catch (error) {
+    console.error("Error approving receipt as interest payment:", error);
+    return { error: "Error al aprobar el abono de intereses" };
   }
 }
 
@@ -1684,7 +1874,8 @@ export async function registerManualPayment(
       if (range) expectedCuotaBase = Number(range.amount);
 
       const totalExpectedPerCuota = expectedCuotaBase * data.installmentsCount;
-      const currentPenalty = res.manual_penalty || 0;
+      // Mora REAL total que debe hoy (automática + fija) — mismo arreglo que approveReceipt.
+      const currentPenalty = calculateCurrentMoraOwed(res, res.project);
 
       const paid = data.amount;
       const cuotaPaidAmount = Math.min(paid, totalExpectedPerCuota);
@@ -1703,7 +1894,7 @@ export async function registerManualPayment(
             },
             next_payment_date: null,
             manual_penalty: shortfall > 0 ? shortfall : null,
-            penalty_mode: shortfall > 0 ? "FIXED" : "AUTO",
+            penalty_mode: shortfall > 0 ? (res.penalty_mode === "MIXED" ? "MIXED" : "FIXED") : "AUTO",
             debt_start_date: null,
             debt_end_date: null,
           },
@@ -1806,6 +1997,145 @@ export async function registerManualPayment(
   } catch (error) {
     console.error("Error adding manual payment:", error);
     return { error: "Error al registrar pago manual" };
+  }
+}
+
+/**
+ * Registra un pago manual/offline (ej. depósito que le llegó a postventa
+ * fuera del portal) y lo aplica ÍNTEGRO a la mora, sin tocar cuotas.
+ * Si el monto supera la mora que el cliente debe, se topa en la mora total
+ * y se informa el excedente para que postventa lo registre aparte como
+ * pago de cuota. No modifica ningún otro dato de la reserva.
+ */
+export async function registerInterestPayment(
+  reservationId: string,
+  data: {
+    amount: number;
+    paidAt: string;
+    receiptUrl?: string;
+  }
+) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const res = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { lot: true, user: true, project: true },
+    });
+
+    if (!res) return { error: "Reserva no encontrada" };
+
+    const currentMora = calculateCurrentMoraOwed(res, res.project);
+    if (currentMora <= 0) {
+      return { error: "Este cliente no tiene mora pendiente por abonar" };
+    }
+
+    const paymentDate = new Date(data.paidAt + "T12:00:00");
+    const receiptId = crypto.randomUUID();
+
+    const paid = data.amount;
+    const appliedToMora = Math.min(paid, currentMora);
+    const excess = Math.max(0, paid - currentMora);
+    const remainingMora = currentMora - appliedToMora;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+      await tx.reservation.update({
+        where: { id: reservationId },
+        data: {
+          manual_penalty: remainingMora > 0 ? remainingMora : null,
+          penalty_mode: remainingMora > 0 ? "MIXED" : "AUTO",
+          debt_start_date: null,
+          debt_end_date: null,
+        },
+      });
+      await tx.financialLedger.create({
+        data: {
+          reservation_id: reservationId,
+          amount_clp: appliedToMora,
+          category: "PENALTY",
+          description: "Abono Manual de Intereses",
+          paid_at: paymentDate,
+        },
+      });
+      if (data.receiptUrl) {
+        await tx.paymentReceipt.create({
+          data: {
+            id: receiptId,
+            reservation_id: reservationId,
+            lot_id: res.lot_id,
+            amount_clp: appliedToMora,
+            receipt_url: data.receiptUrl,
+            scope: "INSTALLMENT",
+            status: "APPROVED",
+            processed_at: new Date(),
+          },
+        });
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "CREATE",
+        entity: "Reservation",
+        entity_id: reservationId,
+        details: `Abono manual de intereses registrado: $${appliedToMora.toLocaleString("es-CL")} aplicados a mora. Mora restante: $${remainingMora.toLocaleString("es-CL")}.${excess > 0 ? ` Excedente sin aplicar: $${excess.toLocaleString("es-CL")}.` : ""}`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    if (data.receiptUrl) {
+      try {
+        const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
+        const clientName = res.last_name
+          ? `${res.name} ${res.last_name}`.trim()
+          : (res.user?.name || res.name || "Cliente Alimin");
+        const rut = res.rut || "No registrado";
+        const email = res.user?.email || res.email || "No registrado";
+        const projectName = res.project?.name || "Alimin SPA";
+        const lotNumber = (res.lot as any)?.number || res.lot_id.toString();
+        const stage = res.lot?.stage || "";
+
+        const pdfBase64 = await generateReceiptPDF({
+          clientName,
+          rut,
+          email,
+          projectName,
+          lotNumber,
+          stage,
+          concept: "Abono de Intereses",
+          amount: appliedToMora,
+          date: paymentDate,
+          receiptId: receiptId.substring(0, 8).toUpperCase(),
+        });
+
+        await prisma.reservationDocument.create({
+          data: {
+            reservation_id: reservationId,
+            name: `Comprobante_Abono_Intereses_${receiptId.substring(0, 6)}.pdf`,
+            file_type: "application/pdf",
+            base64_content: `data:application/pdf;base64,${pdfBase64}`,
+            created_at: paymentDate,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to generate PDF for manual interest payment:", err);
+      }
+    }
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true, appliedToMora, remainingMora, excess };
+  } catch (error) {
+    console.error("Error registering interest payment:", error);
+    return { error: "Error al registrar el abono de intereses" };
   }
 }
 

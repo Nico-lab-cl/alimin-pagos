@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 import {
   updateClientProfile, updateClientFinancials, toggleAlContado,
-  registerManualPayment, getFinancialHistory, addClientNote, getClientNotes,
+  registerManualPayment, registerInterestPayment, getFinancialHistory, addClientNote, getClientNotes,
   sendClientObservation
 } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, deleteLegacyDocument, getReservationDocuments } from "@/actions/documents";
@@ -141,6 +141,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     paidAt: new Date().toISOString().split("T")[0],
     isPie: false
   });
+  const [paymentType, setPaymentType] = useState<"CUOTA" | "PIE" | "INTERES">("CUOTA");
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
 
   // Financial History State
@@ -426,16 +427,36 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
         });
       }
 
-      const res = await registerManualPayment(selectedClient.id, {
-        amount: paymentForm.amount,
-        installmentsCount: paymentForm.installmentsCount,
-        paidAt: paymentForm.paidAt,
-        isPie: paymentForm.isPie,
-        receiptUrl: base64 || undefined
-      });
+      let success = false;
+      let errorMsg: string | undefined;
 
-      if (res.success) {
-        toast.success("Pago registrado exitosamente");
+      if (paymentType === "INTERES") {
+        const res = await registerInterestPayment(selectedClient.id, {
+          amount: paymentForm.amount,
+          paidAt: paymentForm.paidAt,
+          receiptUrl: base64 || undefined
+        });
+        success = !!res.success;
+        errorMsg = res.error;
+        if (success) {
+          let msg = `Se aplicaron ${formatCLP(res.appliedToMora || 0)} a la mora.`;
+          if (res.excess && res.excess > 0) msg += ` Sobraron ${formatCLP(res.excess)} — regístralos aparte como pago de cuota.`;
+          toast.success("Abono de intereses registrado", { description: msg, duration: 8000 });
+        }
+      } else {
+        const res = await registerManualPayment(selectedClient.id, {
+          amount: paymentForm.amount,
+          installmentsCount: paymentForm.installmentsCount,
+          paidAt: paymentForm.paidAt,
+          isPie: paymentType === "PIE",
+          receiptUrl: base64 || undefined
+        });
+        success = !!res.success;
+        errorMsg = res.error;
+        if (success) toast.success("Pago registrado exitosamente");
+      }
+
+      if (success) {
         setShowPaymentModal(false);
         setPaymentForm({
           amount: 0,
@@ -443,12 +464,13 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           paidAt: new Date().toISOString().split("T")[0],
           isPie: false
         });
+        setPaymentType("CUOTA");
         setPaymentFile(null);
         onUpdate();
         fetchNotesAndHistory();
         refreshDocs();
       } else {
-        toast.error(res.error || "Error al registrar pago");
+        toast.error(errorMsg || "Error al registrar pago");
       }
     } catch (err) {
       toast.error("Error de conexión");
@@ -1952,28 +1974,51 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-455">Cantidad de Cuotas que amortiza</label>
-                <input 
-                  type="number" 
-                  min={1}
-                  value={paymentForm.installmentsCount}
-                  onChange={e => setPaymentForm({...paymentForm, installmentsCount: Math.max(1, Number(e.target.value))})}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-750 focus:border-blue-500 outline-none"
-                  required
-                />
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-455">Tipo de Pago</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentType("CUOTA")}
+                    className={`py-2.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${paymentType === "CUOTA" ? "bg-blue-600 border-blue-600 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    Cuota
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentType("PIE")}
+                    className={`py-2.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${paymentType === "PIE" ? "bg-blue-600 border-blue-600 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    Pie
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentType("INTERES")}
+                    className={`py-2.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${paymentType === "INTERES" ? "bg-amber-600 border-amber-600 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    Abono Intereses
+                  </button>
+                </div>
+                {paymentType === "INTERES" && (
+                  <p className="text-[10px] text-amber-650 font-semibold pt-1">
+                    El monto completo se aplica a la mora del cliente. No suma cuotas pagadas. Si sobra dinero, se avisa para registrarlo aparte.
+                  </p>
+                )}
               </div>
 
-              <div className="flex items-center gap-2 py-2">
-                <input 
-                  type="checkbox" 
-                  id="is-pie-checkbox"
-                  checked={paymentForm.isPie}
-                  onChange={e => setPaymentForm({...paymentForm, isPie: e.target.checked})}
-                  className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
-                />
-                <label htmlFor="is-pie-checkbox" className="text-xs text-slate-650 cursor-pointer">Registrar como pago de PIE</label>
-              </div>
+              {paymentType !== "INTERES" && (
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold uppercase tracking-wider text-slate-455">Cantidad de Cuotas que amortiza</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={paymentForm.installmentsCount}
+                    onChange={e => setPaymentForm({...paymentForm, installmentsCount: Math.max(1, Number(e.target.value))})}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-750 focus:border-blue-500 outline-none"
+                    required
+                  />
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-[9px] font-bold uppercase tracking-wider text-slate-455">Comprobante de Pago (Imagen/PDF - Opcional)</label>
@@ -1988,7 +2033,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
               <div className="flex gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowPaymentModal(false)}
+                  onClick={() => { setShowPaymentModal(false); setPaymentType("CUOTA"); }}
                   className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-655 rounded-xl font-bold transition-all cursor-pointer"
                 >
                   Cancelar
@@ -1996,10 +2041,10 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 <button
                   type="submit"
                   disabled={isRegisteringPayment}
-                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                  className={`flex-1 py-3 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${paymentType === "INTERES" ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"}`}
                 >
                   {isRegisteringPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Registrar Pago
+                  {paymentType === "INTERES" ? "Registrar Abono de Intereses" : "Registrar Pago"}
                 </button>
               </div>
             </form>

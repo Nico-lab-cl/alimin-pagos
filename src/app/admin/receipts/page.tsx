@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { getAdminProjects, approveReceipt, rejectReceipt, getAllReceipts } from "@/actions/postventa";
+import { getAdminProjects, approveReceipt, approveReceiptAsInterestPayment, rejectReceipt, getAllReceipts } from "@/actions/postventa";
 import { formatCLP, cn, getReceiptDownloadFilename, downloadDocument } from "@/lib/utils";
 import { toast } from "sonner";
 import { 
@@ -18,7 +18,8 @@ import {
   AlertCircle,
   Plus,
   FileSpreadsheet,
-  FileText
+  FileText,
+  Percent
 } from "lucide-react";
 import Link from "next/link";
 import { getInstallmentDueDate } from "@/lib/financials";
@@ -119,6 +120,24 @@ export default function ReceiptsPage() {
         description: "El saldo del cliente ha sido actualizado.",
       });
       setSelectedReceipt(null); // Close modal
+      loadReceipts();
+    } else {
+      toast.error(result.error || "Ocurrió un fallo en la validación");
+    }
+    setProcessing(null);
+  };
+
+  const handleApproveAsInterestInModal = async (id: string) => {
+    if (!confirm("Este monto se aplicará completo a la mora del cliente, sin sumar cuotas pagadas. ¿Confirmas?")) return;
+    setProcessing(id);
+    const result = await approveReceiptAsInterestPayment(id);
+    if (result.success) {
+      let description = `Se aplicaron ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(result.appliedToMora || 0)} a la mora.`;
+      if (result.excess && result.excess > 0) {
+        description += ` Sobraron ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(result.excess)} — regístralos aparte como pago de cuota.`;
+      }
+      toast.success("Abono de Intereses Aprobado", { description, duration: 8000 });
+      setSelectedReceipt(null);
       loadReceipts();
     } else {
       toast.error(result.error || "Ocurrió un fallo en la validación");
@@ -753,6 +772,17 @@ export default function ReceiptsPage() {
                         Rechazar Pago
                       </button>
                     </>
+                  )}
+                  {selectedReceipt.status === "PENDING" && selectedReceipt.scope !== "PIE" && (
+                    <button
+                      onClick={() => handleApproveAsInterestInModal(selectedReceipt.id)}
+                      disabled={processing === selectedReceipt.id}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-700 font-bold text-xs rounded-xl transition-all disabled:opacity-30"
+                      title="Aplica el monto completo a la mora del cliente, sin sumar cuotas pagadas"
+                    >
+                      <Percent className="w-3.5 h-3.5" />
+                      Abono a Intereses
+                    </button>
                   )}
                   {selectedReceipt.status !== "PENDING" && (
                     <button
