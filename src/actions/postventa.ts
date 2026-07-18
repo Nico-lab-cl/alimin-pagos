@@ -509,6 +509,80 @@ function calculateCurrentMoraOwed(
   return autoPenalty + fixedPenalty;
 }
 
+/**
+ * Arma un texto legible con el desglose de qué cuota(s) está generando
+ * el interés automático vigente y cuántos días de mora lleva cada una.
+ * Se usa para dejar registrado en la bitácora, al momento de cristalizar
+ * un saldo de mora en manual_penalty, DE DÓNDE viene ese monto — porque
+ * una vez guardado como monto fijo, esa trazabilidad se pierde.
+ */
+function getMoraBreakdownText(
+  res: {
+    installments_paid: number | null;
+    lot: { cuotas: number | null };
+    installment_start_date: Date | null;
+    due_day: number | null;
+    mora_frozen: boolean | null;
+    mora_status: string | null;
+    grace_days: number | null;
+    daily_penalty: number | null;
+    penalty_mode: string | null;
+    debt_start_date: Date | null;
+    debt_end_date: Date | null;
+    next_payment_date: Date | null;
+  },
+  project: {
+    due_day_of_month: number | null;
+    grace_period_days: number | null;
+    daily_penalty_amount: number | null;
+    penalty_start_date: Date | null;
+  }
+): string {
+  const paidCuotas = res.installments_paid || 0;
+  const totalCuotas = res.lot.cuotas || 0;
+  if (paidCuotas >= totalCuotas || !res.installment_start_date) return "";
+  if (res.mora_status === "CONGELADO" || res.mora_frozen) return "";
+
+  const currentDate = getChileToday();
+  const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
+  const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
+  const fixedMode = res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED";
+  const formatMonth = new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric", timeZone: "America/Santiago" });
+
+  const lines: string[] = [];
+  const totalPendingRemaining = totalCuotas - paidCuotas;
+  for (let i = 0; i < totalPendingRemaining; i++) {
+    const installmentNumber = paidCuotas + 1 + i;
+    let currentDue: Date;
+    if (i === 0 && res.next_payment_date) {
+      currentDue = new Date(res.next_payment_date);
+    } else {
+      currentDue = getInstallmentDueDate(res.installment_start_date, installmentNumber, res.due_day ?? project.due_day_of_month ?? 5);
+    }
+
+    const penaltyForThis = calculateTotalInterest(
+      currentDue,
+      currentDate,
+      false,
+      graceDays,
+      activeDailyPenalty,
+      fixedMode ? null : (i === 0 ? res.debt_start_date : null),
+      project.penalty_start_date,
+      res.debt_end_date
+    );
+
+    if (penaltyForThis > 0) {
+      const days = Math.round(penaltyForThis / activeDailyPenalty);
+      const monthRaw = formatMonth.format(currentDue);
+      const monthName = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1);
+      lines.push(`Cuota #${installmentNumber} (${monthName}, venció ${currentDue.toLocaleDateString("es-CL")}): ${days} día${days === 1 ? "" : "s"} de mora = $${penaltyForThis.toLocaleString("es-CL")}`);
+    }
+  }
+
+  if (lines.length === 0) return "";
+  return `Desglose del interés automático vigente:\n${lines.join("\n")}`;
+}
+
 export async function approveReceipt(receiptId: string) {
   const session = await auth();
   const user = session?.user as any;
@@ -591,6 +665,9 @@ export async function approveReceipt(receiptId: string) {
         if (shortfall > 0) {
           nextPenaltyMode = res.penalty_mode === "MIXED" ? "MIXED" : "FIXED";
         }
+        // Capturar el desglose ANTES de la transacción, con el estado pre-pago,
+        // porque una vez guardado el shortfall como manual_penalty se pierde de qué cuota venía.
+        const moraBreakdownText = shortfall > 0 ? getMoraBreakdownText(res, res.project) : "";
 
         await prisma.$transaction(async (tx) => {
           await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
@@ -634,6 +711,11 @@ export async function approveReceipt(receiptId: string) {
             });
           }
         });
+
+        if (shortfall > 0) {
+          const noteText = `Multa fija actualizada a $${shortfall.toLocaleString("es-CL")} (el pago cubrió la cuota pero no el interés acumulado).${moraBreakdownText ? "\n\n" + moraBreakdownText : ""}`;
+          await logSystemNote(receipt.reservation_id, noteText, "Reservation");
+        }
       } else {
         // Fallback if reservation not found
         await prisma.$transaction(async (tx) => {
@@ -1973,6 +2055,9 @@ export async function registerManualPayment(
 
       const totalExpected = totalExpectedPerCuota + currentPenalty;
       const shortfall = totalExpected - paid;
+      // Capturar el desglose ANTES de la transacción, con el estado pre-pago,
+      // porque una vez guardado el shortfall como manual_penalty se pierde de qué cuota venía.
+      const moraBreakdownText = shortfall > 0 ? getMoraBreakdownText(res, res.project) : "";
 
       await prisma.$transaction(async (tx) => {
         await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
@@ -2035,6 +2120,11 @@ export async function registerManualPayment(
           });
         }
       });
+
+      if (shortfall > 0) {
+        const noteText = `Multa fija actualizada a $${shortfall.toLocaleString("es-CL")} (el pago cubrió la cuota pero no el interés acumulado).${moraBreakdownText ? "\n\n" + moraBreakdownText : ""}`;
+        await logSystemNote(reservationId, noteText, "Reservation");
+      }
     }
 
     // Auto-generate Digital Payment Receipt PDF for Manual Payment
