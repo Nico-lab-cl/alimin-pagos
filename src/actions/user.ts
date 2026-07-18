@@ -6,6 +6,7 @@ import {
   getInstallmentDueDate,
   calculateTotalInterest,
   calculateAggregatedAutoPenalty,
+  calculateGrowingFixedPenalty,
   getChileToday,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
@@ -139,9 +140,15 @@ export async function getUserLots() {
             res.debt_end_date,
             res.next_payment_date
           );
-          const fixedPenalty = (res.manual_penalty != null && res.manual_penalty > 0) ? res.manual_penalty : 0;
+          // La multa fija/pactada crece día a día desde debt_start_date, igual que en el panel admin.
+          const { amount: fixedPenalty, growthDays: fixedGrowthDays } = calculateGrowingFixedPenalty(
+            res.manual_penalty,
+            res.debt_start_date,
+            activeDailyPenalty,
+            currentDate
+          );
           penaltyAmount = autoPenalty + fixedPenalty;
-          lateDays = autoLateDays;
+          lateDays = autoLateDays + fixedGrowthDays;
         } else {
           // AUTO: pure automatic penalty based on dates
           const { totalPenaltyAmount: autoPenalty, totalLateDays: autoLateDays } = calculateAggregatedAutoPenalty(
@@ -168,15 +175,21 @@ export async function getUserLots() {
         
         // 1. Add historical penalty as a separate item if in FIXED or MIXED mode
         if ((res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") && res.manual_penalty != null && res.manual_penalty > 0) {
+          const { amount: growingFixedAmount, growthDays: fixedGrowthDaysForItem } = calculateGrowingFixedPenalty(
+            res.manual_penalty,
+            res.debt_start_date,
+            activeDailyPenalty,
+            currentDate
+          );
           upcomingInstallments.push({
             number: 0,
             dueDate: null,
             baseAmount: 0,
-            amount: Number(res.manual_penalty),
+            amount: growingFixedAmount,
             monthName: "Intereses Anteriores (Mora Histórica)",
             hasPenalty: true,
-            penaltyAmount: Number(res.manual_penalty),
-            lateDays: null, 
+            penaltyAmount: growingFixedAmount,
+            lateDays: fixedGrowthDaysForItem > 0 ? fixedGrowthDaysForItem : null,
             dailyPenalty: 0,
             isOverdue: true,
             isHistorical: true

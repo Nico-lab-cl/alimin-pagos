@@ -135,6 +135,31 @@ export function calculateTotalInterest(
 }
 
 /**
+ * Calcula el monto vigente de una multa fija/pactada (manual_penalty) que crece
+ * día a día mientras no se pague, usando debtStartDate como fecha desde la que
+ * empieza a crecer (se re-fija cada vez que un pago toca el monto).
+ * Si no hay debtStartDate (datos históricos previos a esta función), el monto
+ * se muestra plano sin crecer — no se altera retroactivamente nada existente.
+ */
+export function calculateGrowingFixedPenalty(
+  manualPenalty: number | null | undefined,
+  debtStartDate: Date | string | null | undefined,
+  dailyPenalty: number,
+  currentDate: Date
+): { amount: number; growthDays: number } {
+  const base = manualPenalty && manualPenalty > 0 ? manualPenalty : 0;
+  if (base === 0) return { amount: 0, growthDays: 0 };
+  if (!debtStartDate) return { amount: base, growthDays: 0 };
+
+  const start = getSantiagoUTCDate(new Date(debtStartDate));
+  const today = getSantiagoUTCDate(currentDate);
+  const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const growthDays = Math.max(0, diffDays);
+
+  return { amount: base + dailyPenalty * growthDays, growthDays };
+}
+
+/**
  * Calculates the total aggregated automatic penalty across all pending installments.
  * It loops through each pending installment, calculates its due date, and evaluates its penalty independently.
  */

@@ -6,6 +6,7 @@ import {
   getInstallmentDueDate,
   calculateTotalInterest,
   calculateAggregatedAutoPenalty,
+  calculateGrowingFixedPenalty,
   getProjectConfig,
   getChileToday,
 } from "@/lib/financials";
@@ -158,9 +159,16 @@ export async function getFullPostventaData({
             res.debt_end_date,
             res.next_payment_date
           );
-          const fixedPenalty = (res.manual_penalty != null && res.manual_penalty > 0) ? res.manual_penalty : 0;
+          // La multa fija/pactada crece día a día desde debt_start_date (re-fijado
+          // cada vez que un pago la toca), en vez de quedar congelada para siempre.
+          const { amount: fixedPenalty, growthDays: fixedGrowthDays } = calculateGrowingFixedPenalty(
+            res.manual_penalty,
+            res.debt_start_date,
+            activeDailyPenalty,
+            currentDate
+          );
           penaltyAmount = autoPenalty + fixedPenalty;
-          lateDays = autoLateDays;
+          lateDays = autoLateDays + fixedGrowthDays;
         } else {
           // AUTO: pure automatic penalty based on dates
           const { totalPenaltyAmount: autoPenalty, totalLateDays: autoLateDays } = calculateAggregatedAutoPenalty(
@@ -482,14 +490,15 @@ function calculateCurrentMoraOwed(
   const paidCuotas = res.installments_paid || 0;
   const totalCuotas = res.lot.cuotas || 0;
   const fixedMode = res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED";
-  const fixedPenalty = fixedMode && res.manual_penalty ? res.manual_penalty : 0;
+  const currentDate = getChileToday();
+  const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
+  const { amount: fixedPenalty } = fixedMode
+    ? calculateGrowingFixedPenalty(res.manual_penalty, res.debt_start_date, activeDailyPenalty, currentDate)
+    : { amount: 0 };
 
   if (paidCuotas >= totalCuotas || !res.installment_start_date) {
     return fixedPenalty;
   }
-
-  const currentDate = getChileToday();
-  const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
   const { totalPenaltyAmount: autoPenalty } = calculateAggregatedAutoPenalty(
     totalCuotas - paidCuotas,
@@ -684,7 +693,8 @@ export async function approveReceipt(receiptId: string) {
               next_payment_date: null,
               manual_penalty: shortfall > 0 ? shortfall : null,
               penalty_mode: nextPenaltyMode,
-              debt_start_date: null,
+              // Re-fija la fecha desde la que la multa empieza a crecer día a día.
+              debt_start_date: shortfall > 0 ? getChileToday() : null,
               debt_end_date: null,
             },
           });
@@ -859,7 +869,8 @@ export async function approveReceiptAsInterestPayment(receiptId: string) {
         data: {
           manual_penalty: remainingMora > 0 ? remainingMora : null,
           penalty_mode: remainingMora > 0 ? "MIXED" : "AUTO",
-          debt_start_date: null,
+          // Re-fija la fecha desde la que la mora restante sigue creciendo día a día.
+          debt_start_date: remainingMora > 0 ? getChileToday() : null,
           debt_end_date: null,
         },
       });
@@ -1400,7 +1411,8 @@ export async function deleteFinancialLedgerEntry(ledgerId: string, reason: strin
         const newMode = res.penalty_mode === "AUTO" ? "MIXED" : (res.penalty_mode || "MIXED");
         await tx.reservation.update({
           where: { id: entry.reservation_id },
-          data: { manual_penalty: newManualPenalty, penalty_mode: newMode },
+          // Re-fija la fecha desde la que la mora restaurada sigue creciendo día a día.
+          data: { manual_penalty: newManualPenalty, penalty_mode: newMode, debt_start_date: getChileToday() },
         });
         reversalDetail = `Mora pactada devuelta de $${(res.manual_penalty || 0).toLocaleString("es-CL")} a $${newManualPenalty.toLocaleString("es-CL")}.`;
       }
@@ -2070,7 +2082,8 @@ export async function registerManualPayment(
             next_payment_date: null,
             manual_penalty: shortfall > 0 ? shortfall : null,
             penalty_mode: shortfall > 0 ? (res.penalty_mode === "MIXED" ? "MIXED" : "FIXED") : "AUTO",
-            debt_start_date: null,
+            // Re-fija la fecha desde la que la multa empieza a crecer día a día.
+            debt_start_date: shortfall > 0 ? getChileToday() : null,
             debt_end_date: null,
           },
         });
@@ -2229,7 +2242,8 @@ export async function registerInterestPayment(
         data: {
           manual_penalty: remainingMora > 0 ? remainingMora : null,
           penalty_mode: remainingMora > 0 ? "MIXED" : "AUTO",
-          debt_start_date: null,
+          // Re-fija la fecha desde la que la mora restante sigue creciendo día a día.
+          debt_start_date: remainingMora > 0 ? getChileToday() : null,
           debt_end_date: null,
         },
       });
