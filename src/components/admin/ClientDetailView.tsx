@@ -4,15 +4,15 @@ import { useState, useEffect } from "react";
 import { formatCLP, formatDate, getDownloadFilename, downloadDocument } from "@/lib/utils";
 import { 
   ArrowLeft, Bell, HelpCircle, User, FileText, Calendar, Building, Clock, 
-  AlertTriangle, Phone, CheckCircle2, ChevronRight, ChevronDown, Download, Plus, 
+  AlertTriangle, Phone, CheckCircle2, ChevronRight, ChevronDown, Download, Plus,
   Mail, Settings, MoreVertical, MessageSquare, Send, ShieldAlert, History, Zap, Loader2,
-  Trash2, Eye, X, Save, Lock
+  Trash2, Eye, X, Save, Lock, Pencil
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   updateClientProfile, updateClientFinancials, toggleAlContado,
   registerManualPayment, registerInterestPayment, getFinancialHistory, addClientNote, getClientNotes,
-  sendClientObservation
+  sendClientObservation, updateFinancialLedgerAmount, deleteFinancialLedgerEntry
 } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, deleteLegacyDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
@@ -148,6 +148,14 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
   const [financialHistory, setFinancialHistory] = useState<any[]>([]);
   const [loadingFinHistory, setLoadingFinHistory] = useState(false);
 
+  // Ledger Entry Edit/Delete State
+  const [editingLedgerEntry, setEditingLedgerEntry] = useState<any | null>(null);
+  const [editLedgerForm, setEditLedgerForm] = useState({ amount: "", installmentsCount: "", reason: "" });
+  const [isSavingLedgerEdit, setIsSavingLedgerEdit] = useState(false);
+  const [deletingLedgerEntry, setDeletingLedgerEntry] = useState<any | null>(null);
+  const [deleteLedgerReason, setDeleteLedgerReason] = useState("");
+  const [isDeletingLedger, setIsDeletingLedger] = useState(false);
+
   // Document State
   const [docs, setDocs] = useState<any[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
@@ -209,6 +217,73 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     fetchNotesAndHistory();
     refreshDocs();
   }, [selectedClient.id]);
+
+  const handleOpenEditLedger = (item: any) => {
+    setEditingLedgerEntry(item);
+    const descMatch = item.description?.match(/Cuota\s*x\s*(\d+)/i);
+    setEditLedgerForm({
+      amount: String(item.amount_clp || 0),
+      installmentsCount: item.category === "CUOTA" ? String(descMatch ? descMatch[1] : 1) : "",
+      reason: "",
+    });
+  };
+
+  const handleSaveLedgerEdit = async () => {
+    if (!editingLedgerEntry) return;
+    const newAmount = parseInt(editLedgerForm.amount, 10);
+    if (isNaN(newAmount) || newAmount <= 0) {
+      toast.error("Ingresa un monto válido");
+      return;
+    }
+    if (!editLedgerForm.reason.trim()) {
+      toast.error("Debes indicar el motivo del cambio");
+      return;
+    }
+    setIsSavingLedgerEdit(true);
+    try {
+      const newCount = editingLedgerEntry.category === "CUOTA" && editLedgerForm.installmentsCount
+        ? parseInt(editLedgerForm.installmentsCount, 10)
+        : undefined;
+      const res = await updateFinancialLedgerAmount(editingLedgerEntry.id, newAmount, editLedgerForm.reason.trim(), newCount);
+      if (res?.error) {
+        toast.error(res.error);
+      } else {
+        toast.success("Registro de caja actualizado");
+        setEditingLedgerEntry(null);
+        onUpdate();
+        fetchNotesAndHistory();
+      }
+    } catch (e) {
+      toast.error("Error al actualizar el registro");
+    } finally {
+      setIsSavingLedgerEdit(false);
+    }
+  };
+
+  const handleConfirmDeleteLedger = async () => {
+    if (!deletingLedgerEntry) return;
+    if (!deleteLedgerReason.trim()) {
+      toast.error("Debes indicar el motivo de la eliminación");
+      return;
+    }
+    setIsDeletingLedger(true);
+    try {
+      const res = await deleteFinancialLedgerEntry(deletingLedgerEntry.id, deleteLedgerReason.trim());
+      if (res?.error) {
+        toast.error(res.error);
+      } else {
+        toast.success("Registro de caja eliminado");
+        setDeletingLedgerEntry(null);
+        setDeleteLedgerReason("");
+        onUpdate();
+        fetchNotesAndHistory();
+      }
+    } catch (e) {
+      toast.error("Error al eliminar el registro");
+    } finally {
+      setIsDeletingLedger(false);
+    }
+  };
 
   useEffect(() => {
     setLogPage(1);
@@ -533,7 +608,8 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
         date: item.paid_at,
         icon: CheckCircle2,
         iconBg: "bg-emerald-50 text-emerald-600 border border-emerald-100",
-        author: "Postventa Alimin"
+        author: "Postventa Alimin",
+        ledgerItem: item
       });
     });
 
@@ -1801,12 +1877,34 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                             </span>
                           </div>
                           <p className="text-xs text-slate-600 leading-relaxed font-medium mb-3">{log.description}</p>
-                          
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-655 uppercase border border-slate-350">
-                              {log.author ? log.author.substring(0, 2).toUpperCase() : "AD"}
+
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-655 uppercase border border-slate-350">
+                                {log.author ? log.author.substring(0, 2).toUpperCase() : "AD"}
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-500 uppercase">{log.author}</span>
                             </div>
-                            <span className="text-[10px] font-bold text-slate-500 uppercase">{log.author}</span>
+                            {log.badge === "PAGO" && log.ledgerItem && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditLedger(log.ledgerItem)}
+                                  className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all cursor-pointer"
+                                  title="Editar registro"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setDeletingLedgerEntry(log.ledgerItem); setDeleteLedgerReason(""); }}
+                                  className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                  title="Eliminar registro"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2242,6 +2340,158 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 >
                   {isSavingMoraSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Aplicar Ajustes de Mora
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Ledger Entry Modal */}
+      {editingLedgerEntry && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in p-4 overflow-y-auto">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+              <div className="flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-blue-600" />
+                <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider">Editar Registro de Caja</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingLedgerEntry(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-450 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs font-semibold text-slate-750">
+              <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 text-[11px] text-slate-600 font-medium">
+                {editingLedgerEntry.description}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Monto ($)</label>
+                <input
+                  type="number"
+                  value={editLedgerForm.amount}
+                  onChange={e => setEditLedgerForm({ ...editLedgerForm, amount: e.target.value })}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-850 focus:border-blue-500 outline-none"
+                />
+              </div>
+
+              {editingLedgerEntry.category === "CUOTA" && (
+                <div className="space-y-1.5">
+                  <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Cantidad de Cuotas que Representa</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={editLedgerForm.installmentsCount}
+                    onChange={e => setEditLedgerForm({ ...editLedgerForm, installmentsCount: e.target.value })}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-850 focus:border-blue-500 outline-none"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="block text-[9px] uppercase tracking-wider text-red-500 font-bold">Motivo del Cambio (obligatorio)</label>
+                <textarea
+                  rows={3}
+                  value={editLedgerForm.reason}
+                  onChange={e => setEditLedgerForm({ ...editLedgerForm, reason: e.target.value })}
+                  placeholder="Ej: Corrección de monto mal ingresado por error de digitación."
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-blue-500 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-150 rounded-xl px-3 py-2.5 text-[10px] font-semibold text-amber-700">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>Este cambio queda registrado en la bitácora de auditoría con tu usuario, el motivo y el monto anterior.</span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingLedgerEntry(null)}
+                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-655 rounded-xl font-bold transition-all cursor-pointer text-center"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveLedgerEdit}
+                  disabled={isSavingLedgerEdit}
+                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  {isSavingLedgerEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Guardar Cambios
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Ledger Entry Modal */}
+      {deletingLedgerEntry && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in p-4 overflow-y-auto">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-red-600" />
+                <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider">Eliminar Registro de Caja</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeletingLedgerEntry(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-450 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs font-semibold text-slate-750">
+              <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 text-[11px] text-slate-600 font-medium">
+                {deletingLedgerEntry.description}. Monto: {formatCLP(deletingLedgerEntry.amount_clp)}.
+              </div>
+
+              <div className="flex items-start gap-2 bg-red-50 border border-red-150 rounded-xl px-3 py-2.5 text-[10px] font-semibold text-red-700">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  {deletingLedgerEntry.category === "CUOTA" && "Se revertirán las cuotas pagadas que representaba este registro."}
+                  {deletingLedgerEntry.category === "PIE" && "El pie del cliente volverá a estado PENDIENTE."}
+                  {deletingLedgerEntry.category === "PENALTY" && "El monto se devolverá a la mora pactada del cliente."}
+                  {" "}El comprobante/PDF asociado (si existe) no se elimina, solo este registro de caja. Esta acción queda registrada en la bitácora de auditoría.
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[9px] uppercase tracking-wider text-red-500 font-bold">Motivo de la Eliminación (obligatorio)</label>
+                <textarea
+                  rows={3}
+                  value={deleteLedgerReason}
+                  onChange={e => setDeleteLedgerReason(e.target.value)}
+                  placeholder="Ej: Pago duplicado registrado por error."
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-red-400 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeletingLedgerEntry(null)}
+                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-655 rounded-xl font-bold transition-all cursor-pointer text-center"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteLedger}
+                  disabled={isDeletingLedger}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  {isDeletingLedger ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  Eliminar Registro
                 </button>
               </div>
             </div>

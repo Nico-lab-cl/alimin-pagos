@@ -1259,6 +1259,96 @@ export async function updateFinancialLedgerAmount(
 }
 
 /**
+ * Elimina una entrada del Historial de Pagos (FinancialLedger) y revierte
+ * EXACTAMENTE su efecto según la categoría:
+ * - CUOTA: resta la cantidad de cuotas que representaba a installments_paid
+ *   (parseada de la descripción, igual que ya hace updateFinancialLedgerAmount).
+ * - PIE: vuelve pie_status a PENDING.
+ * - PENALTY (mora, incluye los abonos de intereses): devuelve el monto a
+ *   manual_penalty (mora pactada), pasando a modo Mixto si estaba en Automático.
+ *
+ * No toca el comprobante (PaymentReceipt) ni el PDF asociado: no existe una
+ * relación directa en la base de datos entre un registro de caja y su
+ * comprobante, y adivinar por monto+fecha (como hacía deletePaymentReceipt)
+ * arriesga borrar el comprobante equivocado. El comprobante queda como
+ * historial, y el detalle de auditoría deja explícito que no se tocó.
+ */
+export async function deleteFinancialLedgerEntry(ledgerId: string, reason: string) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  if (!reason || !reason.trim()) {
+    return { error: "Debes indicar el motivo de la eliminación" };
+  }
+
+  try {
+    const entry = await prisma.financialLedger.findUnique({
+      where: { id: ledgerId },
+      include: { reservation: true },
+    });
+
+    if (!entry) return { error: "Registro no encontrado" };
+
+    const res = entry.reservation;
+    let reversalDetail = "";
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+
+      if (entry.category === "CUOTA") {
+        const descMatch = entry.description?.match(/Cuota\s*x\s*(\d+)/i);
+        const count = descMatch ? parseInt(descMatch[1], 10) : 1;
+        const newInstallmentsPaid = Math.max(0, (res.installments_paid || 0) - count);
+        await tx.reservation.update({
+          where: { id: entry.reservation_id },
+          data: { installments_paid: newInstallmentsPaid },
+        });
+        reversalDetail = `Cuotas pagadas revertidas de ${res.installments_paid || 0} a ${newInstallmentsPaid}.`;
+      } else if (entry.category === "PIE") {
+        await tx.reservation.update({
+          where: { id: entry.reservation_id },
+          data: { pie_status: "PENDING" },
+        });
+        reversalDetail = "Pie vuelve a estado PENDIENTE.";
+      } else if (entry.category === "PENALTY") {
+        const newManualPenalty = (res.manual_penalty || 0) + entry.amount_clp;
+        const newMode = res.penalty_mode === "AUTO" ? "MIXED" : (res.penalty_mode || "MIXED");
+        await tx.reservation.update({
+          where: { id: entry.reservation_id },
+          data: { manual_penalty: newManualPenalty, penalty_mode: newMode },
+        });
+        reversalDetail = `Mora pactada devuelta de $${(res.manual_penalty || 0).toLocaleString("es-CL")} a $${newManualPenalty.toLocaleString("es-CL")}.`;
+      }
+
+      await tx.financialLedger.delete({ where: { id: ledgerId } });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "DELETE",
+        entity: "FinancialLedger",
+        entity_id: ledgerId,
+        details: `Registro de caja eliminado: ${entry.category} $${entry.amount_clp.toLocaleString("es-CL")} ("${entry.description || ""}"). ${reversalDetail} Motivo: ${reason}. El comprobante/PDF asociado (si existe) NO se modificó. ID Reserva: ${entry.reservation_id}`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting financial ledger entry:", error);
+    return { error: "Error al eliminar el registro" };
+  }
+}
+
+/**
  * Gets all lots for a project (admin inventory view).
  */
 export async function getAdminLots(projectSlug: string) {
