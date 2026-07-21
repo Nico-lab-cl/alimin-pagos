@@ -35,10 +35,11 @@ export async function getProjectEmails(projectSlug: string) {
       }
     });
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const emails = reservations.map(r => ({
       name: `${r.name} ${r.last_name || ""}`.trim(),
-      email: r.user?.email || r.email
-    })).filter(e => e.email && e.email.includes("@"));
+      email: (r.user?.email && emailRegex.test(r.user.email)) ? r.user.email : r.email
+    })).filter(e => e.email && emailRegex.test(e.email));
 
     // Remove duplicates
     const uniqueEmails = Array.from(new Set(emails.map(e => e.email)))

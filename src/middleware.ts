@@ -6,8 +6,28 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const user = req.auth?.user as any;
 
+  // Maintenance mode handling
+  const isMaintenanceMode = process.env.MAINTENANCE_MODE === "true";
+  const isAdmin = user?.role === "ADMIN";
+
+  if (isMaintenanceMode) {
+    // Admins can bypass maintenance mode
+    if (!isAdmin && pathname !== "/mantenimiento") {
+      // Allow login and auth api endpoints so admins can authenticate
+      if (pathname === "/login" || pathname.startsWith("/api/auth")) {
+        return NextResponse.next();
+      }
+      return NextResponse.redirect(new URL("/mantenimiento", req.nextUrl));
+    }
+  } else {
+    // If maintenance mode is disabled but user hits /mantenimiento directly
+    if (pathname === "/mantenimiento") {
+      return NextResponse.redirect(new URL("/", req.nextUrl));
+    }
+  }
+
   // Public routes
-  const publicPaths = ["/login", "/api/auth"];
+  const publicPaths = ["/login", "/api/auth", "/mantenimiento"];
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
   if (isPublic) return NextResponse.next();
