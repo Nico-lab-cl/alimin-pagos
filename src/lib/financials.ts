@@ -135,6 +135,75 @@ export function calculateTotalInterest(
 }
 
 /**
+ * Réplica EXACTA de calculateDaysLate/calculateTotalInterest de
+ * aliminlomasdelmar.com (su src/lib/financials.ts), para que la mora del
+ * proyecto Lomas del Mar coincida al peso con lo que muestra ese sistema.
+ *
+ * Difiere de calculateTotalInterest (la fórmula estándar del portal) en:
+ *   1) NO suma el "+1 día" final al conteo de atraso.
+ *   2) Cuando hay debtStartDate, ancla el conteo al día ANTERIOR (-1).
+ *   3) El cutoff (penalty_start_date) solo aplica cuando NO hay debtStartDate,
+ *      igual que Lomas (effectiveIsLegacy = isLegacy || !!debtStart).
+ * Además, el llamador debe pasar debtStartDate a TODAS las cuotas (no solo a la
+ * primera), tal como hace el loop de Lomas. Se usa únicamente para lomas-del-mar.
+ */
+export function calculateLomasInterest(
+  dueDate: Date,
+  paymentDate: Date = new Date(),
+  moraFrozen: boolean = false,
+  gracePeriodDays: number = 5,
+  dailyPenaltyAmount: number = 10000,
+  debtStartDate?: Date | string | null,
+  penaltyStartDate?: Date | string | null,
+  debtEndDate?: Date | string | null
+): number {
+  if (moraFrozen) return 0;
+
+  let effectivePayment = getSantiagoUTCDate(paymentDate);
+  if (debtEndDate) {
+    const end = getSantiagoUTCDate(new Date(debtEndDate));
+    if (effectivePayment > end) effectivePayment = end;
+  }
+
+  const dueMidnight = getSantiagoUTCDate(dueDate);
+  const gracePeriodEnd = new Date(dueMidnight);
+  gracePeriodEnd.setUTCDate(gracePeriodEnd.getUTCDate() + gracePeriodDays);
+
+  let effectiveMoraStart = gracePeriodEnd;
+  if (debtStartDate) {
+    const manualStart = getSantiagoUTCDate(new Date(debtStartDate));
+    effectiveMoraStart = manualStart > gracePeriodEnd ? manualStart : gracePeriodEnd;
+  }
+  if (effectivePayment < effectiveMoraStart) return 0;
+
+  let gDate: Date;
+  if (debtStartDate) {
+    const manualStart = getSantiagoUTCDate(new Date(debtStartDate));
+    const baseAnchor = manualStart > gracePeriodEnd ? manualStart : gracePeriodEnd;
+    gDate = new Date(baseAnchor);
+    gDate.setUTCDate(gDate.getUTCDate() - 1); // ancla al día anterior (comportamiento Lomas)
+  } else {
+    gDate = gracePeriodEnd;
+  }
+
+  // Cutoff equivalente a PENALTY_START_DATE_WEB: Lomas solo lo aplica cuando NO
+  // hay debtStartDate (effectiveIsLegacy). Para las cuotas vencidas actuales el
+  // cutoff (mar-2026) queda muy atrás, así que en la práctica no altera nada.
+  if (!debtStartDate && penaltyStartDate) {
+    const cutoff = getSantiagoUTCDate(new Date(penaltyStartDate));
+    if (effectivePayment < cutoff) return 0;
+    if (gDate < cutoff) {
+      gDate = new Date(cutoff);
+      gDate.setUTCDate(gDate.getUTCDate() - 1);
+    }
+  }
+
+  const diffTime = effectivePayment.getTime() - gDate.getTime();
+  const daysLate = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  return daysLate > 0 ? dailyPenaltyAmount * daysLate : 0;
+}
+
+/**
  * Calcula el monto vigente de una multa fija/pactada (manual_penalty) que crece
  * día a día mientras no se pague, usando debtStartDate como fecha desde la que
  * empieza a crecer (se re-fija cada vez que un pago toca el monto).

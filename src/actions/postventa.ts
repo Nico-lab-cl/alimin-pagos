@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   getInstallmentDueDate,
   calculateTotalInterest,
+  calculateLomasInterest,
   calculateAggregatedAutoPenalty,
   calculateGrowingFixedPenalty,
   getProjectConfig,
@@ -148,6 +149,10 @@ export async function getFullPostventaData({
       let penaltyAmount = 0;
       let overdueInstallments: { number: number; dueDate: string; interestStartDate: string; monthName: string; lateDays: number; penaltyAmount: number; moraCredit: number }[] = [];
       const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
+      // Lomas del Mar usa la formula de mora identica a aliminlomasdelmar.com
+      // (ver calculateLomasInterest): sin "+1 dia", ancla -1 con fecha de deuda,
+      // y la fecha de deuda aplica a TODAS las cuotas. Solo para este proyecto.
+      const isLomasProject = projectSlug === "lomas-del-mar";
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
         // Always calculate dynamically based on installments paid
@@ -192,6 +197,35 @@ export async function getFullPostventaData({
           );
           penaltyAmount = autoPenalty + fixedPenalty;
           lateDays = autoLateDays + fixedGrowthDays;
+        } else if (isLomasProject) {
+          // Lomas del Mar: replica exacta de la mora de aliminlomasdelmar.com.
+          // La fecha de deuda (debt_start_date) aplica a TODAS las cuotas.
+          const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
+          const dueDay = res.due_day ?? project.due_day_of_month ?? 5;
+          let lomasPenalty = 0;
+          let lomasLateDays = 0;
+          for (let i = 0; i < totalCuotas - paidCuotas; i++) {
+            const instNum = paidCuotas + 1 + i;
+            const iDue = getInstallmentDueDate(res.installment_start_date, instNum, dueDay);
+            const interest = calculateLomasInterest(
+              iDue,
+              currentDate,
+              res.mora_frozen || false,
+              graceDays,
+              activeDailyPenalty,
+              res.debt_start_date,
+              project.penalty_start_date,
+              res.debt_end_date
+            );
+            if (interest > 0) {
+              lomasPenalty += interest;
+              lomasLateDays += Math.round(interest / activeDailyPenalty);
+            } else if (iDue >= currentDate) {
+              break; // cuota futura sin mora: dejamos de escanear
+            }
+          }
+          penaltyAmount = lomasPenalty;
+          lateDays = lomasLateDays;
         } else {
           // AUTO: pure automatic penalty based on dates
           const { totalPenaltyAmount: autoPenalty, totalLateDays: autoLateDays } = calculateAggregatedAutoPenalty(
@@ -237,16 +271,31 @@ export async function getFullPostventaData({
           // Only auto penalty per installment
           let autoPenaltyForThis = 0;
           if (res.mora_status !== "CONGELADO" && !res.mora_frozen) {
-            autoPenaltyForThis = calculateTotalInterest(
-              currentDue,
-              currentDate,
-              false,
-              res.grace_days ?? project.grace_period_days ?? 5,
-              activeDailyPenalty,
-              (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
-              project.penalty_start_date,
-              res.debt_end_date
-            );
+            if (isLomasProject) {
+              // Lomas del Mar: misma formula que aliminlomasdelmar.com.
+              // La fecha de deuda aplica a TODAS las cuotas.
+              autoPenaltyForThis = calculateLomasInterest(
+                currentDue,
+                currentDate,
+                false,
+                res.grace_days ?? project.grace_period_days ?? 5,
+                activeDailyPenalty,
+                res.debt_start_date,
+                project.penalty_start_date,
+                res.debt_end_date
+              );
+            } else {
+              autoPenaltyForThis = calculateTotalInterest(
+                currentDue,
+                currentDate,
+                false,
+                res.grace_days ?? project.grace_period_days ?? 5,
+                activeDailyPenalty,
+                (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+                project.penalty_start_date,
+                res.debt_end_date
+              );
+            }
           }
 
           if (autoPenaltyForThis > 0) {
@@ -2493,6 +2542,35 @@ export async function getClientPOV(reservationId: string) {
         const fixedPenalty = (res.manual_penalty != null && res.manual_penalty > 0) ? res.manual_penalty : 0;
         penaltyAmount = autoPenalty + fixedPenalty;
         lateDays = autoLateDays;
+      } else if (project.slug === "lomas-del-mar") {
+        // Lomas del Mar: mora con la formula exacta de aliminlomasdelmar.com
+        // (debt_start_date aplica a TODAS las cuotas).
+        const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
+        const dueDay = res.due_day ?? project.due_day_of_month ?? 5;
+        let lomasPenalty = 0;
+        let lomasLateDays = 0;
+        for (let i = 0; i < totalCuotas - paidCuotas; i++) {
+          const instNum = paidCuotas + 1 + i;
+          const iDue = getInstallmentDueDate(res.installment_start_date, instNum, dueDay);
+          const interest = calculateLomasInterest(
+            iDue,
+            currentDate,
+            res.mora_status === "CONGELADO" || (res.mora_frozen || false),
+            graceDays,
+            activeDailyPenalty,
+            res.debt_start_date,
+            project.penalty_start_date,
+            res.debt_end_date
+          );
+          if (interest > 0) {
+            lomasPenalty += interest;
+            lomasLateDays += Math.round(interest / activeDailyPenalty);
+          } else if (iDue >= currentDate) {
+            break;
+          }
+        }
+        penaltyAmount = lomasPenalty;
+        lateDays = lomasLateDays;
       } else {
         // AUTO: pure automatic penalty based on dates
         const { totalPenaltyAmount: autoPenalty, totalLateDays: autoLateDays } = calculateAggregatedAutoPenalty(
@@ -2569,17 +2647,30 @@ export async function getClientPOV(reservationId: string) {
         // Calculate auto penalty for this specific installment (always, regardless of penalty_mode)
         let autoPenaltyForThis = 0;
         if (res.mora_status !== "CONGELADO" && !res.mora_frozen) {
-          autoPenaltyForThis = calculateTotalInterest(
-            currentDue,
-            currentDate,
-            res.mora_frozen || false,
-            res.grace_days ?? project.grace_period_days ?? 5,
-            activeDailyPenalty,
-            // For FIXED/MIXED, don't use debt_start_date (fixed penalty covers history)
-            (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
-            project.penalty_start_date,
-            res.debt_end_date
-          );
+          if (project.slug === "lomas-del-mar") {
+            autoPenaltyForThis = calculateLomasInterest(
+              currentDue,
+              currentDate,
+              res.mora_frozen || false,
+              res.grace_days ?? project.grace_period_days ?? 5,
+              activeDailyPenalty,
+              res.debt_start_date,
+              project.penalty_start_date,
+              res.debt_end_date
+            );
+          } else {
+            autoPenaltyForThis = calculateTotalInterest(
+              currentDue,
+              currentDate,
+              res.mora_frozen || false,
+              res.grace_days ?? project.grace_period_days ?? 5,
+              activeDailyPenalty,
+              // For FIXED/MIXED, don't use debt_start_date (fixed penalty covers history)
+              (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+              project.penalty_start_date,
+              res.debt_end_date
+            );
+          }
         }
 
         // Abonos/condonaciones de mora registrados especificamente para esta cuota
