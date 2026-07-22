@@ -2566,11 +2566,13 @@ export async function getClientPOV(reservationId: string) {
           .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
         installmentPenaltyAmount = Math.max(0, autoPenaltyForThis - instMoraCredits);
 
-        if (installmentPenaltyAmount > 0) {
+        if (autoPenaltyForThis > 0) {
           finalAmount += installmentPenaltyAmount;
-          hasPenalty = true;
-          // Calculate late days specifically for the auto penalty part
-          installmentLateDays = Math.round(installmentPenaltyAmount / activeDailyPenalty);
+          hasPenalty = installmentPenaltyAmount > 0;
+          // Los dias de atraso reflejan el interes bruto (fechas reales), no el neto
+          // despues de aplicar abonos -- de lo contrario un abono parcial hace parecer
+          // que hay menos dias de atraso de los que realmente hay.
+          installmentLateDays = Math.round(autoPenaltyForThis / activeDailyPenalty);
         }
 
         // Status flags
@@ -2614,6 +2616,7 @@ export async function getClientPOV(reservationId: string) {
           monthName: monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1),
           hasPenalty,
           penaltyAmount: installmentPenaltyAmount,
+          moraCredit: instMoraCredits,
           lateDays: installmentLateDays,
           dailyPenalty: hasPenalty ? activeDailyPenalty : 0,
           isOverdue

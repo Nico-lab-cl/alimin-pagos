@@ -902,6 +902,12 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
                             <span>Interés mora ({c.lateDays || 0} días × {formatCLP(c.dailyPenalty || data.dailyPenalty || 1500)})</span>
                             <span className="text-red-655 font-extrabold">{formatCLP(c.penaltyAmount || 0)}</span>
                           </div>
+                          {c.moraCredit > 0 && (
+                            <div className="flex justify-between items-center text-xs font-semibold text-emerald-600">
+                              <span>Abono a intereses ya aplicado</span>
+                              <span className="font-extrabold">-{formatCLP(c.moraCredit)}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-center text-xs font-bold text-slate-700 pt-3 border-t border-slate-50">
                             <span>Total cuota #{c.number}</span>
                             <span className="text-red-655 text-sm font-extrabold">{formatCLP((c.baseAmount || c.amount) + (c.penaltyAmount || 0))}</span>

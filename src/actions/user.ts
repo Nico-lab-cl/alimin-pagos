@@ -240,12 +240,18 @@ export async function getUserLots() {
             );
           }
 
-          installmentPenaltyAmount = autoPenaltyForThis;
+          // Abonos/condonaciones de mora registrados especificamente para esta cuota
+          const instMoraCredits = (res.receipts || [])
+            .filter((r: any) => r.scope === "MORA" && r.nominal_installment_number === installmentNumber)
+            .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
+          installmentPenaltyAmount = Math.max(0, autoPenaltyForThis - instMoraCredits);
 
-          if (installmentPenaltyAmount > 0) {
+          if (autoPenaltyForThis > 0) {
             finalAmount += installmentPenaltyAmount;
-            hasPenalty = true;
-            installmentLateDays = Math.round(installmentPenaltyAmount / activeDailyPenalty);
+            hasPenalty = installmentPenaltyAmount > 0;
+            // Los dias de atraso reflejan el interes bruto (fechas reales), no el neto
+            // despues de aplicar abonos.
+            installmentLateDays = Math.round(autoPenaltyForThis / activeDailyPenalty);
           }
           
           const dailyPenaltyRate = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
@@ -291,6 +297,7 @@ export async function getUserLots() {
             monthName: monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1),
             hasPenalty,
             penaltyAmount: installmentPenaltyAmount,
+            moraCredit: instMoraCredits,
             lateDays: installmentLateDays,
             dailyPenalty: hasPenalty ? dailyPenaltyRate : 0,
             isOverdue
