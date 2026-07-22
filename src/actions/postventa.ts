@@ -109,16 +109,38 @@ export async function getFullPostventaData({
           : (lot.valor_cuota || 0);
       }
 
-      // Total Invertido strictly follows (Cuotas + Pie + Extra)
-      // As requested, we always include the full Pie amount because if they are in the system, it's paid.
       const extraPaid = res.extra_paid_amount || 0;
-      const totalPaid = calculatedCuotasTotal + pieAmount + extraPaid;
-      
-      // Total Commitment is the total lot price
       const totalToPay = lot.price_total_clp || 0;
-      
-      // Saldo Remanente = Compromiso Total - Total Invertido (Positive value as requested)
-      let pendingBalance = totalToPay - totalPaid;
+
+      let totalPaid: number;
+      let pendingBalance: number;
+
+      if (projectSlug === "lomas-del-mar") {
+        // Replica EXACTA de la formula de Total Invertido / Saldo Pendiente que usa
+        // aliminlomasdelmar.com, para que los saldos coincidan al peso:
+        //   1) Suma el pago de RESERVA inicial (lot.reservation_amount_clp).
+        //   2) Cuenta el PIE solo si esta efectivamente pagado (monto pactado o recibos),
+        //      no lo asume pagado como hace el resto de los proyectos.
+        // Es solo el calculo del monto mostrado; no toca ningun dato del cliente.
+        const manualPie = res.pie || 0;
+        const targetGrossPie = manualPie || lot.pie || 0;
+        let actualPieComponent = 0;
+        if (manualPie > 0) actualPieComponent = manualPie;
+        else if (piePaidFromReceipts > 0) actualPieComponent = piePaidFromReceipts;
+        else if ((res.pie_status || "").toUpperCase() === "PAID") actualPieComponent = targetGrossPie;
+
+        const reservationAmountPaid = lot.reservation_amount_clp ?? 500000;
+
+        totalPaid = totalCuotas === 0
+          ? totalToPay + extraPaid
+          : reservationAmountPaid + actualPieComponent + calculatedCuotasTotal + extraPaid;
+        pendingBalance = Math.max(0, totalToPay - totalPaid + (res.pending_amount || 0));
+      } else {
+        // Resto de proyectos (Arena y Sol, Libertad y Alegria): sin cambios.
+        // Total Invertido = Cuotas + Pie (siempre) + Extra.
+        totalPaid = calculatedCuotasTotal + pieAmount + extraPaid;
+        pendingBalance = totalToPay - totalPaid;
+      }
 
       // Due date & penalty
       let nextDueDate: Date | null = null;
