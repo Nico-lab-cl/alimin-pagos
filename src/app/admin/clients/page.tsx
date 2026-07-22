@@ -288,14 +288,21 @@ export default function ClientsPage() {
   }, {});
 
   const stats = useMemo(() => {
+    // Lomas del Mar cuenta "mora congelada" dentro de "Al Dia" (igual que su
+    // panel original en aliminlomasdelmar.com). Los demas proyectos mantienen
+    // el criterio anterior (congelados no cuentan en ninguna pestana con nombre,
+    // solo en "Todos los Clientes") para no cambiarles nada.
+    const okStatuses = selectedProject === "lomas-del-mar"
+      ? ["OK", "COMPLETED", "FROZEN"]
+      : ["OK", "COMPLETED"];
     return {
       total: nonTestClients.length,
       late: nonTestClients.filter((c: any) => c.status === "LATE").length,
       grace: nonTestClients.filter((c: any) => c.status === "GRACE").length,
       upcoming: nonTestClients.filter((c: any) => c.status === "UPCOMING").length,
-      ok: nonTestClients.filter((c: any) => c.status === "OK" || c.status === "COMPLETED").length,
+      ok: nonTestClients.filter((c: any) => okStatuses.includes(c.status)).length,
     };
-  }, [nonTestClients]);
+  }, [nonTestClients, selectedProject]);
 
   // Orden "natural" por numero de lote: extrae la parte numerica (ej. "L04A" -> 4)
   // para que el orden sea 1,2,3...10 en vez de alfabetico (1,10,2,3...). Ante empate
@@ -328,10 +335,16 @@ export default function ClientsPage() {
       if (!c.lotStage || c.lotStage.toString().toUpperCase() !== selectedStage.toUpperCase()) return false;
     }
 
+    // Lomas del Mar cuenta "mora congelada" dentro de "Al Dia" (ver stats arriba);
+    // los demas proyectos mantienen el criterio anterior.
+    const okStatusesForTab = selectedProject === "lomas-del-mar"
+      ? ["OK", "COMPLETED", "FROZEN"]
+      : ["OK", "COMPLETED"];
+
     if (activeTab === "LATE" && c.status !== "LATE") return false;
     if (activeTab === "GRACE" && c.status !== "GRACE") return false;
     if (activeTab === "UPCOMING" && c.status !== "UPCOMING") return false;
-    if (activeTab === "OK" && c.status !== "OK" && c.status !== "COMPLETED") return false;
+    if (activeTab === "OK" && !okStatusesForTab.includes(c.status)) return false;
 
     return matchesSearch;
   }).sort((a: any, b: any) => {
