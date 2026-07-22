@@ -12,9 +12,14 @@ interface PreviewModalProps {
   fileType?: string;
 }
 
+// Marcadores usados para pagos migrados/registrados sin un archivo digital real
+// (ej. historial importado desde otro sistema, o condonaciones administrativas).
+const NO_FILE_MARKERS = ["LEGACY_SYNC", "CONDONACION_ADMIN"];
+
 export default function PreviewModal({ isOpen, onClose, url, title, fileType }: PreviewModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const isMissingFile = NO_FILE_MARKERS.includes(url);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const getDownloadFilename = () => {
@@ -67,6 +72,12 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
       setError(false);
       document.body.style.overflow = "hidden";
 
+      // Pago migrado/registrado sin archivo digital real -> no hay nada que cargar
+      if (isMissingFile) {
+        setLoading(false);
+        return;
+      }
+
       // Si sabemos de antemano que no es previsualizable (ej: Word)
       const isOffice = fileType?.includes("officedocument") || fileType?.includes("msword");
       if (isOffice) {
@@ -87,7 +98,7 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
       document.body.style.overflow = "unset";
       clearSafetyTimeout();
     };
-  }, [isOpen, fileType, clearSafetyTimeout]);
+  }, [isOpen, fileType, isMissingFile, clearSafetyTimeout]);
 
   if (!isOpen) return null;
 
@@ -115,13 +126,15 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
           </div>
 
           <div className="flex items-center gap-3">
-             <button 
-              onClick={() => downloadDocument(url, title, fileType)}
-              className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-250 transition-all shadow-sm cursor-pointer"
-              title="Descargar"
-            >
-              <Download className="w-4 h-4" />
-            </button>
+             {!isMissingFile && (
+               <button
+                onClick={() => downloadDocument(url, title, fileType)}
+                className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-250 transition-all shadow-sm cursor-pointer"
+                title="Descargar"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+             )}
             <button 
               onClick={onClose}
               className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all shadow-sm cursor-pointer"
@@ -140,7 +153,19 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
             </div>
           )}
 
-          {error ? (
+          {isMissingFile ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 p-10 text-center bg-white">
+              <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <FileText className="w-8 h-8 text-slate-400" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-slate-800 uppercase tracking-tight mb-1">Sin comprobante digital</h4>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide leading-relaxed max-w-xs mx-auto">
+                  Este pago fue registrado como parte del historial migrado y no tiene un archivo (imagen o PDF) asociado.
+                </p>
+              </div>
+            </div>
+          ) : error ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 p-10 text-center bg-white">
               <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
                 <FileText className="w-8 h-8 text-slate-400" />
@@ -151,7 +176,7 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
                   Este archivo (Word, Excel o similar) no se puede mostrar en el navegador. Usa el botón de abajo para descargarlo.
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => downloadDocument(url, title, fileType)}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
               >
