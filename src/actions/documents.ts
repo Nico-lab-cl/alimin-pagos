@@ -117,12 +117,17 @@ export async function getReservationDocuments(reservationId: string) {
             : `Comprobante_Pago_Cuota.${ext}`;
       }
 
+      // Pagos migrados/registrados sin un archivo digital real (ej. historial
+      // importado, o condonaciones administrativas) no tienen nada que previsualizar.
+      const hasFile = !!r.receipt_url && !["LEGACY_SYNC", "CONDONACION_ADMIN"].includes(r.receipt_url);
+
       return {
         id: r.id,
         name: docName,
         file_type: fileType,
         created_at: r.processed_at || r.created_at,
         type: "receipt",
+        hasFile,
       };
     });
 
@@ -132,6 +137,7 @@ export async function getReservationDocuments(reservationId: string) {
       file_type: d.file_type,
       created_at: d.created_at,
       type: "table",
+      hasFile: true,
     }));
 
     const combined = [...tableDocs, ...receiptDocs].sort(

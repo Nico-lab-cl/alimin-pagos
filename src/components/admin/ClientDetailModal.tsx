@@ -220,15 +220,17 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
           date: d.created_at,
           url: `/api/documents/${d.id}`,
           fileType: d.file_type,
-          type: d.type || 'table'
+          type: d.type || 'table',
+          hasFile: d.hasFile !== false
         }));
-        
+
         const legacyDocs = (selectedClient.manual_documents || []).map((d: any, i: number) => ({
           id: `legacy-${i}`,
           name: d.name,
           date: d.uploadedAt,
           url: d.url,
-          type: 'legacy'
+          type: 'legacy',
+          hasFile: true
         }));
 
         setDocs([...tableDocs, ...legacyDocs]);
@@ -1289,14 +1291,25 @@ export default function ClientDetailModal({ selectedClient, onClose, onUpdate, p
                         </div>
                       </div>
                       <div className="flex gap-2 w-full sm:w-auto justify-end">
-                        <button onClick={() => {setPreviewData({url: doc.url, title: doc.name, type: doc.fileType}); setIsPreviewOpen(true);}} className="flex-1 sm:flex-none h-9 sm:w-8 sm:h-8 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"><Eye className="w-3.5 h-3.5"/></button>
-                        <button
-                           onClick={() => downloadDocument(doc.url, doc.name, doc.fileType)}
-                           className="flex-1 sm:flex-none h-9 sm:w-8 sm:h-8 rounded-lg bg-slate-50 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-center text-slate-500 transition-colors"
-                           title="Descargar"
-                         >
-                           <Download className="w-3.5 h-3.5"/>
-                         </button>
+                        {doc.hasFile === false ? (
+                          <span
+                            className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 text-[9px] font-bold uppercase tracking-wider"
+                            title="Pago del historial migrado, sin archivo digital asociado"
+                          >
+                            Sin archivo
+                          </span>
+                        ) : (
+                          <>
+                            <button onClick={() => {setPreviewData({url: doc.url, title: doc.name, type: doc.fileType}); setIsPreviewOpen(true);}} className="flex-1 sm:flex-none h-9 sm:w-8 sm:h-8 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"><Eye className="w-3.5 h-3.5"/></button>
+                            <button
+                               onClick={() => downloadDocument(doc.url, doc.name, doc.fileType)}
+                               className="flex-1 sm:flex-none h-9 sm:w-8 sm:h-8 rounded-lg bg-slate-50 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-center text-slate-500 transition-colors"
+                               title="Descargar"
+                             >
+                               <Download className="w-3.5 h-3.5"/>
+                             </button>
+                          </>
+                        )}
                         {doc.type === 'table' && !isReadOnly && (
                           <button onClick={async () => { if(confirm("¿Eliminar archivo?")) { const res = await deleteDocument(doc.id); if (res.success) setDocs(docs.filter(d=>d.id!==doc.id)); }}} className="flex-1 sm:flex-none h-9 sm:w-8 sm:h-8 rounded-lg bg-slate-50 hover:bg-red-50 hover:text-red-600 flex items-center justify-center text-slate-500 transition-colors"><Trash2 className="w-3.5 h-3.5"/></button>
                         )}

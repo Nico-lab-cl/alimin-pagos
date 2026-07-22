@@ -647,23 +647,34 @@ export default function LegalDashboardPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              onClick={() => {
-                                setPreviewData({ url, title: doc.name, type: doc.file_type });
-                                setIsPreviewOpen(true);
-                              }}
-                              className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-450 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm cursor-pointer"
-                              title="Previsualizar"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => downloadDocument(url, doc.name, doc.file_type)}
-                              className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-450 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm cursor-pointer"
-                              title="Descargar"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
+                            {doc.hasFile === false ? (
+                              <span
+                                className="px-2.5 h-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-[9px] font-bold uppercase tracking-wider"
+                                title="Pago del historial migrado, sin archivo digital asociado"
+                              >
+                                Sin archivo
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setPreviewData({ url, title: doc.name, type: doc.file_type });
+                                    setIsPreviewOpen(true);
+                                  }}
+                                  className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-450 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm cursor-pointer"
+                                  title="Previsualizar"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => downloadDocument(url, doc.name, doc.file_type)}
+                                  className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-450 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm cursor-pointer"
+                                  title="Descargar"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       );
