@@ -123,8 +123,7 @@ export async function getFullPostventaData({
       let nextDueDate: Date | null = null;
       let lateDays = 0;
       let penaltyAmount = 0;
-      let overdueInstallments: { number: number; dueDate: string; interestStartDate: string; monthName: string; lateDays: number; penaltyAmount: number }[] = [];
-      let totalOverdueCuotasBase = 0;
+      let overdueInstallments: { number: number; dueDate: string; interestStartDate: string; monthName: string; lateDays: number; penaltyAmount: number; moraCredit: number }[] = [];
       const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
@@ -237,14 +236,6 @@ export async function getFullPostventaData({
             const instMoraCredits = (res.receipts || [])
               .filter((r: any) => r.scope === "MORA" && r.nominal_installment_number === installmentNumber)
               .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
-            const overdueRange = (ranges as any[]).find((r: any) => {
-              const from = Number(r.from ?? r.start ?? 0);
-              const to = Number(r.to ?? r.end ?? 0);
-              return installmentNumber >= from && installmentNumber <= to;
-            });
-            totalOverdueCuotasBase += overdueRange
-              ? Number(overdueRange.amount ?? overdueRange.value ?? 0)
-              : (lot.valor_cuota || 0);
             overdueInstallments.push({
               number: installmentNumber,
               dueDate: currentDue.toISOString(),
@@ -252,6 +243,7 @@ export async function getFullPostventaData({
               monthName: monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1),
               lateDays: days,
               penaltyAmount: Math.max(0, autoPenaltyForThis - instMoraCredits),
+              moraCredit: instMoraCredits,
             });
           } else {
             // Stop once we hit installments that are not overdue
@@ -342,7 +334,6 @@ export async function getFullPostventaData({
         nextDueDate,
         lateDays,
         penaltyAmount,
-        totalOverdueAmount: totalOverdueCuotasBase + penaltyAmount,
         overdueInstallments,
         isGracePeriod,
         isUpcoming,

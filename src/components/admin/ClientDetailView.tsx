@@ -1678,16 +1678,6 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       </div>
                     </div>
 
-                    {/* Total Adeudado Vencido: cuotas base sin pagar + interes neto de mora.
-                        Por ahora solo se muestra en Lomas del Mar; el calculo ya es compartido
-                        (totalOverdueAmount viene de getFullPostventaData), asi que mas adelante
-                        basta con sacar este gate de projectSlug para mostrarlo en todos lados. */}
-                    {projectSlug === "lomas-del-mar" && selectedClient.totalOverdueAmount > 0 && (
-                      <div className="bg-slate-800 rounded-xl p-4 flex items-center justify-between">
-                        <p className="text-[9px] text-slate-300 font-bold uppercase tracking-wider">Total Adeudado Vencido</p>
-                        <p className="text-xl font-bold text-white">{formatCLP(selectedClient.totalOverdueAmount)}</p>
-                      </div>
-                    )}
 
                     {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED") && selectedClient.manual_penalty > 0 && (
                       <div className="space-y-2">
@@ -1726,6 +1716,11 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                                 <p className="text-[10px] text-red-500 font-semibold">
                                   Venció el {formatDate(inst.interestStartDate || inst.dueDate)}
                                 </p>
+                                {inst.moraCredit > 0 && (
+                                  <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                                    Abono a intereses aplicado: -{formatCLP(inst.moraCredit)}
+                                  </p>
+                                )}
                               </div>
                               <div className="text-right flex flex-col items-end gap-1.5">
                                 <span className="text-sm font-bold text-red-600">{formatCLP(inst.penaltyAmount)}</span>
