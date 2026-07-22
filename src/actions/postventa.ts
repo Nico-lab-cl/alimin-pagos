@@ -69,6 +69,7 @@ export async function getFullPostventaData({
             amount_clp: true,
             scope: true,
             created_at: true,
+            nominal_installment_number: true,
           },
         },
       },
