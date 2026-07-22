@@ -124,6 +124,7 @@ export async function getFullPostventaData({
       let lateDays = 0;
       let penaltyAmount = 0;
       let overdueInstallments: { number: number; dueDate: string; interestStartDate: string; monthName: string; lateDays: number; penaltyAmount: number }[] = [];
+      let totalOverdueCuotasBase = 0;
       const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
 
       if (paidCuotas < totalCuotas && res.installment_start_date) {
@@ -189,6 +190,12 @@ export async function getFullPostventaData({
           lateDays = autoLateDays;
         }
 
+        // Abonos/condonaciones de mora (scope=MORA) reducen el interes efectivo adeudado.
+        const moraCredits = (res.receipts || [])
+          .filter((r: any) => r.scope === "MORA")
+          .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
+        penaltyAmount = Math.max(0, penaltyAmount - moraCredits);
+
         // Build per-installment overdue breakdown for admin display
         const formatMonthAdmin = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'America/Santiago' });
         const totalPendingRemaining = totalCuotas - paidCuotas;
@@ -226,13 +233,25 @@ export async function getFullPostventaData({
             const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
             const interestStart = new Date(currentDue);
             interestStart.setDate(interestStart.getDate() + graceDays);
+            // Abonos/condonaciones de mora registrados especificamente para esta cuota
+            const instMoraCredits = (res.receipts || [])
+              .filter((r: any) => r.scope === "MORA" && r.nominal_installment_number === installmentNumber)
+              .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
+            const overdueRange = (ranges as any[]).find((r: any) => {
+              const from = Number(r.from ?? r.start ?? 0);
+              const to = Number(r.to ?? r.end ?? 0);
+              return installmentNumber >= from && installmentNumber <= to;
+            });
+            totalOverdueCuotasBase += overdueRange
+              ? Number(overdueRange.amount ?? overdueRange.value ?? 0)
+              : (lot.valor_cuota || 0);
             overdueInstallments.push({
               number: installmentNumber,
               dueDate: currentDue.toISOString(),
               interestStartDate: interestStart.toISOString(),
               monthName: monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1),
               lateDays: days,
-              penaltyAmount: autoPenaltyForThis,
+              penaltyAmount: Math.max(0, autoPenaltyForThis - instMoraCredits),
             });
           } else {
             // Stop once we hit installments that are not overdue
@@ -323,6 +342,7 @@ export async function getFullPostventaData({
         nextDueDate,
         lateDays,
         penaltyAmount,
+        totalOverdueAmount: totalOverdueCuotasBase + penaltyAmount,
         overdueInstallments,
         isGracePeriod,
         isUpcoming,
@@ -479,6 +499,7 @@ function calculateCurrentMoraOwed(
     debt_start_date: Date | null;
     debt_end_date: Date | null;
     next_payment_date: Date | null;
+    receipts?: { scope: string; status: string | null; amount_clp: number }[] | null;
   },
   project: {
     due_day_of_month: number | null;
@@ -496,8 +517,13 @@ function calculateCurrentMoraOwed(
     ? calculateGrowingFixedPenalty(res.manual_penalty, res.debt_start_date, activeDailyPenalty, currentDate)
     : { amount: 0 };
 
+  // Abonos/condonaciones de mora (scope=MORA) reducen el interes efectivo adeudado.
+  const moraCredits = (res.receipts || [])
+    .filter((r) => r.scope === "MORA" && r.status === "APPROVED")
+    .reduce((sum, r) => sum + (r.amount_clp || 0), 0);
+
   if (paidCuotas >= totalCuotas || !res.installment_start_date) {
-    return fixedPenalty;
+    return Math.max(0, fixedPenalty - moraCredits);
   }
 
   const { totalPenaltyAmount: autoPenalty } = calculateAggregatedAutoPenalty(
@@ -515,7 +541,7 @@ function calculateCurrentMoraOwed(
     res.next_payment_date
   );
 
-  return autoPenalty + fixedPenalty;
+  return Math.max(0, autoPenalty + fixedPenalty - moraCredits);
 }
 
 /**
@@ -602,14 +628,15 @@ export async function approveReceipt(receiptId: string) {
   try {
     const receipt = await prisma.paymentReceipt.findUnique({
       where: { id: receiptId },
-      include: { 
+      include: {
         reservation: {
-          include: { 
+          include: {
             user: true,
             project: true,
-            lot: true
+            lot: true,
+            receipts: true
           }
-        } 
+        }
       },
     });
 
@@ -839,7 +866,7 @@ export async function approveReceiptAsInterestPayment(receiptId: string) {
   try {
     const receipt = await prisma.paymentReceipt.findUnique({
       where: { id: receiptId },
-      include: { reservation: { include: { user: true, project: true, lot: true } } },
+      include: { reservation: { include: { user: true, project: true, lot: true, receipts: true } } },
     });
 
     if (!receipt) return { error: "Comprobante no encontrado" };
@@ -2001,7 +2028,7 @@ export async function registerManualPayment(
   try {
     const res = await prisma.reservation.findUnique({
       where: { id: reservationId },
-      include: { lot: true, user: true, project: true },
+      include: { lot: true, user: true, project: true, receipts: true },
     });
 
     if (!res) return { error: "Reserva no encontrada" };
@@ -2217,7 +2244,7 @@ export async function registerInterestPayment(
   try {
     const res = await prisma.reservation.findUnique({
       where: { id: reservationId },
-      include: { lot: true, user: true, project: true },
+      include: { lot: true, user: true, project: true, receipts: true },
     });
 
     if (!res) return { error: "Reserva no encontrada" };
@@ -2472,6 +2499,12 @@ export async function getClientPOV(reservationId: string) {
         lateDays = autoLateDays;
       }
 
+      // Abonos/condonaciones de mora (scope=MORA) reducen el interes efectivo adeudado.
+      const moraCreditsTotal = (res.receipts || [])
+        .filter((r: any) => r.scope === "MORA")
+        .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
+      penaltyAmount = Math.max(0, penaltyAmount - moraCreditsTotal);
+
       // Upcoming installments
       const totalPendingRemaining = totalCuotas - paidCuotas;
       const maxToShow = totalPendingRemaining;
@@ -2535,7 +2568,11 @@ export async function getClientPOV(reservationId: string) {
           );
         }
 
-        installmentPenaltyAmount = autoPenaltyForThis;
+        // Abonos/condonaciones de mora registrados especificamente para esta cuota
+        const instMoraCredits = (res.receipts || [])
+          .filter((r: any) => r.scope === "MORA" && r.nominal_installment_number === installmentNumber)
+          .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
+        installmentPenaltyAmount = Math.max(0, autoPenaltyForThis - instMoraCredits);
 
         if (installmentPenaltyAmount > 0) {
           finalAmount += installmentPenaltyAmount;

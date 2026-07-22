@@ -1678,6 +1678,17 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       </div>
                     </div>
 
+                    {/* Total Adeudado Vencido: cuotas base sin pagar + interes neto de mora.
+                        Por ahora solo se muestra en Lomas del Mar; el calculo ya es compartido
+                        (totalOverdueAmount viene de getFullPostventaData), asi que mas adelante
+                        basta con sacar este gate de projectSlug para mostrarlo en todos lados. */}
+                    {projectSlug === "lomas-del-mar" && selectedClient.totalOverdueAmount > 0 && (
+                      <div className="bg-slate-800 rounded-xl p-4 flex items-center justify-between">
+                        <p className="text-[9px] text-slate-300 font-bold uppercase tracking-wider">Total Adeudado Vencido</p>
+                        <p className="text-xl font-bold text-white">{formatCLP(selectedClient.totalOverdueAmount)}</p>
+                      </div>
+                    )}
+
                     {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED") && selectedClient.manual_penalty > 0 && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-amber-600">

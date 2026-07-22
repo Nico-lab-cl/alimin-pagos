@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { SearchProvider, useSearch } from "@/context/SearchContext";
-import { getFullPostventaData } from "@/actions/postventa";
+import { getFullPostventaData, getAdminProjects } from "@/actions/postventa";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -85,24 +85,22 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function loadAllClients() {
       try {
-        const [arenaRes, libertadRes] = await Promise.all([
-          getFullPostventaData({ projectSlug: "arena-y-sol" }),
-          getFullPostventaData({ projectSlug: "libertad-y-alegria" })
-        ]);
-        
-        const arenaClients = (arenaRes.data || []).map((c: any) => ({
-          ...c,
-          projectName: "Arena y Sol",
-          projectSlug: "arena-y-sol"
-        }));
-        
-        const libertadClients = (libertadRes.data || []).map((c: any) => ({
-          ...c,
-          projectName: "Libertad y Alegría",
-          projectSlug: "libertad-y-alegria"
-        }));
-        
-        setAllClients([...arenaClients, ...libertadClients]);
+        const projectsRes = await getAdminProjects();
+        const projects = projectsRes.projects || [];
+
+        const results = await Promise.all(
+          projects.map((p: any) => getFullPostventaData({ projectSlug: p.slug }))
+        );
+
+        const clients = results.flatMap((res, i) =>
+          (res.data || []).map((c: any) => ({
+            ...c,
+            projectName: projects[i].name,
+            projectSlug: projects[i].slug,
+          }))
+        );
+
+        setAllClients(clients);
       } catch (err) {
         console.error("Error loading search clients:", err);
       }

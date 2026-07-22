@@ -32,8 +32,7 @@ export default function ReportsPage() {
     moraClientesCount: 0,
     tasaCobro: 0,
     topDebtors: [] as any[],
-    arenaRevenue: 0,
-    libertadRevenue: 0,
+    revenueBySlug: {} as Record<string, number>,
     monthlyChart: [] as { month: string; value: number; percent: number }[],
   });
 
@@ -105,62 +104,47 @@ export default function ReportsPage() {
       try {
         // Fetch projects
         const projRes = await getAdminProjects();
-        if (projRes.projects) {
-          setProjects(projRes.projects);
-        }
+        const activeProjects = projRes.projects || [];
+        setProjects(activeProjects);
 
-        // Fetch client data
-        const [arenaResult, libertadResult] = await Promise.all([
-          getFullPostventaData({ projectSlug: "arena-y-sol" }),
-          getFullPostventaData({ projectSlug: "libertad-y-alegria" }),
-        ]);
+        // Projects included in this view (all, or just the one selected)
+        const scopedProjects = selectedProject === "ALL"
+          ? activeProjects
+          : activeProjects.filter((p: any) => p.slug === selectedProject);
 
-        const arenaClients = (arenaResult.data || []).map((c: any) => ({
-          ...c,
-          projectName: "Arena y Sol",
-          projectSlug: "arena-y-sol"
-        }));
-
-        const libertadClients = (libertadResult.data || []).map((c: any) => ({
-          ...c,
-          projectName: "Libertad y Alegría",
-          projectSlug: "libertad-y-alegria"
-        }));
+        // Fetch client data for every active project
+        const clientResults = await Promise.all(
+          activeProjects.map((p: any) => getFullPostventaData({ projectSlug: p.slug }))
+        );
+        const allClients = clientResults.flatMap((res, i) =>
+          (res.data || []).map((c: any) => ({
+            ...c,
+            projectName: activeProjects[i].name,
+            projectSlug: activeProjects[i].slug,
+          }))
+        );
 
         // Filter combined clients based on selectedProject
-        let combinedClients = [...arenaClients, ...libertadClients];
+        let combinedClients = allClients;
         if (selectedProject !== "ALL") {
           combinedClients = combinedClients.filter(c => c.projectSlug === selectedProject);
         }
 
-        // 1. Fetch ledger stats based on date parameters and selected project
+        // 1. Fetch ledger stats based on date parameters, for every project in scope
         const dateParams = getDateParams(period);
-        let arenaRev = 0;
-        let libertadRev = 0;
-        
-        if (selectedProject === "ALL" || selectedProject === "arena-y-sol") {
-          const arenaLedger = await getProjectLedgerStats(
-            "arena-y-sol",
+        const revenueBySlug: Record<string, number> = {};
+        for (const p of scopedProjects) {
+          const ledger = await getProjectLedgerStats(
+            p.slug,
             dateParams.queryMonth,
             dateParams.queryYear,
             dateParams.customStartDate,
             dateParams.customEndDate
           );
-          arenaRev = (!arenaLedger.error && typeof arenaLedger.revenue === "number") ? arenaLedger.revenue : 0;
+          revenueBySlug[p.slug] = (!ledger.error && typeof ledger.revenue === "number") ? ledger.revenue : 0;
         }
 
-        if (selectedProject === "ALL" || selectedProject === "libertad-y-alegria") {
-          const libertadLedger = await getProjectLedgerStats(
-            "libertad-y-alegria",
-            dateParams.queryMonth,
-            dateParams.queryYear,
-            dateParams.customStartDate,
-            dateParams.customEndDate
-          );
-          libertadRev = (!libertadLedger.error && typeof libertadLedger.revenue === "number") ? libertadLedger.revenue : 0;
-        }
-
-        const totalRevenue = arenaRev + libertadRev;
+        const totalRevenue = Object.values(revenueBySlug).reduce((a, b) => a + b, 0);
 
         // 2. Cuotas Cobradas
         const totalCuotas = combinedClients.reduce((acc, c) => acc + (c.totalCuotas || 0), 0);
@@ -185,16 +169,13 @@ export default function ReportsPage() {
         const monthsList = [1, 2, 3, 4, 5, 6];
         const monthlyStats = await Promise.all(
           monthsList.map(async (m) => {
-            let monthRevenue = 0;
-            if (selectedProject === "ALL" || selectedProject === "arena-y-sol") {
-              const res = await getProjectLedgerStats("arena-y-sol", m, currentYear);
-              monthRevenue += (!res.error && typeof res.revenue === "number") ? res.revenue : 0;
-            }
-            if (selectedProject === "ALL" || selectedProject === "libertad-y-alegria") {
-              const res = await getProjectLedgerStats("libertad-y-alegria", m, currentYear);
-              monthRevenue += (!res.error && typeof res.revenue === "number") ? res.revenue : 0;
-            }
-            return monthRevenue;
+            const perProject = await Promise.all(
+              scopedProjects.map((p: any) => getProjectLedgerStats(p.slug, m, currentYear))
+            );
+            return perProject.reduce(
+              (acc, res) => acc + ((!res.error && typeof res.revenue === "number") ? res.revenue : 0),
+              0
+            );
           })
         );
         
@@ -216,8 +197,7 @@ export default function ReportsPage() {
           moraClientesCount,
           tasaCobro,
           topDebtors,
-          arenaRevenue: arenaRev,
-          libertadRevenue: libertadRev,
+          revenueBySlug,
           monthlyChart,
         });
       } catch (error) {
@@ -453,33 +433,25 @@ export default function ReportsPage() {
           </div>
 
           <div className="space-y-6 py-6 flex-1 flex flex-col justify-center">
-            {/* Arena y Sol */}
-            {(selectedProject === "ALL" || selectedProject === "arena-y-sol") && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-bold text-slate-700">
-                  <span>Arena y Sol</span>
-                  <span>{formatCLPMillion(stats.arenaRevenue)}</span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden">
-                  <div className="bg-blue-600 h-full" style={{ width: stats.arenaRevenue > 0 ? "65%" : "0%" }} />
-                  <div className="bg-blue-300 h-full" style={{ width: stats.arenaRevenue > 0 ? "25%" : "0%" }} />
-                </div>
-              </div>
-            )}
-
-            {/* Libertad y Alegría */}
-            {(selectedProject === "ALL" || selectedProject === "libertad-y-alegria") && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-bold text-slate-700">
-                  <span>Libertad y Alegría</span>
-                  <span>{formatCLPMillion(stats.libertadRevenue)}</span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden">
-                  <div className="bg-amber-600 h-full" style={{ width: stats.libertadRevenue > 0 ? "75%" : "0%" }} />
-                  <div className="bg-amber-250 h-full" style={{ width: stats.libertadRevenue > 0 ? "15%" : "0%" }} />
-                </div>
-              </div>
-            )}
+            {projects
+              .filter((p: any) => selectedProject === "ALL" || selectedProject === p.slug)
+              .map((p: any, idx: number) => {
+                const rev = stats.revenueBySlug[p.slug] || 0;
+                const barColor = idx % 2 === 0 ? "bg-blue-600" : "bg-amber-600";
+                const barColorLight = idx % 2 === 0 ? "bg-blue-300" : "bg-amber-250";
+                return (
+                  <div className="space-y-2" key={p.slug}>
+                    <div className="flex justify-between text-xs font-bold text-slate-700">
+                      <span>{p.name}</span>
+                      <span>{formatCLPMillion(rev)}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden">
+                      <div className={`${barColor} h-full`} style={{ width: rev > 0 ? "65%" : "0%" }} />
+                      <div className={`${barColorLight} h-full`} style={{ width: rev > 0 ? "25%" : "0%" }} />
+                    </div>
+                  </div>
+                );
+              })}
           </div>
 
           <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 pt-4 border-t border-slate-100">

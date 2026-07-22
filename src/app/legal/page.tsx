@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getFullPostventaData } from "@/actions/postventa";
+import { getFullPostventaData, getAdminProjects } from "@/actions/postventa";
 import { getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import { formatCLP, formatDate, downloadDocument } from "@/lib/utils";
@@ -40,7 +40,8 @@ export default function LegalDashboardPage() {
   const [previewData, setPreviewData] = useState({ url: "", title: "", type: "" });
   
   // Filtering & Pagination State
-  const [projectFilter, setProjectFilter] = useState<"ALL" | "arena-y-sol" | "libertad-y-alegria">("ALL");
+  const [projectFilter, setProjectFilter] = useState<string>("ALL");
+  const [projects, setProjects] = useState<{ slug: string; name: string }[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -124,25 +125,22 @@ export default function LegalDashboardPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const [arenaResult, libertadResult] = await Promise.all([
-          getFullPostventaData({ projectSlug: "arena-y-sol" }),
-          getFullPostventaData({ projectSlug: "libertad-y-alegria" }),
-        ]);
+        const projectsRes = await getAdminProjects();
+        const activeProjects = projectsRes.projects || [];
+        setProjects(activeProjects.map((p: any) => ({ slug: p.slug, name: p.name })));
 
-        const arenaClients = (arenaResult.data || []).map((c: any) => ({
-          ...c,
-          projectName: "Arena y Sol",
-          projectSlug: "arena-y-sol"
-        }));
+        const results = await Promise.all(
+          activeProjects.map((p: any) => getFullPostventaData({ projectSlug: p.slug }))
+        );
 
-        const libertadClients = (libertadResult.data || []).map((c: any) => ({
-          ...c,
-          projectName: "Libertad y Alegría",
-          projectSlug: "libertad-y-alegria"
-        }));
+        const combined = results.flatMap((res, i) =>
+          (res.data || []).map((c: any) => ({
+            ...c,
+            projectName: activeProjects[i].name,
+            projectSlug: activeProjects[i].slug,
+          }))
+        );
 
-        const combined = [...arenaClients, ...libertadClients];
-        
         // Filter: only real clients in LATE status or with penaltyAmount > 0 (excluding test accounts)
         const morosos = combined.filter((c: any) => {
           const isTest = c.clientName?.toLowerCase().includes("nicolas cabrera") || 
@@ -165,8 +163,9 @@ export default function LegalDashboardPage() {
   }, []);
 
   const totalCount = clients.length;
-  const arenaCount = clients.filter((c: any) => c.projectSlug === "arena-y-sol").length;
-  const libertadCount = clients.filter((c: any) => c.projectSlug === "libertad-y-alegria").length;
+  const countsBySlug = Object.fromEntries(
+    projects.map((p) => [p.slug, clients.filter((c: any) => c.projectSlug === p.slug).length])
+  );
 
   const filteredClients = clients
     .filter((c: any) => projectFilter === "ALL" || c.projectSlug === projectFilter)
@@ -263,7 +262,7 @@ export default function LegalDashboardPage() {
               Centro de Alertas
             </h1>
             <p className="text-xs text-slate-500 mt-1 max-w-2xl font-medium">
-              Esta consola muestra a los clientes con mora crítica de los proyectos **Arena y Sol** y **Libertad y Alegría**. La información es estrictamente confidencial y de solo lectura.
+              Esta consola muestra a los clientes con mora crítica de los proyectos {projects.map((p) => p.name).join(", ") || "activos"}. La información es estrictamente confidencial y de solo lectura.
             </p>
           </div>
 
@@ -313,35 +312,23 @@ export default function LegalDashboardPage() {
             }`}>{totalCount}</span>
           </button>
 
-          <button
-            onClick={() => { setProjectFilter("arena-y-sol"); setCurrentPage(1); }}
-            className={`
-              group relative flex items-center gap-2 pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer
-              ${projectFilter === "arena-y-sol" 
-                ? "text-blue-600 border-b-2 border-blue-600 font-bold" 
-                : "text-slate-400 hover:text-slate-650 border-b-2 border-transparent"}
-            `}
-          >
-            <span>Arena y Sol</span>
-            <span className={`px-2 py-0.5 rounded-lg text-[9px] ${
-              projectFilter === "arena-y-sol" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
-            }`}>{arenaCount}</span>
-          </button>
-
-          <button
-            onClick={() => { setProjectFilter("libertad-y-alegria"); setCurrentPage(1); }}
-            className={`
-              group relative flex items-center gap-2 pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer
-              ${projectFilter === "libertad-y-alegria" 
-                ? "text-blue-600 border-b-2 border-blue-600 font-bold" 
-                : "text-slate-400 hover:text-slate-650 border-b-2 border-transparent"}
-            `}
-          >
-            <span>Libertad y Alegría</span>
-            <span className={`px-2 py-0.5 rounded-lg text-[9px] ${
-              projectFilter === "libertad-y-alegria" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
-            }`}>{libertadCount}</span>
-          </button>
+          {projects.map((p) => (
+            <button
+              key={p.slug}
+              onClick={() => { setProjectFilter(p.slug); setCurrentPage(1); }}
+              className={`
+                group relative flex items-center gap-2 pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer
+                ${projectFilter === p.slug
+                  ? "text-blue-600 border-b-2 border-blue-600 font-bold"
+                  : "text-slate-400 hover:text-slate-650 border-b-2 border-transparent"}
+              `}
+            >
+              <span>{p.name}</span>
+              <span className={`px-2 py-0.5 rounded-lg text-[9px] ${
+                projectFilter === p.slug ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
+              }`}>{countsBySlug[p.slug] || 0}</span>
+            </button>
+          ))}
         </div>
 
         {/* Table Content */}
