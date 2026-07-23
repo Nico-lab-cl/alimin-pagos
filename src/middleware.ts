@@ -13,8 +13,14 @@ export default auth((req) => {
   if (isMaintenanceMode) {
     // Admins can bypass maintenance mode
     if (!isAdmin && pathname !== "/mantenimiento") {
-      // Allow login and auth api endpoints so admins can authenticate
-      if (pathname === "/login" || pathname.startsWith("/api/auth")) {
+      // Allow login, auth api y las pantallas de recuperacion de clave, para que
+      // un cliente sin sesion pueda restablecer su contrasena aun en mantenimiento.
+      if (
+        pathname === "/login" ||
+        pathname.startsWith("/api/auth") ||
+        pathname === "/forgot-password" ||
+        pathname === "/reset-password"
+      ) {
         return NextResponse.next();
       }
       return NextResponse.redirect(new URL("/mantenimiento", req.nextUrl));
@@ -26,8 +32,8 @@ export default auth((req) => {
     }
   }
 
-  // Public routes
-  const publicPaths = ["/login", "/api/auth", "/mantenimiento"];
+  // Public routes (accesibles sin sesion, incluidas las de recuperacion de clave)
+  const publicPaths = ["/login", "/api/auth", "/mantenimiento", "/forgot-password", "/reset-password"];
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
   if (isPublic) return NextResponse.next();
