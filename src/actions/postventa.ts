@@ -303,7 +303,7 @@ export async function getFullPostventaData({
             const monthRaw = formatMonthAdmin.format(currentDue);
             const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
             const interestStart = new Date(currentDue);
-            interestStart.setDate(interestStart.getDate() + graceDays);
+            interestStart.setDate(interestStart.getDate() + graceDays + 1);
             // Abonos/condonaciones de mora registrados especificamente para esta cuota
             const instMoraCredits = (res.receipts || [])
               .filter((r: any) => r.scope === "MORA" && r.nominal_installment_number === installmentNumber)
