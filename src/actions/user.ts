@@ -596,12 +596,31 @@ export async function requestPasswordReset(email: string) {
       },
     });
 
-    // NOTE: In a real production environment, you would send an email here.
-    // For now, we return the token in the response so the developer can see it
-    // or the system can use it for demonstration.
-    console.log(`Reset token for ${email}: ${token}`);
-    
-    return { success: true, token }; // Returning token for easy testing/dev
+    // Arma el link de recuperacion apuntando al portal de pagos.
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.AUTH_URL || "https://pagos.aliminspa.cl").replace(/\/$/, "");
+    const resetLink = `${baseUrl}/reset-password?token=${token}`;
+
+    // Envia el link por n8n (mismo webhook de recuperacion que ya usaba
+    // aliminlomasdelmar.com; solo manda el correo con el link que le pasamos).
+    const webhookUrl = process.env.N8N_PASSWORD_RESET_WEBHOOK_URL
+      || "https://n8n.aliminlomasdelmar.com/webhook/140fae21-540a-4ef5-b0bf-7354b9baa44d";
+    try {
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email,
+          name: user.name,
+          resetLink,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    } catch (e) {
+      console.error("Error enviando el correo de recuperacion via n8n:", e);
+      // No revelamos el fallo al cliente; el token quedo guardado igual.
+    }
+
+    return { success: true }; // Ya no se devuelve el token (seguridad).
   } catch (error) {
     console.error("Error in requestPasswordReset:", error);
     return { error: "Error al procesar la solicitud" };

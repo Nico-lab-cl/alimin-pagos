@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { requestPasswordReset } from "@/actions/user";
 import { Loader2, Mail, ArrowLeft, Send } from "lucide-react";
 import Link from "next/link";
@@ -24,8 +23,6 @@ export default function ForgotPasswordPage() {
         setError(result.error);
       } else {
         setMessage("Si el correo existe en nuestro sistema, recibirás instrucciones para restablecer tu clave.");
-        // In a real app, the token is sent by email. 
-        // For this project, we might display it or just tell the user to check their email.
       }
     } catch (err) {
       setError("Error al procesar la solicitud");
@@ -35,50 +32,62 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden emerald-mesh">
-      <div className="w-full max-w-[480px] animate-slide-up relative z-10">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-2">
-            Recuperar <span className="text-accent">Acceso</span>
-          </h1>
-          <p className="text-white/40 text-xs font-medium uppercase tracking-widest">Ingresa tu email para continuar</p>
-        </div>
+    <div className="flex flex-col min-h-screen items-center justify-center font-body-md text-on-surface p-4 bg-[#F8FAFC]">
+      <main className="w-full max-w-md animate-slide-up">
+        <div className="bg-white rounded-2xl p-6 md:p-10 flex flex-col items-center border border-border-subtle shadow-[0_10px_15px_-3px_rgba(0,0,0,0.05),0_4px_6px_-2px_rgba(0,0,0,0.02)]">
+          {/* Identity Section */}
+          <div className="flex flex-col items-center mb-6">
+            <img
+              alt="Logo Alimin Cobranzas"
+              className="w-20 h-20 mb-4 object-contain"
+              src="/logo.png"
+            />
+            <h1 className="font-headline-sm text-headline-sm text-cobalt-blue">Recuperar Acceso</h1>
+            <p className="font-headline-md text-headline-md text-on-surface-variant mt-1 text-center">
+              Ingresa tu email para continuar
+            </p>
+          </div>
 
-        <div className="glass-card rounded-[3rem] p-10 md:p-12 border-white/10 relative overflow-hidden">
           {message ? (
-            <div className="space-y-8 text-center py-4">
-              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Mail className="w-10 h-10 text-emerald-400" />
+            <div className="w-full flex flex-col items-center text-center space-y-4 py-2">
+              <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                <Mail className="w-8 h-8 text-emerald-600" />
               </div>
-              <p className="text-white/80 text-sm font-medium leading-relaxed">
+              <p className="font-body-sm text-body-sm text-text-muted leading-relaxed max-w-xs">
                 {message}
               </p>
-              <Link 
+              <Link
                 href="/login"
-                className="inline-flex items-center gap-2 text-accent text-[10px] font-black uppercase tracking-[0.2em] hover:brightness-125 transition-all"
+                className="inline-flex items-center gap-2 text-cobalt-blue text-body-sm font-body-sm hover:underline"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Volver al Inicio
+                Volver al inicio de sesión
               </Link>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="space-y-2">
-                <label className="label-premium">Email Registrado</label>
-                <div className="relative group">
+            <form onSubmit={handleSubmit} className="w-full space-y-6">
+              <div className="flex flex-col space-y-1">
+                <label className="font-label-md text-label-md text-text-muted" htmlFor="email">
+                  Correo Electrónico Registrado
+                </label>
+                <div className="relative border border-outline-variant rounded-lg transition-all focus-within:border-cobalt-blue focus-within:ring-2 focus-within:ring-cobalt-blue/10 bg-transparent">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="w-5 h-5 text-outline-variant" />
+                  </span>
                   <input
+                    id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
                     required
-                    className="w-full input-premium pl-4 pr-4 py-5 text-sm font-medium"
+                    className="block w-full pl-10 pr-3 py-3 font-body-md text-body-md rounded-lg border-none focus:ring-0 focus:outline-none bg-transparent placeholder:text-outline-variant text-on-surface"
                   />
                 </div>
               </div>
 
               {error && (
-                <div className="p-4 rounded-xl bg-error/10 border border-error/20 text-[10px] font-bold text-error text-center uppercase">
+                <div className="p-4 rounded-lg bg-error-container border border-error/20 text-xs font-bold text-on-error-container text-center animate-fade-in uppercase tracking-wider">
                   {error}
                 </div>
               )}
@@ -86,30 +95,38 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-6 rounded-2xl btn-metallic-gold text-xs flex items-center justify-center gap-3 active:scale-[0.98]"
+                className="w-full bg-cobalt-blue text-white font-headline-md text-headline-md py-4 rounded-lg shadow-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Enviando...</span>
+                  </>
                 ) : (
                   <>
-                    Solicitar Recuperación
+                    <span>Solicitar Recuperación</span>
                     <Send className="w-5 h-5" />
                   </>
                 )}
               </button>
 
               <div className="text-center">
-                <Link 
+                <Link
                   href="/login"
-                  className="text-white/20 hover:text-accent text-[9px] font-black uppercase tracking-widest transition-colors"
+                  className="font-body-sm text-body-sm text-text-muted hover:text-cobalt-blue transition-colors"
                 >
-                  Volver al Login
+                  Volver al inicio de sesión
                 </Link>
               </div>
             </form>
           )}
+
+          {/* Card Footer */}
+          <div className="mt-10 border-t border-border-subtle pt-4 w-full text-center">
+            <p className="font-body-sm text-body-sm text-text-muted">Alimin Cobranzas</p>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
