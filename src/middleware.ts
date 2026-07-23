@@ -18,6 +18,7 @@ export default auth((req) => {
       if (
         pathname === "/login" ||
         pathname.startsWith("/api/auth") ||
+        pathname.startsWith("/api/cron") ||
         pathname === "/forgot-password" ||
         pathname === "/reset-password"
       ) {
@@ -32,8 +33,8 @@ export default auth((req) => {
     }
   }
 
-  // Public routes (accesibles sin sesion, incluidas las de recuperacion de clave)
-  const publicPaths = ["/login", "/api/auth", "/mantenimiento", "/forgot-password", "/reset-password"];
+  // Public routes (accesibles sin sesion; /api/cron se protege con CRON_SECRET)
+  const publicPaths = ["/login", "/api/auth", "/api/cron", "/mantenimiento", "/forgot-password", "/reset-password"];
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
   if (isPublic) return NextResponse.next();
