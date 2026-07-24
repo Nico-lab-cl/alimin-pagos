@@ -1194,26 +1194,28 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                             </button>
                           </>
                         )}
-                        <button
-                          onClick={async () => {
-                            if (confirm("¿Estás seguro de que deseas eliminar este archivo? Esta acción quedará registrada en la bitácora.")) {
-                              const res = doc.type === "legacy"
-                                ? await deleteLegacyDocument(selectedClient.id, doc.name)
-                                : await deleteDocument(doc.id);
-                              if (res.success) {
-                                setDocs(docs.filter((d) => d.id !== doc.id));
-                                toast.success("Documento eliminado.");
-                                fetchNotesAndHistory();
-                              } else {
-                                toast.error(res.error || "No se pudo eliminar.");
+                        {doc.type !== "official_receipt" && (
+                          <button
+                            onClick={async () => {
+                              if (confirm("¿Estás seguro de que deseas eliminar este archivo? Esta acción quedará registrada en la bitácora.")) {
+                                const res = doc.type === "legacy"
+                                  ? await deleteLegacyDocument(selectedClient.id, doc.name)
+                                  : await deleteDocument(doc.id);
+                                if (res.success) {
+                                  setDocs(docs.filter((d) => d.id !== doc.id));
+                                  toast.success("Documento eliminado.");
+                                  fetchNotesAndHistory();
+                                } else {
+                                  toast.error(res.error || "No se pudo eliminar.");
+                                }
                               }
-                            }
-                          }}
-                          className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-550 hover:bg-red-50 hover:text-red-650 transition-colors shadow-sm cursor-pointer"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                            }}
+                            className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-550 hover:bg-red-50 hover:text-red-650 transition-colors shadow-sm cursor-pointer"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))

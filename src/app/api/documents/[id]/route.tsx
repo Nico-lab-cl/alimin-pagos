@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { renderToStream } from "@react-pdf/renderer";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getInstallmentDueDate } from "@/lib/financials";
+import { getReceiptLegalInfo } from "@/lib/receiptLegalInfo";
+import { PaymentReceiptPDF } from "@/components/pdf/PaymentReceiptPDF";
+
+const OFFICIAL_RECEIPT_PREFIX = "official-";
 
 export async function GET(
   request: NextRequest,
@@ -14,6 +20,91 @@ export async function GET(
   const { id } = await params;
   const url = new URL(request.url);
   const forceDownload = url.searchParams.get("download") === "true";
+
+  // Recibo OFICIAL emitido por Alimin (distinto del comprobante que sube el
+  // cliente): se genera al vuelo desde los datos del PaymentReceipt, no hay
+  // archivo guardado. Se identifica con el prefijo "official-" sobre el id
+  // real del PaymentReceipt.
+  if (id.startsWith(OFFICIAL_RECEIPT_PREFIX)) {
+    const receiptId = id.slice(OFFICIAL_RECEIPT_PREFIX.length);
+    try {
+      const receipt = await prisma.paymentReceipt.findUnique({
+        where: { id: receiptId },
+        include: { reservation: { include: { lot: true, project: true } }, lot: true },
+      });
+      if (!receipt) return new NextResponse("Document not found", { status: 404 });
+
+      const user = session.user as any;
+      if (user.role !== "ADMIN" && user.role !== "LEGAL") {
+        if (receipt.reservation.user_id !== user.id) {
+          return new NextResponse("Forbidden", { status: 403 });
+        }
+      }
+
+      const receiptDate = receipt.processed_at || receipt.created_at || new Date();
+      const startDate = receipt.reservation.installment_start_date || receipt.reservation.created_at || new Date();
+      const dueDay = receipt.reservation.due_day || undefined;
+
+      let installmentDueDate: Date | undefined;
+      let installmentBreakdown: { number: number; dueDate: Date; amount: number }[] | undefined;
+      if (receipt.scope === "INSTALLMENT" && receipt.installments_count) {
+        let effectiveInstallmentNum = receipt.nominal_installment_number || receipt.installments_count || 1;
+        const rangeMatch = receipt.nominal_installment_range?.match(/^(\d+)-(\d+)$/);
+        if (rangeMatch) effectiveInstallmentNum = parseInt(rangeMatch[2], 10);
+
+        installmentDueDate = getInstallmentDueDate(startDate, effectiveInstallmentNum, dueDay);
+
+        if (rangeMatch) {
+          const rangeStart = parseInt(rangeMatch[1], 10);
+          const rangeEnd = parseInt(rangeMatch[2], 10);
+          const count = rangeEnd - rangeStart + 1;
+          const baseAmount = Math.floor(receipt.amount_clp / count);
+          installmentBreakdown = [];
+          for (let n = rangeStart; n <= rangeEnd; n++) {
+            installmentBreakdown.push({
+              number: n,
+              dueDate: getInstallmentDueDate(startDate, n, dueDay),
+              amount: n === rangeEnd ? receipt.amount_clp - baseAmount * (count - 1) : baseAmount,
+            });
+          }
+        }
+      }
+
+      const stream = await renderToStream(
+        <PaymentReceiptPDF
+          receiptId={receipt.id}
+          receiptDate={receiptDate}
+          clientName={`${receipt.reservation.name} ${receipt.reservation.last_name || ""}`.trim()}
+          clientRut={receipt.reservation.rut || ""}
+          clientEmail={receipt.reservation.email}
+          projectName={receipt.reservation.project.name}
+          legalInfo={getReceiptLegalInfo(receipt.reservation.project.slug)}
+          lotNumber={receipt.lot.number}
+          lotStage={receipt.lot.stage || ""}
+          amountPaid={receipt.amount_clp}
+          paymentScope={receipt.scope}
+          installmentsCount={receipt.installments_count || 0}
+          totalInstallments={receipt.lot.cuotas || 0}
+          nominalInstallmentNumber={receipt.nominal_installment_number}
+          nominalInstallmentRange={receipt.nominal_installment_range}
+          installmentDueDate={installmentDueDate}
+          installmentBreakdown={installmentBreakdown}
+        />
+      );
+
+      const dispositionMode = forceDownload ? "attachment" : "inline";
+      return new NextResponse(stream as unknown as ReadableStream, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `${dispositionMode}; filename="Recibo_Oficial_Lote_${receipt.lot.number}.pdf"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (error) {
+      console.error("Error generating official receipt PDF:", error);
+      return new NextResponse("Internal Server Error", { status: 500 });
+    }
+  }
 
   try {
     let documentName = "";
@@ -48,7 +139,7 @@ export async function GET(
             else if (fileType === "application/pdf") ext = "pdf";
           }
         }
-        
+
         let docName = "Comprobante de Pago";
         if (receipt.scope === "PIE") {
           docName = `Comprobante_Pago_Pie.${ext}`;
@@ -105,8 +196,8 @@ export async function GET(
     }
 
     // Convert base64 to Buffer
-    const base64Data = base64Content.includes(",") 
-        ? base64Content.split(",")[1] 
+    const base64Data = base64Content.includes(",")
+        ? base64Content.split(",")[1]
         : base64Content;
     const buffer = Buffer.from(base64Data, 'base64');
 

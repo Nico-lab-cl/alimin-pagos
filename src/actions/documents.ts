@@ -140,7 +140,32 @@ export async function getReservationDocuments(reservationId: string) {
       hasFile: true,
     }));
 
-    const combined = [...tableDocs, ...receiptDocs].sort(
+    // Recibo OFICIAL emitido por Alimin (distinto del comprobante que sube el
+    // cliente): un documento adicional por cada comprobante aprobado, generado
+    // al vuelo (sin archivo guardado) via /api/documents/official-{id}.
+    const officialReceiptDocs = receipts.map((r: any) => {
+      let docName = "Recibo_Oficial_Pago";
+      if (r.scope === "PIE") {
+        docName = "Recibo_Oficial_Pago_Pie.pdf";
+      } else {
+        docName = r.nominal_installment_range
+          ? `Recibo_Oficial_Cuotas_${r.nominal_installment_range}.pdf`
+          : r.nominal_installment_number
+            ? `Recibo_Oficial_Cuota_${r.nominal_installment_number}.pdf`
+            : "Recibo_Oficial_Pago.pdf";
+      }
+
+      return {
+        id: `official-${r.id}`,
+        name: docName,
+        file_type: "application/pdf",
+        created_at: r.processed_at || r.created_at,
+        type: "official_receipt",
+        hasFile: true,
+      };
+    });
+
+    const combined = [...tableDocs, ...receiptDocs, ...officialReceiptDocs].sort(
       (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
     );
 
