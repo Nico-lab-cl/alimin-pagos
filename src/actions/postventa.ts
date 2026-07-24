@@ -1699,6 +1699,7 @@ export async function updateClientProfile(reservationId: string, data: { name: s
         data: {
           user_id: newUser.id,
           name: data.name,
+          last_name: null,
           email: sanitizedEmail,
           rut: data.rut,
           phone: data.phone,
@@ -1727,6 +1728,11 @@ export async function updateClientProfile(reservationId: string, data: { name: s
           where: { id: reservationId },
           data: {
             name: data.name,
+            // El formulario edita el nombre como un solo campo "Nombre Completo".
+            // Se limpia last_name para que no quede un apellido viejo que se
+            // vuelva a pegar en la concatenacion (name + " " + last_name) la
+            // proxima vez que se muestre el cliente.
+            last_name: null,
             email: sanitizedEmail,
             rut: data.rut,
             phone: data.phone,
