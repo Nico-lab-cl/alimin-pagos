@@ -147,7 +147,7 @@ export async function getFullPostventaData({
       let nextDueDate: Date | null = null;
       let lateDays = 0;
       let penaltyAmount = 0;
-      let overdueInstallments: { number: number; dueDate: string; interestStartDate: string; monthName: string; lateDays: number; penaltyAmount: number; moraCredit: number }[] = [];
+      let overdueInstallments: { number: number; dueDate: string; interestStartDate: string; monthName: string; lateDays: number; penaltyAmount: number; moraCredit: number; baseAmount: number }[] = [];
       const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
       // Lomas del Mar usa la formula de mora identica a aliminlomasdelmar.com
       // (ver calculateLomasInterest): sin "+1 dia", ancla -1 con fecha de deuda,
@@ -268,6 +268,12 @@ export async function getFullPostventaData({
             );
           }
 
+          let installmentBaseAmount = lot.valor_cuota || 0;
+          if (ranges && ranges.length > 0) {
+            const range = (ranges as any[]).find((r: any) => installmentNumber >= Number(r.from ?? r.start ?? 0) && installmentNumber <= Number(r.to ?? r.end ?? 0));
+            if (range) installmentBaseAmount = Number(range.amount ?? range.value ?? installmentBaseAmount);
+          }
+
           // Only auto penalty per installment
           let autoPenaltyForThis = 0;
           if (res.mora_status !== "CONGELADO" && !res.mora_frozen) {
@@ -316,6 +322,7 @@ export async function getFullPostventaData({
               lateDays: days,
               penaltyAmount: Math.max(0, autoPenaltyForThis - instMoraCredits),
               moraCredit: instMoraCredits,
+              baseAmount: installmentBaseAmount,
             });
           } else {
             // Stop once we hit installments that are not overdue

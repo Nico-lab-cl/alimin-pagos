@@ -1720,28 +1720,41 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                         </div>
                         <div className="space-y-2">
                           {selectedClient.overdueInstallments.map((inst: any) => (
-                            <div key={inst.number} className="bg-white border border-red-150 rounded-xl p-4 flex items-center justify-between hover:border-red-300 transition-colors shadow-sm">
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xs font-bold text-slate-800">Cuota {inst.number}</span>
-                                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                    {inst.monthName}
-                                  </span>
-                                </div>
-                                <p className="text-[10px] text-red-500 font-semibold">
-                                  Venció el {formatDate(inst.interestStartDate || inst.dueDate)}
-                                </p>
-                                {inst.moraCredit > 0 && (
-                                  <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
-                                    Abono a intereses aplicado: -{formatCLP(inst.moraCredit)}
+                            <div key={inst.number} className="bg-white border border-red-150 rounded-xl p-4 hover:border-red-300 transition-colors shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-bold text-slate-800">Cuota {inst.number}</span>
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                      {inst.monthName}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-red-500 font-semibold">
+                                    Venció el {formatDate(inst.interestStartDate || inst.dueDate)}
                                   </p>
-                                )}
-                              </div>
-                              <div className="text-right flex flex-col items-end gap-1.5">
-                                <span className="text-sm font-bold text-red-600">{formatCLP(inst.penaltyAmount)}</span>
-                                <span className="text-[8px] font-bold text-red-550 uppercase tracking-wider bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
+                                  {inst.moraCredit > 0 && (
+                                    <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                                      Abono a intereses aplicado: -{formatCLP(inst.moraCredit)}
+                                    </p>
+                                  )}
+                                </div>
+                                <span className="text-[8px] font-bold text-red-550 uppercase tracking-wider bg-red-50 px-2 py-0.5 rounded-md border border-red-200 h-fit">
                                   {inst.lateDays} {inst.lateDays === 1 ? 'día' : 'días'} de atraso
                                 </span>
+                              </div>
+                              <div className="mt-3 pt-3 border-t border-slate-100 space-y-1">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-500 font-semibold">Cuota base</span>
+                                  <span className="text-slate-700 font-bold">{formatCLP(inst.baseAmount || 0)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-500 font-semibold">Interés (mora)</span>
+                                  <span className="text-red-600 font-bold">{formatCLP(inst.penaltyAmount)}</span>
+                                </div>
+                                <div className="flex items-center justify-between pt-1 mt-1 border-t border-dashed border-slate-200">
+                                  <span className="text-[11px] text-slate-800 font-bold">Total a pagar</span>
+                                  <span className="text-sm text-slate-900 font-black">{formatCLP((inst.baseAmount || 0) + inst.penaltyAmount)}</span>
+                                </div>
                               </div>
                             </div>
                           ))}
