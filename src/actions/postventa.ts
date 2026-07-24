@@ -569,12 +569,17 @@ function calculateCurrentMoraOwed(
     grace_period_days: number | null;
     daily_penalty_amount: number | null;
     penalty_start_date: Date | null;
-  }
+  },
+  // Fecha de referencia para el calculo (por defecto, hoy). Al REGISTRAR un pago
+  // que ocurrio en el pasado, hay que pasar la fecha real del pago para no
+  // comparar el monto pagado contra la mora de HOY (que sigue creciendo dia a
+  // dia) en vez de la mora vigente el dia que efectivamente se pago.
+  asOfDate: Date = getChileToday()
 ): number {
   const paidCuotas = res.installments_paid || 0;
   const totalCuotas = res.lot.cuotas || 0;
   const fixedMode = res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED";
-  const currentDate = getChileToday();
+  const currentDate = asOfDate;
   const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
   const { amount: fixedPenalty } = fixedMode
     ? calculateGrowingFixedPenalty(res.manual_penalty, res.debt_start_date, activeDailyPenalty, currentDate)
@@ -2154,8 +2159,10 @@ export async function registerManualPayment(
       if (range) expectedCuotaBase = Number(range.amount);
 
       const totalExpectedPerCuota = expectedCuotaBase * data.installmentsCount;
-      // Mora REAL total que debe hoy (automática + fija) — mismo arreglo que approveReceipt.
-      const currentPenalty = calculateCurrentMoraOwed(res, res.project);
+      // Mora vigente A LA FECHA DEL PAGO (no "hoy") — si el pago se registra
+      // dias despues de haber ocurrido, comparar contra la mora de hoy hace
+      // ver un faltante que en realidad no existia el dia que el cliente pago.
+      const currentPenalty = calculateCurrentMoraOwed(res, res.project, paymentDate);
 
       const paid = data.amount;
       const cuotaPaidAmount = Math.min(paid, totalExpectedPerCuota);
@@ -2178,8 +2185,10 @@ export async function registerManualPayment(
             next_payment_date: null,
             manual_penalty: shortfall > 0 ? shortfall : null,
             penalty_mode: shortfall > 0 ? (res.penalty_mode === "MIXED" ? "MIXED" : "FIXED") : "AUTO",
-            // Re-fija la fecha desde la que la multa empieza a crecer día a día.
-            debt_start_date: shortfall > 0 ? getChileToday() : null,
+            // El faltante se calculo A LA FECHA DEL PAGO (paymentDate), asi que
+            // debe empezar a crecer desde ese mismo dia, no desde hoy — sino el
+            // saldo restante queda atrasado respecto a lo que realmente debe.
+            debt_start_date: shortfall > 0 ? paymentDate : null,
             debt_end_date: null,
           },
         });
@@ -2318,12 +2327,13 @@ export async function registerInterestPayment(
 
     if (!res) return { error: "Reserva no encontrada" };
 
-    const currentMora = calculateCurrentMoraOwed(res, res.project);
+    const paymentDate = new Date(data.paidAt + "T12:00:00");
+    // Mora vigente A LA FECHA DEL PAGO, no "hoy" (ver registerManualPayment).
+    const currentMora = calculateCurrentMoraOwed(res, res.project, paymentDate);
     if (currentMora <= 0) {
       return { error: "Este cliente no tiene mora pendiente por abonar" };
     }
 
-    const paymentDate = new Date(data.paidAt + "T12:00:00");
     const receiptId = crypto.randomUUID();
 
     const paid = data.amount;
