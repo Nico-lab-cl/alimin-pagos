@@ -613,6 +613,74 @@ function calculateCurrentMoraOwed(
 }
 
 /**
+ * Mora vigente SOLO de la(s) cuota(s) que se estan pagando ahora mismo (no de
+ * TODA la mora pendiente de la reserva). Se usa al registrar un pago manual
+ * de cuota: si el cliente paga la cuota N + su propio interes, el "faltante"
+ * no debe mezclarse con la mora de otras cuotas que sigan pendientes por su
+ * cuenta (eso ya lo trackea el calculo automatico normal para esas cuotas).
+ */
+function calculateMoraForInstallmentsBeingPaid(
+  res: {
+    installments_paid: number | null;
+    installment_start_date: Date | null;
+    due_day: number | null;
+    grace_days: number | null;
+    daily_penalty: number | null;
+    debt_start_date: Date | null;
+    debt_end_date: Date | null;
+    next_payment_date: Date | null;
+  },
+  project: {
+    slug: string;
+    due_day_of_month: number | null;
+    grace_period_days: number | null;
+    daily_penalty_amount: number | null;
+    penalty_start_date: Date | null;
+  },
+  installmentsCount: number,
+  asOfDate: Date
+): number {
+  if (!res.installment_start_date || installmentsCount <= 0) return 0;
+  const isLomasProject = project.slug === "lomas-del-mar";
+  const paidCuotas = res.installments_paid || 0;
+  const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
+  const dueDay = res.due_day ?? project.due_day_of_month ?? 5;
+  const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
+
+  let total = 0;
+  for (let i = 0; i < installmentsCount; i++) {
+    const installmentNumber = paidCuotas + 1 + i;
+    const currentDue =
+      i === 0 && res.next_payment_date
+        ? new Date(res.next_payment_date)
+        : getInstallmentDueDate(res.installment_start_date, installmentNumber, dueDay);
+
+    total += isLomasProject
+      ? calculateLomasInterest(
+          currentDue,
+          asOfDate,
+          false,
+          graceDays,
+          activeDailyPenalty,
+          res.debt_start_date,
+          project.penalty_start_date,
+          res.debt_end_date
+        )
+      : calculateTotalInterest(
+          currentDue,
+          asOfDate,
+          false,
+          graceDays,
+          activeDailyPenalty,
+          i === 0 ? res.debt_start_date : null,
+          project.penalty_start_date,
+          res.debt_end_date
+        );
+  }
+  return total;
+}
+
+/**
  * Arma un texto legible con el desglose de qué cuota(s) está generando
  * el interés automático vigente y cuántos días de mora lleva cada una.
  * Se usa para dejar registrado en la bitácora, al momento de cristalizar
@@ -2159,10 +2227,17 @@ export async function registerManualPayment(
       if (range) expectedCuotaBase = Number(range.amount);
 
       const totalExpectedPerCuota = expectedCuotaBase * data.installmentsCount;
-      // Mora vigente A LA FECHA DEL PAGO (no "hoy") — si el pago se registra
-      // dias despues de haber ocurrido, comparar contra la mora de hoy hace
-      // ver un faltante que en realidad no existia el dia que el cliente pago.
-      const currentPenalty = calculateCurrentMoraOwed(res, res.project, paymentDate);
+      // Mora de SOLO la(s) cuota(s) que se estan pagando ahora, A LA FECHA DEL
+      // PAGO (no "hoy", no la mora de TODA la reserva). Si se usara la mora
+      // agregada de toda la reserva, un pago que cubre exactamente la cuota +
+      // su interes igual mostraria un "faltante" que en realidad es la mora de
+      // OTRA cuota (que sigue pendiente por su cuenta, sin relacion con este pago).
+      const currentPenalty = calculateMoraForInstallmentsBeingPaid(
+        res,
+        res.project,
+        data.installmentsCount,
+        paymentDate
+      );
 
       const paid = data.amount;
       const cuotaPaidAmount = Math.min(paid, totalExpectedPerCuota);
