@@ -4,15 +4,24 @@
  * para que la traducción de "entidad" y "origen" quede en un solo lugar.
  */
 
-export type EntityGroupKey = "RESERVA" | "LOTE" | "CAJA" | "DOCUMENTO" | "PROYECTO";
+export type EntityGroupKey = "RESERVA" | "LOTE" | "CAJA" | "DOCUMENTO" | "COMPROBANTE" | "PROYECTO";
 
 export const ENTITY_GROUPS: { key: EntityGroupKey; label: string; matches: string[] }[] = [
   { key: "RESERVA", label: "Cliente / Reserva", matches: ["Reservation", "RESERVATION"] },
   { key: "LOTE", label: "Lote", matches: ["Lot", "LOT"] },
   { key: "CAJA", label: "Movimiento de Caja", matches: ["FinancialLedger", "FINANCIALLEDGER"] },
   { key: "DOCUMENTO", label: "Documento", matches: ["ReservationDocument", "RESERVATIONDOCUMENT"] },
+  { key: "COMPROBANTE", label: "Comprobante de pago", matches: ["PaymentReceipt", "PAYMENTRECEIPT"] },
   { key: "PROYECTO", label: "Proyecto", matches: ["Project", "PROJECT"] },
 ];
+
+/**
+ * Grupos cuyo audit log guarda el ID de la RESERVA en entity_id (no el ID de la
+ * fila borrada). Es el caso de todo lo que pasa por logSystemNote(): al eliminar
+ * un comprobante o un documento la fila deja de existir, así que lo que queda
+ * registrado —y lo único que permite mostrar el cliente— es el ID de la reserva.
+ */
+export const GROUPS_KEYED_BY_RESERVATION: EntityGroupKey[] = ["RESERVA", "DOCUMENTO", "COMPROBANTE"];
 
 export function getEntityLabel(rawEntity: string | null | undefined): string {
   if (!rawEntity) return "—";

@@ -15,7 +15,7 @@ import { memoryCache } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
 import { hash } from "bcryptjs";
 import crypto from "crypto";
-import { ENTITY_GROUPS, getEntityLabel, getEntityGroupKey } from "@/lib/auditLabels";
+import { ENTITY_GROUPS, getEntityLabel, getEntityGroupKey, GROUPS_KEYED_BY_RESERVATION } from "@/lib/auditLabels";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -4188,7 +4188,7 @@ export async function getAuditLogs({
     ]);
 
     // Resolve client names in bulk, grouped by entity type (read-only)
-    const idsByGroup: Record<string, string[]> = { RESERVA: [], LOTE: [], CAJA: [], DOCUMENTO: [] };
+    const idsByGroup: Record<string, string[]> = { RESERVA: [], LOTE: [], CAJA: [], DOCUMENTO: [], COMPROBANTE: [] };
     for (const log of logs) {
       if (!log.entity_id) continue;
       const key = getEntityGroupKey(log.entity);
@@ -4197,9 +4197,12 @@ export async function getAuditLogs({
 
     const clientNameById: Record<string, string> = {};
 
-    if (idsByGroup.RESERVA.length) {
+    // RESERVA, DOCUMENTO y COMPROBANTE guardan todos el ID de la reserva en
+    // entity_id (ver GROUPS_KEYED_BY_RESERVATION), así que se resuelven juntos.
+    const reservationIds = GROUPS_KEYED_BY_RESERVATION.flatMap((key) => idsByGroup[key] || []);
+    if (reservationIds.length) {
       const reservations = await prisma.reservation.findMany({
-        where: { id: { in: idsByGroup.RESERVA } },
+        where: { id: { in: reservationIds } },
         select: { id: true, name: true, last_name: true },
       });
       reservations.forEach((r) => {
@@ -4229,9 +4232,12 @@ export async function getAuditLogs({
       });
     }
 
-    if (idsByGroup.DOCUMENTO.length) {
+    // Respaldo para registros antiguos de DOCUMENTO cuyo entity_id sí es el ID
+    // del documento y no el de la reserva (solo los que quedaron sin resolver).
+    const unresolvedDocIds = idsByGroup.DOCUMENTO.filter((id) => !clientNameById[id]);
+    if (unresolvedDocIds.length) {
       const docs = await prisma.reservationDocument.findMany({
-        where: { id: { in: idsByGroup.DOCUMENTO } },
+        where: { id: { in: unresolvedDocIds } },
         select: { id: true, reservation: { select: { name: true, last_name: true } } },
       });
       docs.forEach((d) => {
