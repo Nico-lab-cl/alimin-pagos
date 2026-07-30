@@ -427,6 +427,7 @@ export async function getFullPostventaData({
         marital_status: res.marital_status,
         profession: res.profession,
         nationality: res.nationality,
+        advisor: res.advisor,
         internalStatus: res.status,
         isMultiLot: res.is_multilote || false,
         installment_start_date: res.installment_start_date,
@@ -1658,6 +1659,124 @@ export async function getAdminLots(projectSlug: string) {
 /**
  * Updates a client's profile data, updating both Reservation and underlying User login email.
  */
+/**
+ * Lista de asesores disponibles para el selector de la ficha del cliente.
+ * No hay tabla de asesores: se derivan de los nombres ya usados en Reservation.advisor,
+ * normalizando espacios y agrupando sin distinguir mayusculas para que un mismo asesor
+ * no aparezca dos veces por diferencias de tipeo ("Marcela" vs "Marcela ").
+ * Solo lectura.
+ */
+export async function getAdvisors() {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { advisors: [] as string[] };
+  }
+
+  try {
+    const rows = await prisma.reservation.findMany({
+      where: { advisor: { not: null } },
+      select: { advisor: true },
+      distinct: ["advisor"],
+    });
+
+    const uniqueByLowercase = new Map<string, string>();
+    for (const row of rows) {
+      const name = (row.advisor || "").trim();
+      if (!name || name.toLowerCase() === "null") continue;
+      if (!uniqueByLowercase.has(name.toLowerCase())) {
+        uniqueByLowercase.set(name.toLowerCase(), name);
+      }
+    }
+
+    return {
+      advisors: Array.from(uniqueByLowercase.values()).sort((a, b) => a.localeCompare(b, "es")),
+    };
+  } catch (error) {
+    console.error("Error loading advisors:", error);
+    return { advisors: [] as string[] };
+  }
+}
+
+/**
+ * Reasigna el asesor de un cliente. Es una accion aislada a proposito: escribe
+ * SOLO la columna advisor y la nota de bitacora, sin pasar por updateClientProfile,
+ * que ademas reescribe la cuenta de usuario (email/nombre) y puede desacoplar
+ * cuentas compartidas entre lotes. Cambiar de asesor no debe arrastrar nada de eso.
+ * Queda registrado en la Bitacora del cliente y en Auditoria.
+ */
+export async function updateClientAdvisor(reservationId: string, advisor: string) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: { id: true, advisor: true, notes: true },
+    });
+
+    if (!reservation) {
+      return { error: "Reserva no encontrada" };
+    }
+
+    // Vacio se guarda como null, para que "sin asignar" sea un unico valor en la
+    // base y no una mezcla de null y cadena vacia.
+    const previousAdvisor = reservation.advisor?.trim() || null;
+    const nextAdvisor = advisor.trim() || null;
+
+    if (previousAdvisor === nextAdvisor) {
+      return { success: true, advisor: nextAdvisor, unchanged: true };
+    }
+
+    const detail = previousAdvisor
+      ? (nextAdvisor
+          ? `Asesor reasignado: "${previousAdvisor}" -> "${nextAdvisor}".`
+          : `Asesor removido (antes: "${previousAdvisor}"). El cliente queda sin asesor asignado.`)
+      : `Asesor asignado: "${nextAdvisor}". El cliente no tenia asesor.`;
+
+    let parsedNotes: any[] = [];
+    try {
+      parsedNotes = JSON.parse(reservation.notes || "[]");
+    } catch {
+      parsedNotes = [];
+    }
+    parsedNotes.unshift({
+      id: Math.random().toString(36).substring(7),
+      text: detail,
+      type: "Registro",
+      date: new Date().toISOString(),
+      author: adminUser.name || adminUser.email || "Administrador",
+    });
+
+    await prisma.reservation.update({
+      where: { id: reservationId },
+      data: { advisor: nextAdvisor, notes: JSON.stringify(parsedNotes) },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "Reservation",
+        entity_id: reservationId,
+        details: detail,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    revalidatePath("/admin/clients");
+
+    return { success: true, advisor: nextAdvisor };
+  } catch (error) {
+    console.error("Error updating client advisor:", error);
+    return { error: "Error al actualizar el asesor" };
+  }
+}
+
 export async function updateClientProfile(reservationId: string, data: { name: string, email: string, rut: string, phone: string, observation?: string, marital_status?: string, profession?: string, nationality?: string, address_street?: string, address_number?: string, address_region?: string, address_commune?: string }) {
   const session = await auth();
   const adminUser = session?.user as any;

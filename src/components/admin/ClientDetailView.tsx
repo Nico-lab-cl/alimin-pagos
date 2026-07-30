@@ -2,17 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { formatCLP, formatDate, getDownloadFilename, downloadDocument } from "@/lib/utils";
-import { 
-  ArrowLeft, Bell, HelpCircle, User, FileText, Calendar, Building, Clock, 
+import {
+  ArrowLeft, Bell, HelpCircle, User, FileText, Calendar, Building, Clock,
   AlertTriangle, Phone, CheckCircle2, ChevronRight, ChevronDown, Download, Plus,
   Mail, Settings, MoreVertical, MessageSquare, Send, ShieldAlert, History, Zap, Loader2,
-  Trash2, Eye, X, Save, Lock, Pencil
+  Trash2, Eye, X, Save, Lock, Pencil, UserCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   updateClientProfile, updateClientFinancials, toggleAlContado,
   registerManualPayment, registerInterestPayment, getFinancialHistory, addClientNote, getClientNotes,
-  sendClientObservation, updateFinancialLedgerAmount, deleteFinancialLedgerEntry
+  sendClientObservation, updateFinancialLedgerAmount, deleteFinancialLedgerEntry, getAdvisors, updateClientAdvisor
 } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, deleteLegacyDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
@@ -61,6 +61,56 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     observation: selectedClient.observation || "",
   });
 
+  // Asesor: se edita aparte del perfil (accion updateClientAdvisor), porque
+  // guardar el perfil completo reescribe ademas la cuenta de usuario del cliente.
+  // La lista se arma con los nombres ya usados en el sistema, mas la opcion de
+  // escribir uno nuevo (que queda disponible para el resto al guardarse).
+  const [advisors, setAdvisors] = useState<string[]>([]);
+  const [isEditingAdvisor, setIsEditingAdvisor] = useState(false);
+  const [isCustomAdvisor, setIsCustomAdvisor] = useState(false);
+  const [newAdvisorName, setNewAdvisorName] = useState("");
+  const [savingAdvisor, setSavingAdvisor] = useState(false);
+
+  useEffect(() => {
+    getAdvisors()
+      .then((res) => setAdvisors(res.advisors || []))
+      .catch(() => setAdvisors([]));
+  }, []);
+
+  // Se incluye el asesor actual del cliente aunque la lista aun no haya cargado,
+  // para que el selector nunca se abra sin la opcion que ya tiene asignada.
+  const currentAdvisor = (selectedClient.advisor || "").trim();
+  const advisorOptions = (() => {
+    const byLowercase = new Map<string, string>();
+    if (currentAdvisor) byLowercase.set(currentAdvisor.toLowerCase(), currentAdvisor);
+    advisors.forEach((a) => {
+      if (!byLowercase.has(a.toLowerCase())) byLowercase.set(a.toLowerCase(), a);
+    });
+    return Array.from(byLowercase.values()).sort((a, b) => a.localeCompare(b, "es"));
+  })();
+
+  const handleSaveAdvisor = async (advisor: string) => {
+    setSavingAdvisor(true);
+    try {
+      const res = await updateClientAdvisor(selectedClient.id, advisor);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(advisor.trim() ? `Asesor actualizado: ${advisor.trim()}` : "Asesor removido");
+      setIsEditingAdvisor(false);
+      setIsCustomAdvisor(false);
+      setNewAdvisorName("");
+      getAdvisors().then((r) => setAdvisors(r.advisors || [])).catch(() => {});
+      onUpdate();
+      fetchNotesAndHistory();
+    } catch {
+      toast.error("Error al actualizar el asesor");
+    } finally {
+      setSavingAdvisor(false);
+    }
+  };
+
   // Finances Edit State
   const [isEditingFinances, setIsEditingFinances] = useState(false);
   const [financesForm, setFinancesForm] = useState({
@@ -97,6 +147,9 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       nationality: selectedClient.nationality || "",
       observation: selectedClient.observation || "",
     });
+    setIsEditingAdvisor(false);
+    setIsCustomAdvisor(false);
+    setNewAdvisorName("");
     setFinancesForm({
       price_total_clp: selectedClient.totalToPay || 0,
       reservation_price: selectedClient.reservation_price || 0,
@@ -709,6 +762,24 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     );
   };
 
+  const getAdvisorBadge = () => {
+    const advisor = currentAdvisor;
+    if (!advisor) {
+      return (
+        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200 inline-flex items-center gap-1.5">
+          <User className="w-3 h-3 text-slate-400" />
+          ASESOR SIN ASIGNAR
+        </span>
+      );
+    }
+    return (
+      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100 inline-flex items-center gap-1.5">
+        <UserCheck className="w-3 h-3" />
+        ASESOR: {advisor.toUpperCase()}
+      </span>
+    );
+  };
+
   const getLotReference = () => {
     if (projectSlug?.includes("casablanca")) return `VDC-L${selectedClient.lotNumber}`;
     if (projectSlug?.includes("arenas") || projectSlug?.includes("arena")) return `AYS-L${selectedClient.lotNumber}`;
@@ -753,6 +824,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 {getProjectName().toUpperCase()}
               </span>
             </div>
+            <div className="mt-2">{getAdvisorBadge()}</div>
           </div>
         </div>
 
@@ -879,6 +951,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     <button
                       onClick={() => {
                         setIsEditingProfile(false);
+                        setIsCustomAdvisor(false);
                         setProfileForm({
                           name: selectedClient.clientName || "",
                           email: selectedClient.clientEmail || "",
@@ -939,6 +1012,91 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   <div>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nacionalidad</p>
                     <p className="font-bold text-slate-800">{selectedClient.nationality || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Asesor</p>
+                    {!isEditingAdvisor ? (
+                      <div className="flex items-center gap-2">
+                        {currentAdvisor ? (
+                          <span className="font-bold text-slate-800 inline-flex items-center gap-1.5">
+                            <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                            {currentAdvisor}
+                          </span>
+                        ) : (
+                          <span className="font-bold text-slate-450">Sin asignar</span>
+                        )}
+                        <button
+                          onClick={() => setIsEditingAdvisor(true)}
+                          className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200 transition-colors cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <Pencil className="w-2.5 h-2.5" />
+                          {currentAdvisor ? "Cambiar" : "Asignar"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <select
+                          autoFocus
+                          disabled={savingAdvisor}
+                          value={isCustomAdvisor ? "__NEW__" : currentAdvisor}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "__NEW__") {
+                              setIsCustomAdvisor(true);
+                              setNewAdvisorName("");
+                              return;
+                            }
+                            setIsCustomAdvisor(false);
+                            handleSaveAdvisor(value);
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50"
+                        >
+                          <option value="">Sin asignar</option>
+                          {advisorOptions.map((a) => (
+                            <option key={a} value={a}>{a}</option>
+                          ))}
+                          <option value="__NEW__">+ Agregar nuevo asesor…</option>
+                        </select>
+
+                        {isCustomAdvisor && (
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              autoFocus
+                              value={newAdvisorName}
+                              onChange={(e) => setNewAdvisorName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && newAdvisorName.trim()) handleSaveAdvisor(newAdvisorName);
+                              }}
+                              placeholder="Nombre del nuevo asesor"
+                              className="flex-1 bg-white border border-blue-200 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-450 focus:border-blue-500 outline-none"
+                            />
+                            <button
+                              onClick={() => handleSaveAdvisor(newAdvisorName)}
+                              disabled={!newAdvisorName.trim() || savingAdvisor}
+                              className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                            >
+                              Guardar
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          {savingAdvisor && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
+                          <button
+                            onClick={() => {
+                              setIsEditingAdvisor(false);
+                              setIsCustomAdvisor(false);
+                              setNewAdvisorName("");
+                            }}
+                            disabled={savingAdvisor}
+                            className="text-[9px] font-bold uppercase tracking-wider text-slate-450 hover:text-slate-600 transition-colors cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="sm:col-span-2">
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Observación</p>
@@ -1047,6 +1205,13 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       onChange={(e) => setProfileForm({ ...profileForm, nationality: e.target.value })}
                       className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Asesor</label>
+                    <p className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-150 text-xs font-semibold text-slate-500">
+                      {currentAdvisor || "Sin asignar"}
+                      <span className="text-slate-400 font-medium"> · se cambia por separado</span>
+                    </p>
                   </div>
                   <div className="sm:col-span-2 space-y-1">
                     <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Observación</label>
