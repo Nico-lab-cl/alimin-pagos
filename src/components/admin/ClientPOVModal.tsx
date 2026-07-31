@@ -1013,12 +1013,13 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
-                    { label: "BANCO", value: bankName },
-                    { label: "TIPO DE CUENTA", value: `${bankType} #${bankAccount}` },
-                    { label: "RUT", value: bankRut },
-                    { label: "NOMBRE", value: bankHolder }
+                    { label: "BANCO", value: bankName, wide: false },
+                    { label: "TIPO DE CUENTA", value: `${bankType} #${bankAccount}`, wide: false },
+                    { label: "RUT", value: bankRut, wide: false },
+                    { label: "NOMBRE", value: bankHolder, wide: false },
+                    { label: "CORREO", value: bankEmail, wide: true }
                   ].map((item, i) => (
-                    <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                    <div key={i} className={`bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm${item.wide ? " md:col-span-2" : ""}`}>
                       <div>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{item.label}</span>
                         <p className="text-sm font-bold text-slate-800 mt-0.5">{item.value}</p>
@@ -1214,12 +1215,13 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { label: "BANCO", value: bankName },
-                { label: "TIPO DE CUENTA", value: `${bankType} #${bankAccount}` },
-                { label: "RUT", value: bankRut },
-                { label: "NOMBRE", value: bankHolder }
+                { label: "BANCO", value: bankName, wide: false },
+                { label: "TIPO DE CUENTA", value: `${bankType} #${bankAccount}`, wide: false },
+                { label: "RUT", value: bankRut, wide: false },
+                { label: "NOMBRE", value: bankHolder, wide: false },
+                { label: "CORREO", value: bankEmail, wide: true }
               ].map((item, i) => (
-                <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                <div key={i} className={`bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm${item.wide ? " md:col-span-2" : ""}`}>
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{item.label}</span>
                     <p className="text-sm font-bold text-slate-800 mt-0.5">{item.value}</p>
