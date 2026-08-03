@@ -51,20 +51,20 @@ export default function CreateLotModal({ projectSlug, onClose, onSuccess }: Prop
     onSuccess();
   };
 
-  const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 focus:outline-none outline-none font-bold placeholder:text-slate-350 transition-all";
+  const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 focus:outline-none outline-none font-bold placeholder:text-slate-300 transition-all";
   const labelCls = "block text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-1.5";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div className="bg-white border border-slate-200 rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white/90 backdrop-blur px-8 py-6 border-b border-slate-150 flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-white/90 backdrop-blur px-8 py-6 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center">
-              <Plus className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center">
+              <Plus className="w-6 h-6 text-brand-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-850 uppercase tracking-tight">Nuevo Lote</h2>
+              <h2 className="text-xl font-bold text-slate-800 uppercase tracking-tight">Nuevo Lote</h2>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registro de Unidad Catastral</p>
             </div>
           </div>
@@ -92,7 +92,7 @@ export default function CreateLotModal({ projectSlug, onClose, onSuccess }: Prop
           </div>
 
           {/* Financial */}
-          <div className="border-t border-slate-150 pt-6">
+          <div className="border-t border-slate-200 pt-6">
             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><DollarSign className="w-3 h-3 text-slate-400" /> Información Financiera</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -124,7 +124,7 @@ export default function CreateLotModal({ projectSlug, onClose, onSuccess }: Prop
 
           {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-150 text-red-600 text-[10px] font-bold uppercase tracking-widest px-4 py-3 rounded-xl">
+            <div className="bg-red-50 border border-red-200 text-red-600 text-[10px] font-bold uppercase tracking-widest px-4 py-3 rounded-xl">
               {error}
             </div>
           )}
@@ -137,7 +137,7 @@ export default function CreateLotModal({ projectSlug, onClose, onSuccess }: Prop
             <button
               onClick={handleSubmit}
               disabled={saving}
-              className="flex-1 px-4 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              className="flex-1 px-4 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Crear Lote

@@ -39,7 +39,7 @@ export function MobileNav() {
               key={item.href}
               href={item.href}
               className={`flex flex-col items-center gap-1 transition-all ${
-                isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
+                isActive ? "text-brand-600" : "text-slate-400 hover:text-slate-600"
               }`}
             >
               <item.icon className={`w-5 h-5 ${isActive ? "scale-110" : ""}`} />
@@ -53,9 +53,9 @@ export function MobileNav() {
     );
   }
 
-  // User style: dark luxury, gold/metallic accent
+  // User style: light surface, brand green accent
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden glass-panel border-t border-white/10 px-6 py-3 flex items-center justify-around pb-[calc(env(safe-area-inset-bottom)+12px)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-white/95 backdrop-blur-md border-t border-slate-200 px-6 py-3 flex items-center justify-around pb-[calc(env(safe-area-inset-bottom)+12px)] shadow-lg">
       {items.map((item) => {
         const isActive = pathname === item.href || (item.href !== "/user" && pathname.startsWith(item.href));
         return (
@@ -63,7 +63,7 @@ export function MobileNav() {
             key={item.href}
             href={item.href}
             className={`flex flex-col items-center gap-1 transition-all ${
-              isActive ? "text-accent" : "text-white/40 hover:text-white/60"
+              isActive ? "text-brand-600" : "text-slate-400 hover:text-slate-600"
             }`}
           >
             <item.icon className={`w-5 h-5 ${isActive ? "animate-pulse" : ""}`} />

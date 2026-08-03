@@ -72,8 +72,8 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "text-xs font-semibold uppercase tracking-wider transition-colors hover:text-blue-600",
-                    isActive ? "text-blue-600 border-b-2 border-blue-600 pb-1 -mb-1" : "text-slate-500"
+                    "text-xs font-semibold uppercase tracking-wider transition-colors hover:text-brand-600",
+                    isActive ? "text-brand-600 border-b-2 border-brand-600 pb-1 -mb-1" : "text-slate-500"
                   )}
                 >
                   {item.label}
@@ -88,7 +88,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
               <span className="text-xs text-slate-500">
                 ¡Hola, <span className="font-semibold text-slate-800">{userName}</span>! Bienvenido a tu hogar.
               </span>
-              <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-700 shadow-sm select-none">
+              <div className="w-9 h-9 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center text-xs font-bold text-brand-600 shadow-sm select-none">
                 {initials}
               </div>
             </div>
@@ -133,8 +133,8 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
               </div>
 
               {/* User Greeting (Mobile) */}
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-150">
-                <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-xs font-bold text-blue-750">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="w-8 h-8 rounded-full bg-brand-50 border border-brand-200 flex items-center justify-center text-xs font-bold text-brand-700">
                   {initials}
                 </div>
                 <div className="min-w-0">
@@ -153,7 +153,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                       href={item.href}
                       className={cn(
                         "flex items-center justify-between p-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all",
-                        isActive ? "bg-blue-50 text-blue-600 border border-blue-150" : "text-slate-600 hover:bg-slate-50"
+                        isActive ? "bg-brand-50 text-brand-600 border border-brand-200" : "text-slate-600 hover:bg-slate-50"
                       )}
                     >
                       <span className="flex items-center gap-2.5">
@@ -170,7 +170,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
             {/* Logout button */}
             <button 
               onClick={handleSignOut}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-red-50 hover:bg-red-100 border border-red-150 text-red-600 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
               Cerrar Sesión
@@ -183,9 +183,9 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
       <footer className="py-8 border-t border-slate-200 bg-white text-center text-xs text-slate-500 font-medium">
         <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap gap-4">
-            <Link href="/legal?type=terms" className="hover:text-blue-600">Términos y Condiciones</Link>
-            <Link href="/legal?type=privacy" className="hover:text-blue-600">Privacidad</Link>
-            <Link href="/legal?type=support" className="hover:text-blue-600">Soporte</Link>
+            <Link href="/legal?type=terms" className="hover:text-brand-600">Términos y Condiciones</Link>
+            <Link href="/legal?type=privacy" className="hover:text-brand-600">Privacidad</Link>
+            <Link href="/legal?type=support" className="hover:text-brand-600">Soporte</Link>
           </div>
           <p>Alimin Cobranzas v2.1.0 • © 2024 Todos los derechos reservados</p>
         </div>

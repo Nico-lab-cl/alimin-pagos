@@ -84,25 +84,25 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
     }
   };
 
-  const inputCls = "w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-accent outline-none font-bold placeholder:text-white/15";
-  const labelCls = "block text-[9px] text-white/40 uppercase font-black tracking-widest mb-1.5";
+  const inputCls = "w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-sm text-[#191c1e] focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none transition-all font-medium placeholder:text-[#64748B]/40";
+  const labelCls = "block text-[10px] text-[#64748B] uppercase font-bold tracking-wider mb-1.5";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in" onClick={onClose}>
-      <div className="bg-[#050C0C] border border-white/10 rounded-[2.5rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl animate-slide-up" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-[#050C0C]/90 backdrop-blur px-8 py-6 border-b border-white/5 flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-white px-6 sm:px-8 py-5 border-b border-[#E2E8F0] flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-              <UserPlus className="w-6 h-6 text-amber-400" />
+            <div className="w-11 h-11 rounded-xl bg-brand-50 border border-brand-200 flex items-center justify-center">
+              <UserPlus className="w-5 h-5 text-brand-600" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-white italic tracking-tighter uppercase">Asignar Dueño</h2>
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">Lote #{lot.number} {lot.stage ? `- ${lot.stage}` : ''}</p>
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Asignar Dueño</h2>
+              <p className="text-xs font-medium text-[#64748B] mt-0.5">Lote #{lot.number} {lot.stage ? `- ${lot.stage}` : ''}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-red-500/10 hover:text-red-400 transition-all">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all cursor-pointer">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -111,7 +111,7 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
           
           {/* Left Column: Personal Data */}
           <div className="space-y-6">
-            <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><UserPlus className="w-3 h-3"/> Datos Personales</h3>
+            <h3 className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider flex items-center gap-2"><UserPlus className="w-3 h-3"/> Datos Personales</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 sm:col-span-1">
@@ -136,7 +136,7 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
               </div>
             </div>
 
-            <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2 pt-4 border-t border-white/5"><Briefcase className="w-3 h-3"/> Detalles Adicionales</h3>
+            <h3 className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider flex items-center gap-2 pt-4 border-t border-[#E2E8F0]"><Briefcase className="w-3 h-3"/> Detalles Adicionales</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Estado Civil</label>
@@ -156,7 +156,7 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
               </div>
             </div>
 
-            <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2 pt-4 border-t border-white/5"><MapPin className="w-3 h-3"/> Dirección</h3>
+            <h3 className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider flex items-center gap-2 pt-4 border-t border-[#E2E8F0]"><MapPin className="w-3 h-3"/> Dirección</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 sm:col-span-1">
                 <label className={labelCls}>Calle</label>
@@ -179,9 +179,9 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
 
           {/* Right Column: Financial Data */}
           <div className="space-y-6">
-            <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2"><FileText className="w-3 h-3"/> Datos Financieros y Cuotas</h3>
+            <h3 className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider flex items-center gap-2"><FileText className="w-3 h-3"/> Datos Financieros y Cuotas</h3>
             
-            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4">
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Valor PIE Pagado</label>
@@ -214,7 +214,7 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
               </div>
             </div>
 
-            <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] flex items-center gap-2 pt-4 border-t border-white/5"><Hash className="w-3 h-3"/> Configuración de Mora</h3>
+            <h3 className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider flex items-center gap-2 pt-4 border-t border-[#E2E8F0]"><Hash className="w-3 h-3"/> Configuración de Mora</h3>
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className={labelCls}>Día de Vencimiento</label>
@@ -230,13 +230,13 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
               </div>
             </div>
 
-            <div className="space-y-3 pt-4 border-t border-white/5">
+            <div className="space-y-3 pt-4 border-t border-[#E2E8F0]">
               <label className={labelCls}>Observaciones Iniciales</label>
-              <textarea 
-                value={form.observation} 
-                onChange={e => set("observation", e.target.value)} 
+              <textarea
+                value={form.observation}
+                onChange={e => set("observation", e.target.value)}
                 placeholder="Condiciones especiales, al contado, etc."
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-accent outline-none font-bold min-h-[100px] resize-none placeholder:text-white/15"
+                className="w-full bg-white border border-[#E2E8F0] rounded-lg px-3 py-2 text-sm text-[#191c1e] focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none transition-all font-medium min-h-[100px] resize-none placeholder:text-[#64748B]/40"
               />
             </div>
           </div>
@@ -245,21 +245,21 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
         {/* Error */}
         {error && (
           <div className="px-8 pb-4">
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-xl">
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-lg">
               {error}
             </div>
           </div>
         )}
 
         {/* Footer */}
-        <div className="px-8 py-6 border-t border-white/5 flex gap-3">
-          <button onClick={onClose} className="flex-1 px-4 py-4 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/60 hover:bg-white/5 transition-colors">
+        <div className="px-6 sm:px-8 py-5 border-t border-[#E2E8F0] bg-slate-50 flex gap-3">
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-lg bg-white border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-sm">
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="flex-[2] px-4 py-4 rounded-xl btn-metallic-gold text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(212,168,75,0.3)] disabled:opacity-50"
+            className="flex-[2] px-4 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
             Guardar y Asignar Dueño

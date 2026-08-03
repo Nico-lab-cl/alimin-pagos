@@ -68,7 +68,7 @@ export default function ChangePasswordPage() {
         <div className="text-center mb-10">
           <div className="inline-flex relative mb-6">
             <div className="absolute inset-0 bg-accent/20 rounded-2xl blur-xl animate-pulse" />
-            <div className="relative w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-[0_10px_30px_rgba(212,168,75,0.2)]">
+            <div className="relative w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-[0_10px_30px_rgba(75,166,70,0.2)]">
               <ShieldCheck className="w-8 h-8 text-accent" />
             </div>
           </div>
@@ -164,7 +164,7 @@ export default function ChangePasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-metallic-gold w-full py-5 rounded-2xl flex items-center justify-center gap-3 group/btn active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+                className="btn-brand w-full py-5 rounded-2xl flex items-center justify-center gap-3 group/btn active:scale-95 disabled:opacity-50 disabled:active:scale-100"
               >
                 {loading ? (
                   <>

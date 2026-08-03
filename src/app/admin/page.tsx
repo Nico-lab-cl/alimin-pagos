@@ -84,7 +84,7 @@ export default function AdminDashboard() {
   if (loading && !data) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Analizando Cartera...</p>
       </div>
     );
@@ -247,7 +247,7 @@ export default function AdminDashboard() {
                   className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
                   title="Volver a filtro mensual"
                 >
-                  <Calendar className="w-4 h-4 text-blue-600 animate-pulse" />
+                  <Calendar className="w-4 h-4 text-brand-600 animate-pulse" />
                 </button>
                 <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
                   <input
@@ -272,7 +272,7 @@ export default function AdminDashboard() {
                   className="hover:bg-slate-50 p-0.5 rounded transition-all cursor-pointer"
                   title="Filtro personalizado por fechas"
                 >
-                  <Calendar className="w-4 h-4 text-slate-400 hover:text-blue-600 transition-colors" />
+                  <Calendar className="w-4 h-4 text-slate-400 hover:text-brand-600 transition-colors" />
                 </button>
                 <select 
                   value={`${filterMonth}-${filterYear}`} 
@@ -304,7 +304,7 @@ export default function AdminDashboard() {
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-bold uppercase tracking-wider outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[180px] shadow-sm focus:border-blue-500"
+            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-bold uppercase tracking-wider outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[180px] shadow-sm focus:border-brand-500"
             style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 0.8rem center", backgroundSize: "0.6rem" }}
           >
             {projects.map((p) => (
@@ -322,7 +322,7 @@ export default function AdminDashboard() {
 
           <Link 
             href="/admin/clients" 
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+            className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             Nuevo Pago
@@ -351,7 +351,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Actividad Reciente de Cartera Card */}
-      <div className="rounded-2xl bg-white border border-slate-150/80 shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <div>
             <h3 className="text-lg font-bold text-slate-800">Actividad Reciente de Cartera</h3>
@@ -382,7 +382,7 @@ export default function AdminDashboard() {
                         setSelectedClientIds(prev => prev.filter(id => !paginatedClients.some((c: any) => c.id === id)));
                       }
                     }}
-                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                    className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 cursor-pointer"
                   />
                 </th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nombre del Cliente</th>
@@ -409,7 +409,7 @@ export default function AdminDashboard() {
                             prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id]
                           );
                         }}
-                        className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                        className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 cursor-pointer"
                       />
                     </td>
                     <td className="px-6 py-4">
@@ -429,7 +429,7 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-3 min-w-[150px]">
                         <div className="h-2 rounded-full bg-slate-100 overflow-hidden flex-1 border border-slate-200/60 p-0.5">
                           <div 
-                            className="h-full bg-blue-600 rounded-full transition-all duration-300" 
+                            className="h-full bg-brand-600 rounded-full transition-all duration-300" 
                             style={{ 
                               width: c.totalCuotas > 0 ? `${(c.paidCuotas / c.totalCuotas) * 100}%` : '0%'
                             }} 
@@ -445,12 +445,12 @@ export default function AdminDashboard() {
                           Mora
                         </span>
                       ) : c.status === "GRACE" ? (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100 flex items-center gap-1.5 w-fit">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 flex items-center gap-1.5 w-fit">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                           Gracia
                         </span>
                       ) : c.status === "CONTADO" ? (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center gap-1.5 w-fit">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5 w-fit">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           Contado
                         </span>
@@ -460,7 +460,7 @@ export default function AdminDashboard() {
                           Congelado
                         </span>
                       ) : (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center gap-1.5 w-fit">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5 w-fit">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           Al Día
                         </span>
@@ -491,7 +491,7 @@ export default function AdminDashboard() {
             <button 
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
               disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-650 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
             >
               Anterior
             </button>
@@ -512,7 +512,7 @@ export default function AdminDashboard() {
             <button 
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
               disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-650 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
             >
               Siguiente
             </button>

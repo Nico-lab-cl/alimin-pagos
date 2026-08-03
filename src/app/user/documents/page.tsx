@@ -36,8 +36,8 @@ export default function UserDocuments() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-450">Sincronizando Archivos...</p>
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Sincronizando Archivos...</p>
       </div>
     );
   }
@@ -74,17 +74,17 @@ export default function UserDocuments() {
       case "CONTRATO":
         return {
           icon: FileText,
-          iconColor: "text-blue-600",
-          bgColor: "bg-blue-50/80 border-blue-100",
-          badgeBg: "bg-blue-50 text-blue-650 border-blue-100",
+          iconColor: "text-brand-600",
+          bgColor: "bg-brand-50/80 border-brand-100",
+          badgeBg: "bg-brand-50 text-brand-600 border-brand-100",
           badgeText: "Contrato",
         };
       case "CERTIFICADO":
         return {
           icon: ShieldCheck,
-          iconColor: "text-[#0f9f6e]",
+          iconColor: "text-brand-600",
           bgColor: "bg-[#f3faf7] border-[#def7ec]",
-          badgeBg: "bg-emerald-50 text-emerald-600 border-emerald-100",
+          badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-100",
           badgeText: "Certificado",
         };
       case "COMPROBANTE":
@@ -92,7 +92,7 @@ export default function UserDocuments() {
           icon: FileBadge, // Receipt-like badge
           iconColor: "text-orange-500",
           bgColor: "bg-orange-50/50 border-orange-100",
-          badgeBg: "bg-orange-50 text-orange-655 border-orange-100",
+          badgeBg: "bg-orange-50 text-orange-700 border-orange-100",
           badgeText: "Comprobante",
         };
       case "FICHA":
@@ -121,7 +121,7 @@ export default function UserDocuments() {
     <div className="space-y-10 max-w-7xl mx-auto">
       {/* Title Header */}
       <div>
-        <h2 className="text-3xl font-extrabold text-blue-800 tracking-tight leading-none mb-2">Mis Documentos</h2>
+        <h2 className="text-3xl font-extrabold text-brand-800 tracking-tight leading-none mb-2">Mis Documentos</h2>
         <p className="text-sm text-slate-500 font-medium">Todos tus documentos en un solo lugar</p>
       </div>
 
@@ -136,7 +136,7 @@ export default function UserDocuments() {
               onClick={() => setActiveCategory(cat)}
               className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${
                 isActive 
-                  ? "bg-blue-600 border-blue-600 text-white shadow-sm" 
+                  ? "bg-brand-600 border-brand-600 text-white shadow-sm" 
                   : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800"
               }`}
             >
@@ -148,10 +148,10 @@ export default function UserDocuments() {
 
       {/* Documents Grid */}
       {filteredDocs.length === 0 ? (
-        <div className="text-center py-24 bg-white border border-slate-150 rounded-3xl shadow-sm">
+        <div className="text-center py-24 bg-white border border-slate-200 rounded-3xl shadow-sm">
           <FileText className="w-16 h-16 mx-auto mb-4 text-slate-300" />
           <h3 className="text-lg font-bold text-slate-700">Sin Documentos</h3>
-          <p className="text-xs text-slate-450 mt-1 max-w-xs mx-auto leading-relaxed">
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
             No se encontraron documentos en esta categoría para tu cuenta.
           </p>
         </div>
@@ -165,7 +165,7 @@ export default function UserDocuments() {
             return (
               <div 
                 key={idx} 
-                className="bg-white border border-slate-150 hover:border-blue-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-all group"
+                className="bg-white border border-slate-200 hover:border-brand-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-all group"
               >
                 {/* Top Section with Center Icon and Badge */}
                 <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -206,7 +206,7 @@ export default function UserDocuments() {
                   
                   <button 
                     onClick={() => downloadDocument(doc.url, doc.name, doc.fileType)}
-                    className="flex-1 h-11 rounded-xl border border-blue-600 hover:bg-blue-50 text-blue-600 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    className="flex-1 h-11 rounded-xl border border-brand-600 hover:bg-brand-50 text-brand-600 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
                     Descargar
@@ -219,9 +219,9 @@ export default function UserDocuments() {
       )}
 
       {/* Proactive Help Message */}
-      <div className="text-center pt-8 border-t border-slate-150 text-sm text-slate-550 font-medium">
+      <div className="text-center pt-8 border-t border-slate-200 text-sm text-slate-500 font-medium">
         Todos tus documentos están disponibles 24/7. Si necesitas algún documento adicional,{" "}
-        <a href="https://wa.me/56912345678" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 font-bold underline">
+        <a href="https://wa.me/56912345678" target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-800 font-bold underline">
           contáctanos.
         </a>
       </div>

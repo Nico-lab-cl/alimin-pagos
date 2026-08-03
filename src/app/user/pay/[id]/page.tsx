@@ -195,32 +195,32 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-450">Preparando Consola de Pago...</p>
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Preparando Consola de Pago...</p>
       </div>
     );
   }
 
   if (!lot) {
     return (
-      <div className="text-center py-40 bg-white border border-slate-150 rounded-3xl max-w-md mx-auto shadow-sm">
+      <div className="text-center py-40 bg-white border border-slate-200 rounded-3xl max-w-md mx-auto shadow-sm">
         <p className="text-slate-400 font-bold uppercase tracking-wider">Lote no encontrado</p>
-        <Link href="/user" className="text-blue-600 font-bold mt-4 inline-block hover:underline">Volver al Portal</Link>
+        <Link href="/user" className="text-brand-600 font-bold mt-4 inline-block hover:underline">Volver al Portal</Link>
       </div>
     );
   }
 
   if (success) {
     return (
-      <div className="max-w-2xl mx-auto py-24 text-center bg-white border border-slate-150 rounded-3xl shadow-sm px-6">
+      <div className="max-w-2xl mx-auto py-24 text-center bg-white border border-slate-200 rounded-3xl shadow-sm px-6">
         <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-8 shadow-sm">
-          <CheckCircle className="w-10 h-10 text-emerald-600" />
+          <CheckCircle className="w-10 h-10 text-emerald-700" />
         </div>
-        <h2 className="text-3xl font-extrabold text-blue-800 tracking-tight mb-4">Comprobante Enviado</h2>
+        <h2 className="text-3xl font-extrabold text-brand-800 tracking-tight mb-4">Comprobante Enviado</h2>
         <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed mb-8">
           Tu comprobante ha sido ingresado al sistema. Revisaremos y confirmaremos tu pago en menos de 24 horas.
         </p>
-        <Link href="/user" className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2 shadow-sm">
+        <Link href="/user" className="px-8 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2 shadow-sm">
           Volver a Mis Activos
           <ArrowRight className="w-4 h-4" />
         </Link>
@@ -271,9 +271,9 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
       </Link>
 
       {/* Property Header Card */}
-      <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 border border-brand-100">
             <HomeIcon className="w-5 h-5" />
           </div>
           <div>
@@ -284,7 +284,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           </div>
         </div>
         <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
-          lot.isUpToDate && !hasMoraOrPenalty ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-655"
+          lot.isUpToDate && !hasMoraOrPenalty ? "bg-emerald-50 text-emerald-700" : "bg-orange-50 text-orange-700"
         }`}>
           <span className={`w-1.5 h-1.5 rounded-full ${lot.isUpToDate && !hasMoraOrPenalty ? "bg-emerald-500" : "bg-orange-500"}`} />
           {lot.isUpToDate && !hasMoraOrPenalty ? "Al día" : "Pago Pendiente"}
@@ -294,7 +294,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
       {hasMoraOrPenalty ? (
         <div className="space-y-6">
           {/* Header titles */}
-          <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <h2 className="text-xl font-bold text-slate-800">Resumen de pago</h2>
             <p className="text-xs text-slate-500 font-semibold mt-1">
               {lot.clientName || "Cliente"} · {overdueCount > 0 ? (overdueCount === 1 ? "1 cuota vencida" : `${overdueCount} cuotas vencidas`) : "Cuotas al día"}{moraHistorica > 0 ? " · Mora pendiente" : ""}
@@ -302,7 +302,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           </div>
 
           {/* Cuotas Selector Dropdown */}
-          <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-2">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
             <label htmlFor="cuotasSelect" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
               Selecciona cuántas cuotas pagar{overdueCount > 0 ? ` (mínimo ${overdueCount} vencida${overdueCount > 1 ? 's' : ''})` : ''}
             </label>
@@ -311,7 +311,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 id="cuotasSelect"
                 value={installmentsCount}
                 onChange={(e) => { setInstallmentsCount(Number(e.target.value)); setCarouselStartIndex(0); setActiveIdx(0); setShowingTotal(false); }}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 focus:outline-none cursor-pointer appearance-none"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 font-bold focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none cursor-pointer appearance-none"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                   backgroundRepeat: "no-repeat",
@@ -349,7 +349,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             {/* Grid container for Carousel + Pinned Suma Total */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
               {/* Carousel on Left (9/12 cols) */}
-              <div className="lg:col-span-9 relative flex items-center group bg-slate-50 border border-slate-150 rounded-2xl p-2 min-h-[135px]">
+              <div className="lg:col-span-9 relative flex items-center group bg-slate-50 border border-slate-200 rounded-2xl p-2 min-h-[135px]">
                 {/* Carousel wrapper with overflow-hidden */}
                 <div className="overflow-hidden w-full py-1 px-1">
                   <div 
@@ -374,9 +374,9 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                               setActiveIdx(idx);
                             }}
                             className={cn(
-                              "bg-white border rounded-2xl p-4 cursor-pointer transition-all hover:border-slate-350 shadow-sm flex flex-col justify-between h-full min-h-[110px] select-none",
+                              "bg-white border rounded-2xl p-4 cursor-pointer transition-all hover:border-slate-300 shadow-sm flex flex-col justify-between h-full min-h-[110px] select-none",
                               isActive 
-                                ? "border-emerald-500 ring-2 ring-emerald-500/20" 
+                                ? "border-brand-500 ring-2 ring-brand-500/20"
                                 : "border-slate-200"
                             )}
                           >
@@ -384,7 +384,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                                 Cuota {cuota.number} de {lot.totalCuotas}
                               </p>
-                              <p className="text-lg font-bold text-slate-850 mt-1">
+                              <p className="text-lg font-bold text-slate-800 mt-1">
                                 {formatCLP(cuota.baseAmount || cuota.amount)}
                               </p>
                             </div>
@@ -393,7 +393,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                                 Vence {formatDateMockup(cuota.interestStartDate || cuota.dueDate)}
                               </p>
                               {cuota.lateDays >= 90 ? (
-                                <span className="bg-red-50 text-red-750 text-[9px] font-extrabold px-2 py-0.5 rounded-md border border-red-100 uppercase tracking-wider">
+                                <span className="bg-red-50 text-red-700 text-[9px] font-extrabold px-2 py-0.5 rounded-md border border-red-100 uppercase tracking-wider">
                                   +90 días
                                 </span>
                               ) : isOverdue ? (
@@ -441,21 +441,21 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 <div
                   onClick={() => setShowingTotal(true)}
                   className={cn(
-                    "w-full bg-white border rounded-2xl p-4 cursor-pointer transition-all hover:border-slate-350 shadow-sm flex flex-col justify-between h-full min-h-[110px] select-none",
+                    "w-full bg-white border rounded-2xl p-4 cursor-pointer transition-all hover:border-slate-300 shadow-sm flex flex-col justify-between h-full min-h-[110px] select-none",
                     showingTotal 
-                      ? "border-blue-600 ring-2 ring-blue-600/20" 
+                      ? "border-brand-600 ring-2 ring-brand-600/20" 
                       : "border-slate-200"
                   )}
                 >
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Suma total</p>
-                    <p className="text-lg font-bold text-emerald-650 mt-1">{formatCLP(totalAmount)}</p>
+                    <p className="text-lg font-bold text-emerald-700 mt-1">{formatCLP(totalAmount)}</p>
                   </div>
                   <div className="mt-2 pt-1">
-                    <p className="text-[10px] font-bold text-slate-450 leading-snug">
+                    <p className="text-[10px] font-bold text-slate-400 leading-snug">
                       {realCuotasForCards.length === 1 ? "1 cuota" : `${realCuotasForCards.length} cuotas`} + mora {moraHistorica > 0 ? "+ histórica" : ""}
                     </p>
-                    <span className="inline-block mt-1 bg-blue-50 text-blue-700 text-[9px] font-extrabold px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-wider">
+                    <span className="inline-block mt-1 bg-brand-50 text-brand-700 text-[9px] font-extrabold px-2 py-0.5 rounded-md border border-brand-100 uppercase tracking-wider">
                       Ver desglose
                     </span>
                   </div>
@@ -497,7 +497,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <p className="text-sm font-bold text-slate-800">Cuota #{c.number} — detalle de cobro</p>
                           {c.lateDays >= 90 ? (
-                            <span className="bg-red-50 text-red-750 text-[9px] font-bold px-2 py-0.5 rounded-md border border-red-100 uppercase tracking-wider">
+                            <span className="bg-red-50 text-red-700 text-[9px] font-bold px-2 py-0.5 rounded-md border border-red-100 uppercase tracking-wider">
                               +90 días
                             </span>
                           ) : c.lateDays > 0 ? (
@@ -522,7 +522,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                           </div>
                           <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Días de atraso</span>
-                            <p className={cn("text-sm font-extrabold mt-0.5", c.lateDays > 0 ? "text-orange-655" : "text-slate-800")}>
+                            <p className={cn("text-sm font-extrabold mt-0.5", c.lateDays > 0 ? "text-orange-700" : "text-slate-800")}>
                               {c.lateDays || 0} días
                             </p>
                           </div>
@@ -541,17 +541,17 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                           </div>
                           <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
                             <span>Interés mora ({c.lateDays || 0} días × {formatCLP(c.dailyPenalty || lot.dailyPenalty || 1500)})</span>
-                            <span className="text-red-655 font-extrabold">{formatCLP(c.penaltyAmount || 0)}</span>
+                            <span className="text-red-600 font-extrabold">{formatCLP(c.penaltyAmount || 0)}</span>
                           </div>
                           {c.moraCredit > 0 && (
-                            <div className="flex justify-between items-center text-xs font-semibold text-emerald-600">
+                            <div className="flex justify-between items-center text-xs font-semibold text-emerald-700">
                               <span>Abono a intereses ya aplicado</span>
                               <span className="font-extrabold">-{formatCLP(c.moraCredit)}</span>
                             </div>
                           )}
                           <div className="flex justify-between items-center text-xs font-bold text-slate-700 pt-3 border-t border-slate-50">
                             <span>Total cuota #{c.number}</span>
-                            <span className="text-red-655 text-sm font-extrabold">{formatCLP((c.baseAmount || c.amount) + (c.penaltyAmount || 0))}</span>
+                            <span className="text-red-600 text-sm font-extrabold">{formatCLP((c.baseAmount || c.amount) + (c.penaltyAmount || 0))}</span>
                           </div>
                         </div>
                       </div>
@@ -562,7 +562,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                   <div className="space-y-4">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <p className="text-sm font-bold text-slate-800">Desglose total a pagar</p>
-                      <span className="bg-blue-50 text-blue-700 text-[9px] font-bold px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-wider">
+                      <span className="bg-brand-50 text-brand-700 text-[9px] font-bold px-2 py-0.5 rounded-md border border-brand-100 uppercase tracking-wider">
                         {realCuotasForCards.length === 1 ? "1 cuota" : `${realCuotasForCards.length} cuotas`}
                       </span>
                     </div>
@@ -576,7 +576,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                             <span className="text-slate-800 font-extrabold">{formatCLP(c.baseAmount || c.amount)}</span>
                           </div>
                         ))}
-                        <div className="flex justify-between items-center text-xs font-bold text-slate-805 pt-2 border-t border-slate-100">
+                        <div className="flex justify-between items-center text-xs font-bold text-slate-800 pt-2 border-t border-slate-100">
                           <span>Subtotal cuotas</span>
                           <span className="font-extrabold">{formatCLP(cuotasBaseSum)}</span>
                         </div>
@@ -590,12 +590,12 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                           {realCuotasForCards.filter((c: any) => c.penaltyAmount > 0).map((c: any) => (
                             <div key={c.number} className="flex justify-between items-center text-xs font-semibold text-slate-500">
                               <span>Mora cuota #{c.number} ({c.lateDays} días)</span>
-                              <span className="text-red-655 font-extrabold">{formatCLP(c.penaltyAmount)}</span>
+                              <span className="text-red-600 font-extrabold">{formatCLP(c.penaltyAmount)}</span>
                             </div>
                           ))}
-                          <div className="flex justify-between items-center text-xs font-bold text-slate-805 pt-2 border-t border-slate-100">
+                          <div className="flex justify-between items-center text-xs font-bold text-slate-800 pt-2 border-t border-slate-100">
                             <span>Subtotal mora cuotas</span>
-                            <span className="text-red-655 font-extrabold">{formatCLP(totalMoraCuotas)}</span>
+                            <span className="text-red-600 font-extrabold">{formatCLP(totalMoraCuotas)}</span>
                           </div>
                         </div>
                       </div>
@@ -606,7 +606,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Mora histórica</span>
                         <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
                           <span>Intereses anteriores acumulados</span>
-                          <span className="text-red-655 font-extrabold">{formatCLP(moraHistorica)}</span>
+                          <span className="text-red-600 font-extrabold">{formatCLP(moraHistorica)}</span>
                         </div>
                       </div>
                     )}
@@ -614,7 +614,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                     <hr className="border-slate-100 my-4" />
                     <div className="flex justify-between items-center pt-1">
                       <span className="text-sm font-bold text-slate-800">Total a pagar</span>
-                      <span className="text-xl font-extrabold text-emerald-650">{formatCLP(totalAmount)}</span>
+                      <span className="text-xl font-extrabold text-emerald-700">{formatCLP(totalAmount)}</span>
                     </div>
                   </div>
                 )}
@@ -640,16 +640,16 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 </div>
                 <div className="border-l border-slate-200 pl-4">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Total a pagar</p>
-                  <p className="text-lg font-black text-emerald-600 mt-0.5">{formatCLP(totalAmount)}</p>
+                  <p className="text-lg font-black text-emerald-700 mt-0.5">{formatCLP(totalAmount)}</p>
                 </div>
               </div>
               
-              <p className="text-[10px] text-slate-450 text-center font-bold">
+              <p className="text-[10px] text-slate-400 text-center font-bold">
                 Haz clic en una cuota para ver su detalle · Haz clic en "Suma total" para el desglose completo
               </p>
 
               {/* Bank Transfer Box */}
-              <div className="bg-[#f0f7ff]/40 border border-blue-100 rounded-2xl p-5 space-y-4">
+              <div className="bg-brand-50/40 border border-brand-100 rounded-2xl p-5 space-y-4">
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Realiza tu transferencia a estos datos</h4>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -668,7 +668,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                       <button
                         type="button"
                         onClick={() => handleCopy(item.value, item.label)}
-                        className="w-9 h-9 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-150 flex items-center justify-center text-slate-400 hover:text-slate-655 transition-all cursor-pointer"
+                        className="w-9 h-9 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
                         title="Copiar"
                       >
                         <Copy className="w-4 h-4" />
@@ -677,7 +677,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                   ))}
                 </div>
 
-                <div className="text-xs font-bold text-blue-650 flex items-center gap-1.5 pl-1">
+                <div className="text-xs font-bold text-brand-600 flex items-center gap-1.5 pl-1">
                   <span>ℹ</span>
                   <span>Transfiere exactamente el monto indicado para facilitar la conciliación</span>
                 </div>
@@ -700,15 +700,15 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                     onDrop={handleDrop}
                     className={`
                       flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 bg-white
-                      ${receiptBase64 ? 'border-blue-600' : 'border-slate-200 hover:border-blue-300'}
-                      ${dragActive ? 'border-blue-600 bg-blue-50/5' : ''}
+                      ${receiptBase64 ? 'border-brand-600' : 'border-slate-200 hover:border-brand-300'}
+                      ${dragActive ? 'border-brand-600 bg-brand-50/5' : ''}
                     `}
                   >
                     <label htmlFor="receipt" className="w-full h-full flex flex-col items-center justify-center cursor-pointer">
                       {receiptBase64 ? (
                         <div className="text-center animate-fade-in">
-                          <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4 border border-emerald-250">
-                            <FileCheck className="w-7 h-7 text-emerald-600" />
+                          <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4 border border-emerald-200">
+                            <FileCheck className="w-7 h-7 text-emerald-700" />
                           </div>
                           <p className="text-xs font-bold text-slate-700">Comprobante Cargado</p>
                           <p className="text-[10px] text-slate-400 mt-1 font-medium">(Haz clic o arrastra para reemplazar)</p>
@@ -732,7 +732,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                   className={`
                     w-full py-4 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-sm
                     ${receiptBase64 
-                      ? 'bg-blue-600 hover:bg-blue-700 active:scale-[0.99] cursor-pointer' 
+                      ? 'bg-brand-600 hover:bg-brand-700 active:scale-[0.99] cursor-pointer' 
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed'}
                   `}
                 >
@@ -757,19 +757,19 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               {/* Legal Info Box */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-xs uppercase tracking-wider">
-                  <ShieldAlert className="w-4 h-4 text-blue-600" />
+                  <ShieldAlert className="w-4 h-4 text-brand-600" />
                   <span>Aspectos Legales Importantes</span>
                 </div>
                 
                 <div className="space-y-3.5 text-xs text-slate-600 leading-relaxed font-semibold">
-                  <div className="bg-white p-4 rounded-xl border border-slate-150 space-y-1.5 shadow-sm">
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1.5 shadow-sm">
                     <h4 className="font-extrabold text-slate-800">Artículo 1559 del Código Civil: Intereses moratorios</h4>
                     <p className="font-medium text-slate-500">
                       Establece que los intereses moratorios siguen corriendo hasta el pago íntegro de la obligación. Si el pago no incluye los intereses, la obligación no está extinguida y los intereses continuúan devengándose.
                     </p>
                   </div>
 
-                  <div className="bg-white p-4 rounded-xl border border-slate-150 space-y-1.5 shadow-sm">
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1.5 shadow-sm">
                     <h4 className="font-extrabold text-slate-800">Artículo 1595 del Código Civil: Imputación del pago</h4>
                     <p className="font-medium text-slate-500">
                       Cuando hay capital e intereses, el pago se imputa primero a los intereses y luego al capital. Esto significa que si alguien paga solo la cuota sin los intereses, está cubriendo los intereses.
@@ -784,7 +784,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
         /* Original Single Column Flow for No Mora (centered in max-w-4xl) */
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Selector */}
-          <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <div>
               <label htmlFor="installmentsSelect" className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
                 Selecciona la cantidad de cuotas a pagar:
@@ -794,7 +794,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                   id="installmentsSelect"
                   value={installmentsCount}
                   onChange={(e) => setInstallmentsCount(Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 focus:outline-none cursor-pointer appearance-none"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 font-bold focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none cursor-pointer appearance-none"
                   style={{
                     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                     backgroundRepeat: "no-repeat",
@@ -826,7 +826,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           </div>
 
           {/* Summary Box */}
-          <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-3">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
             {/* Selected Real Cuotas */}
             {selectedInstallments.filter((c: any) => c.number > 0).map((cuota: any, idx: number) => (
               <div key={idx} className="flex justify-between text-xs font-medium text-slate-500">
@@ -844,12 +844,12 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             
             <div className="pt-3 border-t border-slate-100 flex justify-between items-center font-bold">
               <span className="text-xs text-slate-700">TOTAL A PAGAR</span>
-              <span className="text-lg text-blue-700 font-extrabold tracking-tight">{formatCLP(totalAmount)}</span>
+              <span className="text-lg text-brand-700 font-extrabold tracking-tight">{formatCLP(totalAmount)}</span>
             </div>
           </div>
 
           {/* Bank Transfer Box */}
-          <div className="bg-[#f0f7ff]/40 border border-blue-100 rounded-2xl p-5 space-y-4">
+          <div className="bg-brand-50/40 border border-brand-100 rounded-2xl p-5 space-y-4">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Realiza tu transferencia a estos datos</h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -860,7 +860,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 { label: "NOMBRE", value: bankHolder, wide: false },
                 { label: "CORREO", value: bankEmail, wide: true }
               ].map((item, i) => (
-                <div key={i} className={`bg-white border border-slate-150 rounded-xl p-4 flex items-center justify-between shadow-sm${item.wide ? " md:col-span-2" : ""}`}>
+                <div key={i} className={`bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm${item.wide ? " md:col-span-2" : ""}`}>
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{item.label}</span>
                     <p className="text-sm font-bold text-slate-800 mt-0.5">{item.value}</p>
@@ -868,7 +868,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                   <button
                     type="button"
                     onClick={() => handleCopy(item.value, item.label)}
-                    className="w-9 h-9 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-150 flex items-center justify-center text-slate-400 hover:text-slate-650 transition-all cursor-pointer"
+                    className="w-9 h-9 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
                     title="Copiar"
                   >
                     <Copy className="w-4 h-4" />
@@ -877,7 +877,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               ))}
             </div>
 
-            <div className="text-xs font-bold text-blue-650 flex items-center gap-1.5 pl-1">
+            <div className="text-xs font-bold text-brand-600 flex items-center gap-1.5 pl-1">
               <span>ℹ</span>
               <span>Transfiere exactamente el monto indicado para facilitar la conciliación</span>
             </div>
@@ -900,15 +900,15 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 onDrop={handleDrop}
                 className={`
                   flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 bg-white
-                  ${receiptBase64 ? 'border-blue-600' : 'border-slate-200 hover:border-blue-300'}
-                  ${dragActive ? 'border-blue-600 bg-blue-50/5' : ''}
+                  ${receiptBase64 ? 'border-brand-600' : 'border-slate-200 hover:border-brand-300'}
+                  ${dragActive ? 'border-brand-600 bg-brand-50/5' : ''}
                 `}
               >
                 <label htmlFor="receipt" className="w-full h-full flex flex-col items-center justify-center cursor-pointer">
                   {receiptBase64 ? (
                     <div className="text-center animate-fade-in">
-                      <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4 border border-emerald-250">
-                        <FileCheck className="w-7 h-7 text-emerald-600" />
+                      <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4 border border-emerald-200">
+                        <FileCheck className="w-7 h-7 text-emerald-700" />
                       </div>
                       <p className="text-xs font-bold text-slate-700">Comprobante Cargado</p>
                       <p className="text-[10px] text-slate-400 mt-1 font-medium">(Haz clic o arrastra para reemplazar)</p>
@@ -932,7 +932,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               className={`
                 w-full py-4 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-sm
                 ${receiptBase64 
-                  ? 'bg-blue-600 hover:bg-blue-700 active:scale-[0.99] cursor-pointer' 
+                  ? 'bg-brand-600 hover:bg-brand-700 active:scale-[0.99] cursor-pointer' 
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed'}
               `}
             >
@@ -947,7 +947,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             </button>
           </form>
 
-          <p className="text-[10px] text-slate-450 font-bold text-center uppercase tracking-wide">
+          <p className="text-[10px] text-slate-400 font-bold text-center uppercase tracking-wide">
             🕒 El equipo revisará y confirmará tu pago en menos de 24 horas
           </p>
         </div>

@@ -648,7 +648,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
         description: `Contrato firmado. Inicio del plan de pagos. Responsable: ${resp.name}.`,
         date: selectedClient.created_at,
         icon: FileText,
-        iconBg: "bg-slate-55 text-slate-500 border border-slate-200/50",
+        iconBg: "bg-slate-50 text-slate-500 border border-slate-200/50",
         author: resp.name
       });
     }
@@ -662,7 +662,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
         description: `${item.description}. Monto: ${formatCLP(item.amount_clp)}.`,
         date: item.paid_at,
         icon: CheckCircle2,
-        iconBg: "bg-emerald-50 text-emerald-600 border border-emerald-100",
+        iconBg: "bg-emerald-50 text-emerald-700 border border-emerald-100",
         author: "Postventa Alimin",
         ledgerItem: item
       });
@@ -671,20 +671,20 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     // Notes
     notesList.forEach(note => {
       let icon = MessageSquare;
-      let bg = "bg-blue-50 text-blue-600 border border-blue-100";
+      let bg = "bg-brand-50 text-brand-600 border border-brand-100";
       let badge = "NOTA INTERNA";
       
       if (note.type === "Seguimiento telefónico") {
         icon = Phone;
-        bg = "bg-blue-50 text-blue-600 border border-blue-150";
+        bg = "bg-brand-50 text-brand-600 border border-brand-200";
         badge = "COMUNICACIÓN";
       } else if (note.type === "Observación") {
         icon = Mail;
-        bg = "bg-blue-50 text-blue-600 border border-blue-150";
+        bg = "bg-brand-50 text-brand-600 border border-brand-200";
         badge = "COMUNICACIÓN";
       } else if (note.type === "Alerta") {
         icon = AlertTriangle;
-        bg = "bg-amber-50 text-amber-600 border border-amber-100";
+        bg = "bg-amber-50 text-amber-700 border border-amber-100";
         badge = "ALERTA";
       } else if (note.type === "Registro") {
         icon = History;
@@ -724,7 +724,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
   const getStatusBadge = (status: string) => {
     if (status === "LATE") {
       return (
-        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-650 border border-red-150 flex items-center gap-1">
+        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 flex items-center gap-1">
           <span className="w-1 h-1 rounded-full bg-red-500" />
           MORA DETECTADA
         </span>
@@ -732,7 +732,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     }
     if (status === "GRACE") {
       return (
-        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-150 flex items-center gap-1">
+        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
           <span className="w-1 h-1 rounded-full bg-amber-500" />
           EN GRACIA
         </span>
@@ -740,7 +740,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     }
     if (status === "CONTADO") {
       return (
-        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-150 flex items-center gap-1">
+        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
           <span className="w-1 h-1 rounded-full bg-emerald-500" />
           AL CONTADO
         </span>
@@ -755,7 +755,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       );
     }
     return (
-      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-150 flex items-center gap-1">
+      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
         <span className="w-1 h-1 rounded-full bg-emerald-500" />
         CONTRATO ACTIVO
       </span>
@@ -773,7 +773,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       );
     }
     return (
-      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100 inline-flex items-center gap-1.5">
+      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-brand-50 text-brand-600 border border-brand-100 inline-flex items-center gap-1.5">
         <UserCheck className="w-3 h-3" />
         ASESOR: {advisor.toUpperCase()}
       </span>
@@ -805,20 +805,20 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
         <div className="flex items-center gap-4">
           <button 
             onClick={onBack}
-            className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-850 transition-colors shadow-sm cursor-pointer"
+            className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-800 transition-colors shadow-sm cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
             <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">
               <span>Clientes</span>
-              <ChevronRight className="w-3 h-3 text-slate-350" />
+              <ChevronRight className="w-3 h-3 text-slate-300" />
               <span>{selectedClient.clientName}</span>
-              <ChevronRight className="w-3 h-3 text-slate-350" />
+              <ChevronRight className="w-3 h-3 text-slate-300" />
               <span className="text-slate-500">{getLotReference()}</span>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl font-bold text-slate-850 tracking-tight leading-none">{selectedClient.clientName}</h2>
+              <h2 className="text-2xl font-bold text-slate-800 tracking-tight leading-none">{selectedClient.clientName}</h2>
               {getStatusBadge(selectedClient.status)}
               <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 border border-slate-200 text-slate-500 tracking-wider">
                 {getProjectName().toUpperCase()}
@@ -831,7 +831,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
         <div className="flex flex-wrap items-center gap-2">
           <button 
             onClick={() => setShowPOV(true)}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
           >
             <Eye className="w-3.5 h-3.5" />
             Vista Cliente
@@ -839,7 +839,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
           <button 
             onClick={() => setShowPaymentModal(true)}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             Registrar Pago
@@ -861,8 +861,8 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             className={cn(
               "px-4 py-2 rounded-xl text-xs font-bold border transition-all shadow-sm flex items-center gap-1.5 cursor-pointer",
               isFrozen 
-                ? "bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100" 
-                : "bg-white border-slate-200 text-slate-650 hover:bg-slate-50"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" 
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
             )}
           >
             <ShieldAlert className="w-3.5 h-3.5" />
@@ -871,7 +871,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           
           <button 
             onClick={() => toast.info("Exportación de ficha disponible próximamente")}
-            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             Exportar Ficha
@@ -886,7 +886,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             onClick={() => setActiveTab("GENERAL")}
             className={cn(
               "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
-              activeTab === "GENERAL" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
+              activeTab === "GENERAL" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-800"
             )}
           >
             Datos Generales
@@ -895,7 +895,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             onClick={() => setActiveTab("FINANCES")}
             className={cn(
               "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
-              activeTab === "FINANCES" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
+              activeTab === "FINANCES" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-800"
             )}
           >
             Finanzas y Mora
@@ -904,7 +904,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             onClick={() => setActiveTab("LOG")}
             className={cn(
               "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
-              activeTab === "LOG" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
+              activeTab === "LOG" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-800"
             )}
           >
             Bitácora
@@ -912,7 +912,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
         </div>
 
         {isFrozen && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-250 text-slate-500 text-[10px] font-bold tracking-wider -mt-3 flex-shrink-0 shadow-sm">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 text-[10px] font-bold tracking-wider -mt-3 flex-shrink-0 shadow-sm">
             <Lock className="w-3 h-3 text-slate-400" />
             <span>MORA CONGELADA</span>
           </div>
@@ -925,7 +925,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           {/* Left Side: Client Info & Documents */}
           <div className="lg:col-span-2 space-y-6">
             {/* Información del Cliente Card */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-6">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3">
                   <User className="w-4.5 h-4.5 text-slate-400" />
@@ -934,7 +934,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 {!isEditingProfile ? (
                   <button
                     onClick={() => setIsEditingProfile(true)}
-                    className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                    className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors cursor-pointer"
                   >
                     Editar
                   </button>
@@ -943,7 +943,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     <button
                       onClick={handleSaveProfile}
                       disabled={loading}
-                      className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       {loading && <Loader2 className="w-3 h-3 animate-spin" />}
                       Guardar
@@ -987,7 +987,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   </div>
                   <div>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email</p>
-                    <p className="font-semibold text-blue-600 underline truncate select-all">{selectedClient.clientEmail}</p>
+                    <p className="font-semibold text-brand-600 underline truncate select-all">{selectedClient.clientEmail}</p>
                   </div>
                   <div>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Teléfono</p>
@@ -1019,15 +1019,15 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       <div className="flex items-center gap-2">
                         {currentAdvisor ? (
                           <span className="font-bold text-slate-800 inline-flex items-center gap-1.5">
-                            <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                            <UserCheck className="w-3.5 h-3.5 text-brand-600" />
                             {currentAdvisor}
                           </span>
                         ) : (
-                          <span className="font-bold text-slate-450">Sin asignar</span>
+                          <span className="font-bold text-slate-400">Sin asignar</span>
                         )}
                         <button
                           onClick={() => setIsEditingAdvisor(true)}
-                          className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md border border-blue-200 transition-colors cursor-pointer inline-flex items-center gap-1"
+                          className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-md border border-brand-200 transition-colors cursor-pointer inline-flex items-center gap-1"
                         >
                           <Pencil className="w-2.5 h-2.5" />
                           {currentAdvisor ? "Cambiar" : "Asignar"}
@@ -1049,7 +1049,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                             setIsCustomAdvisor(false);
                             handleSaveAdvisor(value);
                           }}
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:border-brand-500 outline-none cursor-pointer disabled:opacity-50"
                         >
                           <option value="">Sin asignar</option>
                           {advisorOptions.map((a) => (
@@ -1069,12 +1069,12 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                                 if (e.key === "Enter" && newAdvisorName.trim()) handleSaveAdvisor(newAdvisorName);
                               }}
                               placeholder="Nombre del nuevo asesor"
-                              className="flex-1 bg-white border border-blue-200 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-450 focus:border-blue-500 outline-none"
+                              className="flex-1 bg-white border border-brand-200 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-brand-500 outline-none"
                             />
                             <button
                               onClick={() => handleSaveAdvisor(newAdvisorName)}
                               disabled={!newAdvisorName.trim() || savingAdvisor}
-                              className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                              className="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
                             >
                               Guardar
                             </button>
@@ -1082,7 +1082,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                         )}
 
                         <div className="flex items-center gap-2">
-                          {savingAdvisor && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
+                          {savingAdvisor && <Loader2 className="w-3 h-3 animate-spin text-brand-600" />}
                           <button
                             onClick={() => {
                               setIsEditingAdvisor(false);
@@ -1090,7 +1090,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                               setNewAdvisorName("");
                             }}
                             disabled={savingAdvisor}
-                            className="text-[9px] font-bold uppercase tracking-wider text-slate-450 hover:text-slate-600 transition-colors cursor-pointer"
+                            className="text-[9px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                           >
                             Cancelar
                           </button>
@@ -1111,7 +1111,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.rut}
                       onChange={(e) => setProfileForm({ ...profileForm, rut: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1120,7 +1120,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.name}
                       onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                       required
                     />
                   </div>
@@ -1130,7 +1130,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="email"
                       value={profileForm.email}
                       onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                       required
                     />
                   </div>
@@ -1140,7 +1140,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.phone}
                       onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1149,7 +1149,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.address_street}
                       onChange={(e) => setProfileForm({ ...profileForm, address_street: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1158,7 +1158,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.address_number}
                       onChange={(e) => setProfileForm({ ...profileForm, address_number: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1167,7 +1167,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.address_commune}
                       onChange={(e) => setProfileForm({ ...profileForm, address_commune: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1176,7 +1176,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.address_region}
                       onChange={(e) => setProfileForm({ ...profileForm, address_region: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1185,7 +1185,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.marital_status}
                       onChange={(e) => setProfileForm({ ...profileForm, marital_status: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1194,7 +1194,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.profession}
                       onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1203,12 +1203,12 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="text"
                       value={profileForm.nationality}
                       onChange={(e) => setProfileForm({ ...profileForm, nationality: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Asesor</label>
-                    <p className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-150 text-xs font-semibold text-slate-500">
+                    <p className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-500">
                       {currentAdvisor || "Sin asignar"}
                       <span className="text-slate-400 font-medium"> · se cambia por separado</span>
                     </p>
@@ -1219,7 +1219,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       value={profileForm.observation}
                       onChange={(e) => setProfileForm({ ...profileForm, observation: e.target.value })}
                       rows={3}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none resize-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none resize-none"
                     />
                   </div>
                 </div>
@@ -1227,7 +1227,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             </div>
 
             {/* Repositorio de Documentos */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-6">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3">
                   <FileText className="w-4.5 h-4.5 text-slate-400" />
@@ -1237,16 +1237,16 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
               {/* Upload New Document Box */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-450">Cargar Nuevo Documento</p>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Cargar Nuevo Documento</p>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     placeholder="Nombre (ej. Copia Contrato, Cédula)"
                     value={docName}
                     onChange={(e) => setDocName(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-450 focus:border-blue-500 outline-none"
+                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-brand-500 outline-none"
                   />
-                  <label className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0">
+                  <label className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0">
                     {uploadingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                     Subir
                     <input
@@ -1304,7 +1304,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
                 {loadingDocs ? (
                   <div className="col-span-full py-8 flex flex-col items-center justify-center gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                    <Loader2 className="w-5 h-5 animate-spin text-blue-500/50" />
+                    <Loader2 className="w-5 h-5 animate-spin text-brand-500/50" />
                   </div>
                 ) : docs.length === 0 ? (
                   <div className="col-span-full py-8 flex flex-col items-center justify-center gap-2 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-center">
@@ -1315,11 +1315,11 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   docs.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-blue-500/30 transition-all gap-2 shadow-sm"
+                      className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-brand-500/30 transition-all gap-2 shadow-sm"
                     >
                       <div className="flex items-center gap-2.5 overflow-hidden">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50/50 border border-blue-100 flex items-center justify-center shrink-0">
-                          <FileText className="w-3.5 h-3.5 text-blue-600" />
+                        <div className="w-8 h-8 rounded-lg bg-brand-50/50 border border-brand-100 flex items-center justify-center shrink-0">
+                          <FileText className="w-3.5 h-3.5 text-brand-600" />
                         </div>
                         <div className="overflow-hidden min-w-0">
                           <p className="text-[11px] font-bold text-slate-800 truncate" title={doc.name}>
@@ -1352,7 +1352,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                             </button>
                             <button
                               onClick={() => downloadDocument(doc.url, doc.name, doc.fileType)}
-                              className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-blue-600 transition-colors shadow-sm cursor-pointer"
+                              className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-600 transition-colors shadow-sm cursor-pointer"
                               title="Descargar"
                             >
                               <Download className="w-3 h-3" />
@@ -1375,7 +1375,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                                 }
                               }
                             }}
-                            className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-550 hover:bg-red-50 hover:text-red-650 transition-colors shadow-sm cursor-pointer"
+                            className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm cursor-pointer"
                             title="Eliminar"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -1392,7 +1392,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           {/* Right Side: Land Info & Financial Summary */}
           <div className="space-y-6">
             {/* Información del Terreno Card */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-5">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
               <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
                 <Building className="w-4.5 h-4.5 text-slate-400" />
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Información del Terreno</h3>
@@ -1405,7 +1405,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre del Terreno</p>
-                  <p className="font-bold text-blue-600">Lote {selectedClient.lotNumber}</p>
+                  <p className="font-bold text-brand-600">Lote {selectedClient.lotNumber}</p>
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Metros Cuadrados</p>
@@ -1419,7 +1419,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             </div>
 
             {/* Resumen Financiero Card */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-6">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Resumen Financiero</h3>
               </div>
@@ -1443,21 +1443,21 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-[#64748B] uppercase tracking-wider mb-1">Fecha Cuota Actual</p>
-                  <p className="text-sm font-bold text-blue-600">{selectedClient.nextDueDate ? formatDate(selectedClient.nextDueDate) : "No definido"}</p>
+                  <p className="text-sm font-bold text-brand-600">{selectedClient.nextDueDate ? formatDate(selectedClient.nextDueDate) : "No definido"}</p>
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-[#64748B] uppercase tracking-wider mb-1">Fecha Cuota Siguiente</p>
-                  <p className="text-sm font-bold text-blue-600">{selectedClient.nextDueDate ? getNextInstallmentDate(selectedClient.nextDueDate) : "No definido"}</p>
+                  <p className="text-sm font-bold text-brand-600">{selectedClient.nextDueDate ? getNextInstallmentDate(selectedClient.nextDueDate) : "No definido"}</p>
                 </div>
               </div>
 
               <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex justify-between items-center text-xs">
                 <div>
-                  <p className="text-[9px] font-bold text-slate-550 uppercase tracking-wider mb-0.5">Saldo por Financiar</p>
-                  <p className="text-base font-bold text-blue-700">{formatCLP(selectedClient.pendingBalance)}</p>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Saldo por Financiar</p>
+                  <p className="text-base font-bold text-brand-700">{formatCLP(selectedClient.pendingBalance)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] font-bold text-slate-550 uppercase tracking-wider mb-0.5">Valor Cuota</p>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Valor Cuota</p>
                   <p className="text-sm font-bold text-slate-800">{formatCLP(selectedClient.valor_cuota)}</p>
                 </div>
               </div>
@@ -1486,13 +1486,13 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           {/* Left Column: Sale Info Card & Progress payment Card */}
           <div className="lg:col-span-2 space-y-6">
             {/* Información de Venta Card */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-5">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Información de Venta - Lote {selectedClient.lotNumber}</h3>
                 {!isEditingFinances ? (
                   <button
                     onClick={() => setIsEditingFinances(true)}
-                    className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                    className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors cursor-pointer"
                   >
                     Editar
                   </button>
@@ -1501,7 +1501,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     <button
                       onClick={handleSaveFinances}
                       disabled={loading}
-                      className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       {loading && <Loader2 className="w-3 h-3 animate-spin" />}
                       Guardar
@@ -1541,7 +1541,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   <div className="grid grid-cols-1 sm:grid-cols-3 border-b border-slate-100 pb-5 gap-6 text-xs">
                     <div>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Valor Total Lote</p>
-                      <p className="text-xl font-bold text-blue-600">{formatCLP(selectedClient.totalToPay)}</p>
+                      <p className="text-xl font-bold text-brand-600">{formatCLP(selectedClient.totalToPay)}</p>
                     </div>
                     <div>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Reserva</p>
@@ -1549,7 +1549,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     </div>
                     <div>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pie Pagado</p>
-                      <p className="text-xl font-bold text-slate-850">{formatCLP(selectedClient.pie)}</p>
+                      <p className="text-xl font-bold text-slate-800">{formatCLP(selectedClient.pie)}</p>
                     </div>
                   </div>
 
@@ -1565,7 +1565,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     </div>
                     <div>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Valor Última Cuota</p>
-                      <p className="text-sm font-bold text-slate-850">{formatCLP(selectedClient.last_installment_value)}</p>
+                      <p className="text-sm font-bold text-slate-800">{formatCLP(selectedClient.last_installment_value)}</p>
                     </div>
                   </div>
 
@@ -1573,7 +1573,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   <div className="grid grid-cols-1 sm:grid-cols-3 border-b border-slate-100 pb-5 gap-6 text-xs">
                     <div>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Interés (multa por día)</p>
-                      <p className="text-sm font-bold text-red-650">{formatCLP(selectedClient.daily_penalty)} / día</p>
+                      <p className="text-sm font-bold text-red-600">{formatCLP(selectedClient.daily_penalty)} / día</p>
                     </div>
                     <div>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Días de Gracia</p>
@@ -1625,7 +1625,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.price_total_clp}
                       onChange={(e) => setFinancesForm({ ...financesForm, price_total_clp: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1634,7 +1634,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.reservation_price}
                       onChange={(e) => setFinancesForm({ ...financesForm, reservation_price: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1643,7 +1643,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.pie}
                       onChange={(e) => setFinancesForm({ ...financesForm, pie: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1652,7 +1652,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.cuotas}
                       onChange={(e) => setFinancesForm({ ...financesForm, cuotas: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1661,7 +1661,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.valor_cuota}
                       onChange={(e) => setFinancesForm({ ...financesForm, valor_cuota: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1670,7 +1670,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.last_installment_value}
                       onChange={(e) => setFinancesForm({ ...financesForm, last_installment_value: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1679,7 +1679,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.daily_penalty}
                       onChange={(e) => setFinancesForm({ ...financesForm, daily_penalty: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1688,7 +1688,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.grace_days}
                       onChange={(e) => setFinancesForm({ ...financesForm, grace_days: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1699,7 +1699,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       max={31}
                       value={financesForm.due_day}
                       onChange={(e) => setFinancesForm({ ...financesForm, due_day: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1708,7 +1708,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.installments_paid}
                       onChange={(e) => setFinancesForm({ ...financesForm, installments_paid: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1717,7 +1717,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="date"
                       value={financesForm.installment_start_date}
                       onChange={(e) => setFinancesForm({ ...financesForm, installment_start_date: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1725,7 +1725,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     <select
                       value={financesForm.mora_status}
                       onChange={(e) => setFinancesForm({ ...financesForm, mora_status: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-750 focus:border-blue-500 outline-none cursor-pointer"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:border-brand-500 outline-none cursor-pointer"
                     >
                       <option value="ACTIVO">ACTIVO</option>
                       <option value="CONGELADO">CONGELADO</option>
@@ -1736,7 +1736,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     <select
                       value={financesForm.penalty_mode}
                       onChange={(e) => setFinancesForm({ ...financesForm, penalty_mode: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-755 focus:border-blue-500 outline-none cursor-pointer"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:border-brand-500 outline-none cursor-pointer"
                     >
                       <option value="AUTO">AUTOMÁTICO</option>
                       <option value="FIXED">FIJO</option>
@@ -1749,7 +1749,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.manual_penalty}
                       onChange={(e) => setFinancesForm({ ...financesForm, manual_penalty: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1758,7 +1758,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       type="number"
                       value={financesForm.extra_paid_amount}
                       onChange={(e) => setFinancesForm({ ...financesForm, extra_paid_amount: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-blue-500 outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                     />
                   </div>
                 </div>
@@ -1766,7 +1766,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             </div>
 
             {/* Progreso de Pago Progress Bar Card */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-6">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Progreso de Pago</h3>
                 <span className="text-[10px] text-slate-400 font-semibold uppercase">
@@ -1783,7 +1783,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 
                 <div className="h-3.5 rounded-full bg-slate-100 overflow-hidden flex border border-slate-200/60 p-0.5">
                   <div 
-                    className="h-full bg-blue-600 rounded-l-full transition-all duration-300" 
+                    className="h-full bg-brand-600 rounded-l-full transition-all duration-300" 
                     style={{ 
                       width: selectedClient.totalCuotas > 0 
                         ? `${(selectedClient.paidCuotas / selectedClient.totalCuotas) * 100}%`
@@ -1802,7 +1802,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
                 <div className="flex gap-4 mt-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-brand-600" />
                     <span>Pagado</span>
                   </div>
                   {selectedClient.status === "LATE" && (
@@ -1829,12 +1829,12 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   onClick={() => setShowMoraBreakdown(!showMoraBreakdown)}
                   className="w-full p-5 flex gap-4 items-start text-left hover:bg-red-100/50 transition-colors cursor-pointer"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-650 shrink-0 shadow-inner">
+                  <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600 shrink-0 shadow-inner">
                     <AlertTriangle className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[9px] text-red-650 font-bold uppercase tracking-wider mb-0.5">Estado de Mora Detectado</p>
-                    <h4 className="text-base font-bold text-red-750 leading-tight">Mora Acumulada: {formatCLP(selectedClient.penaltyAmount || 0)}</h4>
+                    <p className="text-[9px] text-red-600 font-bold uppercase tracking-wider mb-0.5">Estado de Mora Detectado</p>
+                    <h4 className="text-base font-bold text-red-700 leading-tight">Mora Acumulada: {formatCLP(selectedClient.penaltyAmount || 0)}</h4>
                     <p className="text-[10px] text-red-500/80 font-medium mt-1 leading-relaxed">
                       {selectedClient.overdueInstallments?.length || 1} cuota{(selectedClient.overdueInstallments?.length || 1) !== 1 ? 's' : ''} vencida{(selectedClient.overdueInstallments?.length || 1) !== 1 ? 's' : ''} a la fecha. Click para ver desglose.
                     </p>
@@ -1850,7 +1850,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     <div className="bg-red-100/60 border border-red-200 rounded-xl p-4 flex items-center justify-between">
                       <div>
                         <p className="text-[9px] text-red-500 font-bold uppercase tracking-wider mb-0.5">Total Multa Vigente</p>
-                        <p className="text-xl font-bold text-red-750">{formatCLP(selectedClient.penaltyAmount || 0)}</p>
+                        <p className="text-xl font-bold text-red-700">{formatCLP(selectedClient.penaltyAmount || 0)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[9px] text-red-500 font-bold uppercase tracking-wider mb-0.5">Atraso Contable</p>
@@ -1861,7 +1861,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
                     {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED") && selectedClient.manual_penalty > 0 && (
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-amber-600">
+                        <div className="flex items-center gap-2 text-amber-700">
                           <ShieldAlert className="w-4 h-4" />
                           <h4 className="text-[10px] font-bold uppercase tracking-wider">Mora Histórica (Acuerdo Fijo)</h4>
                         </div>
@@ -1885,7 +1885,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                         </div>
                         <div className="space-y-2">
                           {selectedClient.overdueInstallments.map((inst: any) => (
-                            <div key={inst.number} className="bg-white border border-red-150 rounded-xl p-4 hover:border-red-300 transition-colors shadow-sm">
+                            <div key={inst.number} className="bg-white border border-red-200 rounded-xl p-4 hover:border-red-300 transition-colors shadow-sm">
                               <div className="flex items-center justify-between">
                                 <div>
                                   <div className="flex items-center gap-2 mb-1">
@@ -1898,12 +1898,12 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                                     Venció el {formatDate(inst.interestStartDate || inst.dueDate)}
                                   </p>
                                   {inst.moraCredit > 0 && (
-                                    <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                                    <p className="text-[10px] text-emerald-700 font-bold mt-0.5">
                                       Abono a intereses aplicado: -{formatCLP(inst.moraCredit)}
                                     </p>
                                   )}
                                 </div>
-                                <span className="text-[8px] font-bold text-red-550 uppercase tracking-wider bg-red-50 px-2 py-0.5 rounded-md border border-red-200 h-fit">
+                                <span className="text-[8px] font-bold text-red-500 uppercase tracking-wider bg-red-50 px-2 py-0.5 rounded-md border border-red-200 h-fit">
                                   {inst.lateDays} {inst.lateDays === 1 ? 'día' : 'días'} de atraso
                                 </span>
                               </div>
@@ -1932,12 +1932,12 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             )}
 
             {/* Acciones Rápidas Card */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-4">
-              <p className="text-[10px] font-bold text-slate-450 uppercase tracking-wider border-b border-slate-100 pb-2">Acciones Rápidas</p>
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Acciones Rápidas</p>
               
               <button 
                 onClick={() => setShowPaymentModal(true)}
-                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 Registrar Pago Manual
@@ -1954,7 +1954,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
               
               <button 
                 onClick={() => toast.info("Funcionalidad de repactación en desarrollo")}
-                className="w-full py-3 rounded-xl bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                className="w-full py-3 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
               >
                 <Calendar className="w-4 h-4" />
                 Repactar Cuotas
@@ -1962,7 +1962,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
               <button 
                 onClick={() => toast.info("Generación de PDF de estado de cuenta en desarrollo")}
-                className="w-full py-3 rounded-xl bg-white border border-blue-600 text-blue-605 hover:bg-blue-50 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm mt-3 cursor-pointer"
+                className="w-full py-3 rounded-xl bg-white border border-brand-600 text-brand-600 hover:bg-brand-50 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm mt-3 cursor-pointer"
               >
                 <FileText className="w-4 h-4" />
                 Generar Estado de Cuenta PDF
@@ -1970,12 +1970,12 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             </div>
 
             {/* Historial de Pagos Card */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-4">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <p className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Historial de Pagos</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Historial de Pagos</p>
                 <button 
                   onClick={() => setActiveTab("LOG")}
-                  className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  className="text-[10px] font-bold text-brand-600 hover:underline cursor-pointer"
                 >
                   Ver todo
                 </button>
@@ -1983,7 +1983,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-550">Último Pago</span>
+                  <span className="text-slate-500">Último Pago</span>
                   <span className="font-semibold text-slate-800">
                     {financialHistory.length > 0 
                       ? new Date(financialHistory[0].paid_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -1991,12 +1991,12 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   </span>
                 </div>
                 <div className="flex justify-between items-center border-t border-slate-50 pt-2.5">
-                  <span className="text-slate-550">Monto Total Pagado</span>
-                  <span className="font-bold text-blue-600">{formatCLP(selectedClient.totalPaid)}</span>
+                  <span className="text-slate-500">Monto Total Pagado</span>
+                  <span className="font-bold text-brand-600">{formatCLP(selectedClient.totalPaid)}</span>
                 </div>
                 <div className="flex justify-between items-center border-t border-slate-50 pt-2.5">
-                  <span className="text-slate-550">Saldo Pendiente</span>
-                  <span className="font-bold text-slate-850">{formatCLP(selectedClient.pendingBalance)}</span>
+                  <span className="text-slate-500">Saldo Pendiente</span>
+                  <span className="font-bold text-slate-800">{formatCLP(selectedClient.pendingBalance)}</span>
                 </div>
               </div>
             </div>
@@ -2008,16 +2008,16 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Activity List Feed */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-6">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                <h3 className="text-sm font-bold text-slate-850 uppercase tracking-wider">Historial de Actividad</h3>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Historial de Actividad</h3>
                 
                 <button 
                   onClick={() => {
                     setNoteType("Nota interna");
                     document.getElementById("add-note-textarea")?.focus();
                   }}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm w-fit cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm w-fit cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Agregar Nota
@@ -2033,7 +2033,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer",
                       logFilter === filter 
-                        ? "bg-blue-600 text-white border-blue-600 shadow-sm" 
+                        ? "bg-brand-600 text-white border-brand-600 shadow-sm" 
                         : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
                     )}
                   >
@@ -2044,10 +2044,10 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
               {/* Feed items */}
               {loadingNotes ? (
-                <div className="py-20 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>
+                <div className="py-20 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>
               ) : filteredLog.length === 0 ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-100 rounded-xl">
-                  <History className="w-12 h-12 text-slate-205 mx-auto mb-4" />
+                  <History className="w-12 h-12 text-slate-200 mx-auto mb-4" />
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Sin historial registrado en este filtro</p>
                 </div>
               ) : (
@@ -2067,11 +2067,11 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                           <div className="flex items-center justify-between gap-4 mb-2 flex-wrap sm:flex-nowrap">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-bold text-slate-800">{log.title}</span>
-                              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-slate-200 text-slate-655">
+                              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-slate-200 text-slate-600">
                                 {log.badge}
                               </span>
                             </div>
-                            <span className="text-[10px] font-semibold text-slate-455 uppercase">
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase">
                               {formatDate(log.date)}
                             </span>
                           </div>
@@ -2079,7 +2079,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-655 uppercase border border-slate-350">
+                              <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 uppercase border border-slate-300">
                                 {log.author ? log.author.substring(0, 2).toUpperCase() : "AD"}
                               </div>
                               <span className="text-[10px] font-bold text-slate-500 uppercase">{log.author}</span>
@@ -2089,7 +2089,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditLedger(log.ledgerItem)}
-                                  className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all cursor-pointer"
+                                  className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 transition-all cursor-pointer"
                                   title="Editar registro"
                                 >
                                   <Pencil className="w-3 h-3" />
@@ -2111,23 +2111,23 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   </div>
 
                   {filteredLog.length > 5 && (
-                    <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-4 gap-4 text-slate-550 text-xs font-semibold px-2">
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-4 gap-4 text-slate-500 text-xs font-semibold px-2">
                       <button
                         type="button"
                         onClick={() => setLogPage(prev => Math.max(prev - 1, 1))}
                         disabled={logPage === 1}
-                        className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-655 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
+                        className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
                       >
                         Anterior
                       </button>
-                      <span className="text-xs text-slate-550 font-bold">
+                      <span className="text-xs text-slate-500 font-bold">
                         Página {logPage} de {Math.ceil(filteredLog.length / 5)}
                       </span>
                       <button
                         type="button"
                         onClick={() => setLogPage(prev => Math.min(prev + 1, Math.ceil(filteredLog.length / 5)))}
                         disabled={logPage === Math.ceil(filteredLog.length / 5)}
-                        className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-655 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
+                        className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
                       >
                         Siguiente
                       </button>
@@ -2141,8 +2141,8 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           {/* Right Column: Add Note, responsibles and pending balance */}
           <div className="space-y-6">
             {/* Agregar Nota Interna Card */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-4">
-              <p className="text-[10px] font-bold text-slate-450 uppercase tracking-wider border-b border-slate-100 pb-2">Agregar Nota Interna</p>
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Agregar Nota Interna</p>
               
               <div className="space-y-3 text-xs text-slate-700">
                 <div>
@@ -2152,7 +2152,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     placeholder="Escribe una nota detallada sobre el cliente o transacción..."
                     value={noteText}
                     onChange={e => setNoteText(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:border-blue-500 outline-none font-medium resize-none"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:border-brand-500 outline-none font-medium resize-none"
                   />
                 </div>
 
@@ -2171,7 +2171,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 </div>
 
                 {noteType === "Observación" && (
-                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-150 rounded-xl px-3 py-2.5 text-[10px] font-semibold text-amber-700">
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-[10px] font-semibold text-amber-700">
                     <Mail className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span>Esta nota se enviará al cliente: le aparece un aviso en su portal y le llega un correo con asunto "ALIMIN | IMPORTANTE". No se puede deshacer.</span>
                   </div>
@@ -2180,7 +2180,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 <button
                   onClick={handleSaveNote}
                   disabled={isSavingNote}
-                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                  className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
                 >
                   {isSavingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                   {noteType === "Observación" ? "Enviar Observación al Cliente" : "Guardar Nota"}
@@ -2189,24 +2189,24 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             </div>
 
             {/* Responsibles Card */}
-            <div className="rounded-2xl bg-white border border-slate-150 shadow-sm p-6 space-y-4">
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-4">
               <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider border-b border-slate-100 pb-2">Responsable de Cartera</p>
               
-              <div className="space-y-4 text-xs font-semibold text-slate-750">
+              <div className="space-y-4 text-xs font-semibold text-slate-700">
                 {(() => {
                   const resp = getResponsible();
                   return (
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-150 flex items-center justify-center font-bold text-blue-650 text-[10px] uppercase">
+                        <div className="w-8 h-8 rounded-full bg-brand-50 border border-brand-200 flex items-center justify-center font-bold text-brand-600 text-[10px] uppercase">
                           {resp.initials}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-850 uppercase">{resp.name}</p>
+                          <p className="font-bold text-slate-800 uppercase">{resp.name}</p>
                           <p className="text-[9px] text-[#64748B] uppercase tracking-wider font-semibold">{resp.role}</p>
                         </div>
                       </div>
-                      <a href={`mailto:${resp.email}`} className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:text-slate-655 shadow-sm transition-colors">
+                      <a href={`mailto:${resp.email}`} className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:text-slate-600 shadow-sm transition-colors">
                         <Mail className="w-3.5 h-3.5" />
                       </a>
                     </div>
@@ -2216,7 +2216,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
             </div>
 
             {/* Saldo Pendiente Card */}
-            <div className="rounded-2xl bg-blue-600 p-6 text-white space-y-4 shadow-md relative overflow-hidden group">
+            <div className="rounded-2xl bg-brand-600 p-6 text-white space-y-4 shadow-md relative overflow-hidden group">
               <Zap className="absolute top-[-5%] left-[-5%] w-32 h-32 opacity-10 text-white" />
               <div>
                 <p className="text-[9px] font-bold uppercase tracking-wider text-white/70 mb-0.5">Saldo Pendiente</p>
@@ -2241,50 +2241,50 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
               <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider">Registrar Pago Manual</h3>
               <button 
                 onClick={() => setShowPaymentModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-450 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleRegisterPayment} className="space-y-4 text-xs font-semibold text-slate-750">
+            <form onSubmit={handleRegisterPayment} className="space-y-4 text-xs font-semibold text-slate-700">
               <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-450">Monto del Pago ($)</label>
+                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Monto del Pago ($)</label>
                 <input 
                   type="number" 
                   value={paymentForm.amount || ""}
                   onChange={e => setPaymentForm({...paymentForm, amount: Number(e.target.value)})}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:border-blue-500 outline-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:border-brand-500 outline-none"
                   placeholder="Monto en CLP"
                   required
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-455">Fecha del Pago</label>
+                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Fecha del Pago</label>
                 <input 
                   type="date" 
                   value={paymentForm.paidAt}
                   onChange={e => setPaymentForm({...paymentForm, paidAt: e.target.value})}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 focus:border-blue-500 outline-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 focus:border-brand-500 outline-none"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-455">Tipo de Pago</label>
+                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Tipo de Pago</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setPaymentType("CUOTA")}
-                    className={`py-2.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${paymentType === "CUOTA" ? "bg-blue-600 border-blue-600 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                    className={`py-2.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${paymentType === "CUOTA" ? "bg-brand-600 border-brand-600 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
                   >
                     Cuota
                   </button>
                   <button
                     type="button"
                     onClick={() => setPaymentType("PIE")}
-                    className={`py-2.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${paymentType === "PIE" ? "bg-blue-600 border-blue-600 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                    className={`py-2.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${paymentType === "PIE" ? "bg-brand-600 border-brand-600 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
                   >
                     Pie
                   </button>
@@ -2297,7 +2297,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   </button>
                 </div>
                 {paymentType === "INTERES" && (
-                  <p className="text-[10px] text-amber-650 font-semibold pt-1">
+                  <p className="text-[10px] text-amber-700 font-semibold pt-1">
                     El monto completo se aplica a la mora del cliente. No suma cuotas pagadas. Si sobra dinero, se avisa para registrarlo aparte.
                   </p>
                 )}
@@ -2305,25 +2305,25 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
               {paymentType !== "INTERES" && (
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold uppercase tracking-wider text-slate-455">Cantidad de Cuotas que amortiza</label>
+                  <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Cantidad de Cuotas que amortiza</label>
                   <input
                     type="number"
                     min={1}
                     value={paymentForm.installmentsCount}
                     onChange={e => setPaymentForm({...paymentForm, installmentsCount: Math.max(1, Number(e.target.value))})}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-750 focus:border-blue-500 outline-none"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 focus:border-brand-500 outline-none"
                     required
                   />
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-455">Comprobante de Pago (Imagen/PDF - Opcional)</label>
+                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Comprobante de Pago (Imagen/PDF - Opcional)</label>
                 <input 
                   type="file" 
                   accept="image/*,application/pdf"
                   onChange={e => setPaymentFile(e.target.files?.[0] || null)}
-                  className="w-full border border-slate-200 bg-slate-50/50 rounded-xl px-3 py-2 text-xs font-medium text-slate-600 cursor-pointer focus:border-blue-500 outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-blue-50 file:text-blue-750 hover:file:bg-blue-100"
+                  className="w-full border border-slate-200 bg-slate-50/50 rounded-xl px-3 py-2 text-xs font-medium text-slate-600 cursor-pointer focus:border-brand-500 outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
                 />
               </div>
 
@@ -2331,14 +2331,14 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 <button
                   type="button"
                   onClick={() => { setShowPaymentModal(false); setPaymentType("CUOTA"); }}
-                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-655 rounded-xl font-bold transition-all cursor-pointer"
+                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-xl font-bold transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isRegisteringPayment}
-                  className={`flex-1 py-3 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${paymentType === "INTERES" ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"}`}
+                  className={`flex-1 py-3 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${paymentType === "INTERES" ? "bg-amber-600 hover:bg-amber-700" : "bg-brand-600 hover:bg-brand-700"}`}
                 >
                   {isRegisteringPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   {paymentType === "INTERES" ? "Registrar Abono de Intereses" : "Registrar Pago"}
@@ -2380,14 +2380,14 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
               </div>
               <button 
                 onClick={() => setShowMoraModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-450 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Form */}
-            <div className="space-y-6 text-xs font-semibold text-slate-750">
+            <div className="space-y-6 text-xs font-semibold text-slate-700">
               
               {/* Mora Status Selector */}
               <div className="space-y-2">
@@ -2411,7 +2411,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     className={cn(
                       "flex-1 py-3 px-4 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer",
                       moraForm.mora_status === "AL_DIA" 
-                        ? "bg-emerald-50 border-emerald-300 text-emerald-600 shadow-sm" 
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm" 
                         : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
                     )}
                   >
@@ -2423,7 +2423,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     className={cn(
                       "flex-1 py-3 px-4 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer",
                       moraForm.mora_status === "CONGELADO" 
-                        ? "bg-blue-50 border-blue-300 text-blue-600 shadow-sm" 
+                        ? "bg-brand-50 border-brand-300 text-brand-600 shadow-sm" 
                         : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
                     )}
                   >
@@ -2434,7 +2434,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
 
               {/* Penalty Mode Selector (only if ACTIVO) */}
               {moraForm.mora_status === "ACTIVO" && (
-                <div className="p-4 bg-slate-50/50 border border-slate-150 rounded-2xl space-y-4">
+                <div className="p-4 bg-slate-50/50 border border-slate-200 rounded-2xl space-y-4">
                   <div className="space-y-2">
                     <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Modo de Cálculo de Penalización</label>
                     <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -2456,7 +2456,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                         className={cn(
                           "flex-1 py-2.5 px-3 rounded-xl text-[9px] font-bold tracking-wider uppercase transition-all border cursor-pointer",
                           moraForm.penalty_mode === "MIXED" 
-                            ? "bg-slate-100 border-slate-350 text-slate-800 shadow-inner font-black" 
+                            ? "bg-slate-100 border-slate-300 text-slate-800 shadow-inner font-black" 
                             : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
                         )}
                       >
@@ -2478,7 +2478,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   </div>
 
                   {/* Mode explanation banner */}
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-[11px] text-blue-800 font-medium leading-relaxed">
+                  <div className="bg-brand-50 border border-brand-100 rounded-xl p-3 text-[11px] text-brand-800 font-medium leading-relaxed">
                     {moraForm.penalty_mode === "AUTO" && "La multa se calcula automáticamente multiplicando los días de atraso por el interés diario configurado."}
                     {moraForm.penalty_mode === "MIXED" && "Se cobra un monto fijo histórico, más el cálculo automático para cuotas nuevas que vayan venciendo."}
                     {moraForm.penalty_mode === "FIXED" && "Solo se cobra el monto fijo definido manualmente, ignorando fechas de atraso y días."}
@@ -2492,7 +2492,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                         type="number" 
                         value={moraForm.manual_penalty || 0}
                         onChange={e => setMoraForm({...moraForm, manual_penalty: Number(e.target.value)})}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-850 focus:border-red-400 outline-none"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:border-red-400 outline-none"
                         placeholder="Monto en CLP"
                       />
                     </div>
@@ -2508,7 +2508,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     type="date" 
                     value={moraForm.debt_start_date}
                     onChange={e => setMoraForm({...moraForm, debt_start_date: e.target.value})}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-750 focus:border-blue-500 outline-none"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 focus:border-brand-500 outline-none"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -2517,7 +2517,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     type="date" 
                     value={moraForm.debt_end_date}
                     onChange={e => setMoraForm({...moraForm, debt_end_date: e.target.value})}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-750 focus:border-blue-500 outline-none"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 focus:border-brand-500 outline-none"
                   />
                 </div>
               </div>
@@ -2527,7 +2527,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 <button
                   type="button"
                   onClick={() => setShowMoraModal(false)}
-                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-655 rounded-xl font-bold transition-all cursor-pointer text-center"
+                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-xl font-bold transition-all cursor-pointer text-center"
                 >
                   Cancelar
                 </button>
@@ -2535,7 +2535,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   type="button"
                   onClick={handleSaveMora}
                   disabled={isSavingMoraSettings}
-                  className="flex-1 py-3 bg-red-500 hover:bg-red-650 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
                 >
                   {isSavingMoraSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Aplicar Ajustes de Mora
@@ -2552,20 +2552,20 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 my-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
               <div className="flex items-center gap-2">
-                <Pencil className="w-5 h-5 text-blue-600" />
+                <Pencil className="w-5 h-5 text-brand-600" />
                 <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider">Editar Registro de Caja</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingLedgerEntry(null)}
-                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-450 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs font-semibold text-slate-750">
-              <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 text-[11px] text-slate-600 font-medium">
+            <div className="space-y-4 text-xs font-semibold text-slate-700">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 font-medium">
                 {editingLedgerEntry.description}
               </div>
 
@@ -2575,7 +2575,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   type="number"
                   value={editLedgerForm.amount}
                   onChange={e => setEditLedgerForm({ ...editLedgerForm, amount: e.target.value })}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-850 focus:border-blue-500 outline-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:border-brand-500 outline-none"
                 />
               </div>
 
@@ -2587,7 +2587,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     min={1}
                     value={editLedgerForm.installmentsCount}
                     onChange={e => setEditLedgerForm({ ...editLedgerForm, installmentsCount: e.target.value })}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-850 focus:border-blue-500 outline-none"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:border-brand-500 outline-none"
                   />
                 </div>
               )}
@@ -2599,11 +2599,11 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   value={editLedgerForm.reason}
                   onChange={e => setEditLedgerForm({ ...editLedgerForm, reason: e.target.value })}
                   placeholder="Ej: Corrección de monto mal ingresado por error de digitación."
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-blue-500 outline-none resize-none"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-brand-500 outline-none resize-none"
                 />
               </div>
 
-              <div className="flex items-start gap-2 bg-amber-50 border border-amber-150 rounded-xl px-3 py-2.5 text-[10px] font-semibold text-amber-700">
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-[10px] font-semibold text-amber-700">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>Este cambio queda registrado en la bitácora de auditoría con tu usuario, el motivo y el monto anterior.</span>
               </div>
@@ -2612,7 +2612,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 <button
                   type="button"
                   onClick={() => setEditingLedgerEntry(null)}
-                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-655 rounded-xl font-bold transition-all cursor-pointer text-center"
+                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-xl font-bold transition-all cursor-pointer text-center"
                 >
                   Cancelar
                 </button>
@@ -2620,7 +2620,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   type="button"
                   onClick={handleSaveLedgerEdit}
                   disabled={isSavingLedgerEdit}
-                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                  className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
                 >
                   {isSavingLedgerEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Guardar Cambios
@@ -2643,18 +2643,18 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
               <button
                 type="button"
                 onClick={() => setDeletingLedgerEntry(null)}
-                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-450 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs font-semibold text-slate-750">
-              <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 text-[11px] text-slate-600 font-medium">
+            <div className="space-y-4 text-xs font-semibold text-slate-700">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 font-medium">
                 {deletingLedgerEntry.description}. Monto: {formatCLP(deletingLedgerEntry.amount_clp)}.
               </div>
 
-              <div className="flex items-start gap-2 bg-red-50 border border-red-150 rounded-xl px-3 py-2.5 text-[10px] font-semibold text-red-700">
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-[10px] font-semibold text-red-700">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>
                   {deletingLedgerEntry.category === "CUOTA" && "Se revertirán las cuotas pagadas que representaba este registro."}
@@ -2679,7 +2679,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 <button
                   type="button"
                   onClick={() => setDeletingLedgerEntry(null)}
-                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-655 rounded-xl font-bold transition-all cursor-pointer text-center"
+                  className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-xl font-bold transition-all cursor-pointer text-center"
                 >
                   Cancelar
                 </button>

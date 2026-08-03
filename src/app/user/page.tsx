@@ -56,7 +56,7 @@ export default function UserDashboard() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Cargando tu Portal...</p>
       </div>
     );
@@ -151,7 +151,7 @@ export default function UserDashboard() {
               className="p-5 rounded-2xl bg-red-50 border border-red-100 flex items-start sm:items-center justify-between gap-4 shadow-sm"
             >
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-650 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600 shrink-0">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
@@ -181,7 +181,7 @@ export default function UserDashboard() {
                 onClick={() => setActiveLotIndex(idx)}
                 className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeLotIndex === idx 
-                    ? "bg-blue-600 text-white shadow-sm" 
+                    ? "bg-brand-600 text-white shadow-sm" 
                     : "bg-slate-50 text-slate-600 hover:bg-slate-100"
                 }`}
               >
@@ -195,15 +195,15 @@ export default function UserDashboard() {
       {/* Top Cards Row */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Tu Propiedad Card */}
-        <div className="lg:col-span-4 bg-white border border-slate-150 rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div className="lg:col-span-4 bg-white border-[1.5px] border-brand-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div>
             <div className="flex items-center justify-between mb-6">
-              <span className="text-xs font-bold text-slate-450 uppercase tracking-widest">Tu Propiedad</span>
-              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tu Propiedad</span>
+              <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center text-brand-600">
                 <Home className="w-4 h-4" />
               </div>
             </div>
-            <h3 className="text-xl font-bold text-blue-700 mb-1">{lot.projectName} - Lote {lot.lotNumber}</h3>
+            <h3 className="text-xl font-bold text-brand-700 mb-1">{lot.projectName} - Lote {lot.lotNumber}</h3>
             <p className="text-xs text-slate-500 font-medium">
               {lot.lotStage ? `Departamento ${lot.lotStage}` : "Terreno Residencial"}
             </p>
@@ -212,8 +212,8 @@ export default function UserDashboard() {
           <div className="mt-8">
             <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
               lot.isUpToDate 
-                ? "bg-emerald-50 text-emerald-600" 
-                : "bg-orange-50 text-orange-655"
+                ? "bg-emerald-50 text-emerald-700" 
+                : "bg-orange-50 text-orange-700"
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${lot.isUpToDate ? "bg-emerald-500" : "bg-orange-500"}`} />
               {lot.isUpToDate ? "Al día" : "Pago Pendiente"}
@@ -222,20 +222,20 @@ export default function UserDashboard() {
         </div>
 
         {/* Estado de tu Plan Card */}
-        <div className="lg:col-span-8 bg-white border border-slate-150 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="lg:col-span-8 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex-1 space-y-4">
             <div>
-              <span className="text-xs font-bold text-slate-450 uppercase tracking-widest">Estado de tu Plan</span>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Estado de tu Plan</span>
             </div>
             
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-blue-600 tracking-tight">{lot.acquisitionProgress}%</span>
-              <span className="text-sm font-semibold text-slate-550">{lot.paidCuotas} de {lot.totalCuotas} cuotas pagadas</span>
+              <span className="text-3xl font-extrabold text-brand-600 tracking-tight">{lot.acquisitionProgress}%</span>
+              <span className="text-sm font-semibold text-slate-500">{lot.paidCuotas} de {lot.totalCuotas} cuotas pagadas</span>
             </div>
 
             <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
               <div 
-                className="bg-blue-600 h-full rounded-full transition-all duration-[1s]"
+                className="bg-gradient-to-r from-brand-500 to-brand-400 h-full rounded-full transition-all duration-[1s]"
                 style={{ width: `${lot.acquisitionProgress}%` }}
               />
             </div>
@@ -246,13 +246,13 @@ export default function UserDashboard() {
           </div>
 
           {/* Pay Next Installment Box */}
-          <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 md:min-w-[320px] flex flex-col justify-between gap-4">
+          <div className="bg-brand-50 border border-brand-200 rounded-2xl p-5 md:min-w-[320px] flex flex-col justify-between gap-4">
             <div>
-              <p className="text-[10px] font-bold text-blue-650 uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-brand-600 uppercase tracking-wider">
                 {lot.paidCuotas >= lot.totalCuotas ? "Plan Completado" : `Próxima Cuota: ${lot.nextInstallmentMonth || "N/A"}`}
               </p>
               {lot.paidCuotas < lot.totalCuotas && (
-                <p className="text-2xl font-extrabold text-blue-700 tracking-tight mt-1">
+                <p className="text-2xl font-extrabold text-brand-700 tracking-tight mt-1">
                   {formatCLP(lot.upcomingInstallments?.find((c: any) => c.number === lot.paidCuotas + 1)?.amount || lot.valor_cuota)}
                 </p>
               )}
@@ -261,7 +261,7 @@ export default function UserDashboard() {
             {lot.paidCuotas < lot.totalCuotas && (
               <Link
                 href={`/user/pay/${lot.reservationId}`}
-                className="flex items-center justify-center gap-2 w-full py-3 bg-[#0f9f6e] hover:bg-[#0e8f62] text-white font-bold text-sm rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer"
+                className="flex items-center justify-center gap-2 w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 Confirmar Pago
@@ -272,7 +272,7 @@ export default function UserDashboard() {
       </div>
 
       {/* Historial de Pagos Table */}
-      <div className="bg-white border border-slate-150 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-800">Historial de Pagos</h3>
         </div>
@@ -297,7 +297,7 @@ export default function UserDashboard() {
                     <td className="px-6 py-4 font-bold text-slate-800">{item.monto}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1 text-xs font-bold ${
-                        isPaid ? "text-emerald-600" : "text-amber-600"
+                        isPaid ? "text-emerald-700" : "text-amber-700"
                       }`}>
                         {isPaid ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                         {item.estado}
@@ -310,19 +310,19 @@ export default function UserDashboard() {
                             {item.comprobanteDigital && (
                               <button
                                 onClick={() => downloadDocument(item.comprobanteDigital, `comprobante_digital_${item.cuota.replace('#', '')}.pdf`, "application/pdf")}
-                                className="text-blue-650 hover:text-blue-800 transition-colors p-1.5 rounded-lg hover:bg-blue-50 inline-flex items-center justify-center cursor-pointer border border-blue-100 bg-blue-50/30"
+                                className="text-brand-600 hover:text-brand-800 transition-colors p-1.5 rounded-lg hover:bg-brand-50 inline-flex items-center justify-center cursor-pointer border border-brand-100 bg-brand-50/30"
                                 title="Descargar Comprobante Digital (PDF)"
                               >
-                                <FileText className="w-4 h-4 text-blue-600" />
+                                <FileText className="w-4 h-4 text-brand-600" />
                               </button>
                             )}
                             {item.comprobanteCliente && (
                               <button
                                 onClick={() => downloadDocument(item.comprobanteCliente, `comprobante_cliente_${item.cuota.replace('#', '')}`)}
-                                className="text-[#0f9f6e] hover:text-[#0e8f62] transition-colors p-1.5 rounded-lg hover:bg-emerald-50 inline-flex items-center justify-center cursor-pointer border border-emerald-100 bg-emerald-50/30"
+                                className="text-brand-600 hover:text-brand-700 transition-colors p-1.5 rounded-lg hover:bg-brand-50 inline-flex items-center justify-center cursor-pointer border border-brand-100 bg-brand-50/30"
                                 title="Descargar Comprobante del Cliente"
                               >
-                                <Download className="w-4 h-4 text-emerald-600" />
+                                <Download className="w-4 h-4 text-brand-600" />
                               </button>
                             )}
                           </div>
@@ -330,7 +330,7 @@ export default function UserDashboard() {
                           <span className="text-xs text-slate-400 italic">No disponible</span>
                         )
                       ) : (
-                        <span className="text-xs text-slate-450 italic font-medium">Próximamente</span>
+                        <span className="text-xs text-slate-400 italic font-medium">Próximamente</span>
                       )}
                     </td>
                   </tr>
@@ -344,7 +344,7 @@ export default function UserDashboard() {
             <button
               onClick={() => setHistoryPage(prev => Math.max(prev - 1, 1))}
               disabled={historyPage === 1}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-655 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
+              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
             >
               Anterior
             </button>
@@ -354,7 +354,7 @@ export default function UserDashboard() {
             <button
               onClick={() => setHistoryPage(prev => Math.min(prev + 1, Math.ceil(paymentHistory.length / 5)))}
               disabled={historyPage === Math.ceil(paymentHistory.length / 5)}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-655 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
+              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white cursor-pointer"
             >
               Siguiente
             </button>
@@ -363,26 +363,26 @@ export default function UserDashboard() {
       </div>
 
       {/* Documentos Importantes Card */}
-      <div className="bg-white border border-slate-150 rounded-2xl p-6 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
         <h3 className="text-base font-bold text-slate-800 mb-6">Documentos Importantes</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: Contrato */}
-          <div className="bg-slate-50/50 border border-slate-150 hover:border-blue-200 transition-all rounded-2xl p-6 flex flex-col items-center text-center">
-            <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mb-4 shadow-sm">
+          <div className="bg-slate-50/50 border-[1.5px] border-brand-100 hover:border-brand-300 transition-all rounded-2xl p-6 flex flex-col items-center text-center">
+            <div className="w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 mb-4 shadow-sm">
               <FileText className="w-6 h-6" />
             </div>
             <h4 className="text-sm font-bold text-slate-800 mb-1">Contrato de Compraventa</h4>
             {contratoDoc ? (
               <button
                 onClick={() => downloadDocument(contratoDoc.url, contratoDoc.name, contratoDoc.fileType)}
-                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-brand-600 hover:text-brand-800 transition-colors mt-3 flex items-center gap-1 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" /> Descargar
               </button>
             ) : (
               <Link
                 href="/user/documents"
-                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1"
+                className="text-xs font-bold text-brand-600 hover:text-brand-800 transition-colors mt-3 flex items-center gap-1"
               >
                 <Download className="w-3.5 h-3.5" /> Descargar
               </Link>
@@ -390,22 +390,22 @@ export default function UserDashboard() {
           </div>
 
           {/* Card 2: Certificado */}
-          <div className="bg-slate-50/50 border border-slate-150 hover:border-blue-200 transition-all rounded-2xl p-6 flex flex-col items-center text-center">
-            <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mb-4 shadow-sm">
+          <div className="bg-slate-50/50 border-[1.5px] border-brand-100 hover:border-brand-300 transition-all rounded-2xl p-6 flex flex-col items-center text-center">
+            <div className="w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 mb-4 shadow-sm">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <h4 className="text-sm font-bold text-slate-800 mb-1">Certificado Cuotas al Día</h4>
             {certificadoDoc ? (
               <button
                 onClick={() => downloadDocument(certificadoDoc.url, certificadoDoc.name, certificadoDoc.fileType)}
-                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-brand-600 hover:text-brand-800 transition-colors mt-3 flex items-center gap-1 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" /> Descargar
               </button>
             ) : (
               <Link
                 href="/user/documents"
-                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1"
+                className="text-xs font-bold text-brand-600 hover:text-brand-800 transition-colors mt-3 flex items-center gap-1"
               >
                 <Download className="w-3.5 h-3.5" /> Descargar
               </Link>
@@ -413,22 +413,22 @@ export default function UserDashboard() {
           </div>
 
           {/* Card 3: Ficha */}
-          <div className="bg-slate-50/50 border border-slate-150 hover:border-blue-200 transition-all rounded-2xl p-6 flex flex-col items-center text-center">
-            <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mb-4 shadow-sm">
+          <div className="bg-slate-50/50 border-[1.5px] border-brand-100 hover:border-brand-300 transition-all rounded-2xl p-6 flex flex-col items-center text-center">
+            <div className="w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 mb-4 shadow-sm">
               <Compass className="w-6 h-6" />
             </div>
             <h4 className="text-sm font-bold text-slate-800 mb-1">Ficha Técnica del Inmueble</h4>
             {fichaDoc ? (
               <button
                 onClick={() => downloadDocument(fichaDoc.url, fichaDoc.name, fichaDoc.fileType)}
-                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-brand-600 hover:text-brand-800 transition-colors mt-3 flex items-center gap-1 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" /> Descargar
               </button>
             ) : (
               <Link
                 href="/user/documents"
-                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors mt-3 flex items-center gap-1"
+                className="text-xs font-bold text-brand-600 hover:text-brand-800 transition-colors mt-3 flex items-center gap-1"
               >
                 <Download className="w-3.5 h-3.5" /> Descargar
               </Link>

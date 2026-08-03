@@ -170,36 +170,36 @@ export default function IncomeAnalyticsPage() {
   if (loading && !data) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-accent" />
-        <p className="text-xs font-black uppercase tracking-[0.3em] opacity-20">Analizando Ingresos...</p>
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#64748B] opacity-65">Analizando Ingresos...</p>
       </div>
     );
   }
 
   const statsList = [
-    { label: "Recaudación Total", value: formatCLP(filteredData.stats?.total || 0), icon: TrendingUp, color: "text-emerald-400", glow: "shadow-emerald-500/20" },
-    { label: "Total Cuotas", value: formatCLP(filteredData.stats?.cuotas || 0), icon: Wallet, color: "text-blue-400", glow: "shadow-blue-500/20" },
-    { label: "Intereses (Mora)", value: formatCLP(filteredData.stats?.penalty || 0), icon: Zap, color: "text-red-400", glow: "shadow-red-500/20" },
+    { label: "Recaudación Total", value: formatCLP(filteredData.stats?.total || 0), icon: TrendingUp, color: "text-emerald-700", iconBg: "bg-emerald-50 border-emerald-200" },
+    { label: "Total Cuotas", value: formatCLP(filteredData.stats?.cuotas || 0), icon: Wallet, color: "text-brand-600", iconBg: "bg-brand-50 border-brand-200" },
+    { label: "Intereses (Mora)", value: formatCLP(filteredData.stats?.penalty || 0), icon: Zap, color: "text-red-700", iconBg: "bg-red-50 border-red-200" },
   ];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="glass-panel p-4 border border-white/10 shadow-2xl backdrop-blur-xl rounded-2xl">
-          <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">{label}</p>
+        <div className="bg-white p-4 border border-slate-200 shadow-lg rounded-xl">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] mb-3">{label}</p>
           <div className="space-y-2">
             {payload.map((p: any) => (
               <div key={p.name} className="flex items-center justify-between gap-8">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-                  <span className="text-[10px] font-bold uppercase text-white/60">{p.name === "cuotas" ? "Cuotas" : "Intereses"}:</span>
+                  <span className="text-[10px] font-semibold uppercase text-slate-600">{p.name === "cuotas" ? "Cuotas" : "Intereses"}:</span>
                 </div>
-                <span className="text-[11px] font-black text-white">{formatCLP(p.value)}</span>
+                <span className="text-[11px] font-bold text-slate-800 tabular-nums">{formatCLP(p.value)}</span>
               </div>
             ))}
-            <div className="pt-2 mt-2 border-t border-white/5 flex items-center justify-between gap-8">
-              <span className="text-[10px] font-bold uppercase text-accent">Total:</span>
-              <span className="text-[11px] font-black text-accent">{formatCLP(payload.reduce((acc: number, p: any) => acc + p.value, 0))}</span>
+            <div className="pt-2 mt-2 border-t border-[#E2E8F0] flex items-center justify-between gap-8">
+              <span className="text-[10px] font-bold uppercase text-brand-600">Total:</span>
+              <span className="text-[11px] font-bold text-brand-600 tabular-nums">{formatCLP(payload.reduce((acc: number, p: any) => acc + p.value, 0))}</span>
             </div>
           </div>
         </div>
@@ -209,48 +209,44 @@ export default function IncomeAnalyticsPage() {
   };
 
   return (
-    <div className="space-y-12 animate-fade-in px-4 relative">
+    <div className="animate-fade-in px-4 relative">
       {/* Header */}
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8">
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 mb-8">
         <div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-2xl bg-accent/20 flex items-center justify-center border border-accent/20">
-              <TrendingUp className="w-5 h-5 text-accent" />
-            </div>
-            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-accent">Financial Intelligence</p>
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="w-4 h-4 text-brand-600" />
+            <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Inteligencia Financiera</p>
           </div>
-          <h1 className="text-5xl font-black text-white tracking-tighter uppercase leading-none">
-            Análisis de <span className="text-white/20">Ingresos</span>
-          </h1>
+          <h2 className="text-3xl font-bold tracking-tight text-[#191c1e] font-headline-lg">Análisis de Ingresos</h2>
         </div>
-        
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          {/* Date Filter (HubSpot Style) */}
-          <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 relative group h-14">
-            <Calendar className="w-4 h-4 text-accent/60" />
-            <select 
+
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
+          {/* Date Filter */}
+          <div className="flex items-center gap-2 px-3 bg-white border border-[#E2E8F0] rounded-lg focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600/10 transition-all w-full sm:w-auto">
+            <Calendar className="w-4 h-4 text-[#64748B]/60 shrink-0" />
+            <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value as DateFilter)}
-              className="flex-1 bg-transparent border-none text-white font-black text-[10px] outline-none uppercase tracking-widest cursor-pointer appearance-none pr-8 h-full"
-              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right center", backgroundSize: "1rem" }}
+              className="flex-1 bg-transparent border-none text-[#191c1e] font-medium text-sm outline-none cursor-pointer appearance-none pr-8 py-2"
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right center", backgroundSize: "1rem" }}
             >
-              <option value="all" className="bg-[#0c1a1a]">Todo el tiempo</option>
-              <option value="today" className="bg-[#0c1a1a]">Hoy</option>
-              <option value="yesterday" className="bg-[#0c1a1a]">Ayer</option>
-              <option value="this_week" className="bg-[#0c1a1a]">Esta semana</option>
-              <option value="this_month" className="bg-[#0c1a1a]">Este mes</option>
-              <option value="custom" className="bg-[#0c1a1a]">Personalizado</option>
+              <option value="all" className="bg-white">Todo el tiempo</option>
+              <option value="today" className="bg-white">Hoy</option>
+              <option value="yesterday" className="bg-white">Ayer</option>
+              <option value="this_week" className="bg-white">Esta semana</option>
+              <option value="this_month" className="bg-white">Este mes</option>
+              <option value="custom" className="bg-white">Personalizado</option>
             </select>
           </div>
 
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[240px] shadow-2xl focus:border-accent/50 h-14"
-            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23d4a84b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1.5rem center", backgroundSize: "0.8rem" }}
+            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[200px]"
+            style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
           >
             {projects.map((p) => (
-              <option key={p.slug} value={p.slug} className="bg-[#0c1a1a] text-white">PROYECTO: {p.name.toUpperCase()}</option>
+              <option key={p.slug} value={p.slug} className="bg-white text-[#191c1e]">{p.name}</option>
             ))}
           </select>
         </div>
@@ -258,62 +254,64 @@ export default function IncomeAnalyticsPage() {
 
       {/* Custom Date Range Picker (Visible only if 'custom' is selected) */}
       {dateFilter === "custom" && (
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-4 animate-fade-in -mt-6">
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-4 animate-fade-in mb-8">
           <div className="flex items-center gap-3">
-             <span className="text-[10px] font-black uppercase tracking-widest text-white/40 mt-2">Desde:</span>
-             <DatePicker 
+             <span className="text-xs font-semibold uppercase tracking-wider text-[#64748B] mt-2">Desde:</span>
+             <DatePicker
                date={customStart}
                onChange={setCustomStart}
                className="w-[160px]"
+               lightMode={true}
              />
           </div>
           <div className="flex items-center gap-3">
-             <span className="text-[10px] font-black uppercase tracking-widest text-white/40 mt-2">Hasta:</span>
-             <DatePicker 
+             <span className="text-xs font-semibold uppercase tracking-wider text-[#64748B] mt-2">Hasta:</span>
+             <DatePicker
                date={customEnd}
                onChange={setCustomEnd}
                className="w-[160px]"
+               lightMode={true}
              />
           </div>
         </div>
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6 mb-8">
         {statsList.map((s, i) => (
           <div
             key={s.label}
-            className="group relative rounded-[3rem] p-10 glass-card animate-slide-up"
+            className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 animate-slide-up"
             style={{ animationDelay: `${i * 100}ms`, animationFillMode: "both" }}
           >
-            <div className="flex items-start justify-between mb-10">
-              <div className={`w-16 h-16 rounded-[1.5rem] bg-white/5 flex items-center justify-center border border-white/10 group-hover:scale-110 transition-all duration-700 shadow-2xl ${s.glow}`}>
-                <s.icon className={`w-7 h-7 ${s.color}`} />
+            <div className="flex items-start justify-between mb-6">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${s.iconBg}`}>
+                <s.icon className={`w-5 h-5 ${s.color}`} />
               </div>
-              <ArrowUpRight className="w-6 h-6 text-white/5 group-hover:text-accent transition-all duration-500" />
+              <ArrowUpRight className="w-5 h-5 text-slate-300 group-hover:text-brand-600 transition-colors duration-300" />
             </div>
-            <p className="label-premium opacity-50 group-hover:opacity-100 transition-opacity mb-2">{s.label}</p>
-            <p className="text-4xl font-black text-white tracking-tighter group-hover:translate-x-1 transition-transform">{s.value}</p>
+            <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">{s.label}</p>
+            <p className="text-3xl font-bold text-slate-800 tracking-tight tabular-nums">{s.value}</p>
           </div>
         ))}
       </div>
 
       {/* Chart Section */}
-      <div className="rounded-[3.5rem] p-12 glass-card overflow-hidden">
-        <div className="flex flex-col md:flex-row items-center justify-between mb-16 gap-6">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm overflow-hidden mb-8">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
           <div>
-            <h3 className="text-3xl font-black tracking-tighter uppercase italic text-glow">Evolución en el tiempo</h3>
-            <p className="label-premium mt-2">Comparativa según filtro aplicado</p>
+            <h3 className="text-xl font-bold tracking-tight text-slate-800">Evolución en el tiempo</h3>
+            <p className="text-sm text-[#64748B] mt-1">Comparativa según filtro aplicado</p>
           </div>
           <div className="flex items-center gap-4">
-             <div className="flex items-center gap-6 px-8 py-4 rounded-2xl bg-white/5 border border-white/10">
+             <div className="flex items-center gap-5 px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Cuotas</span>
+                  <div className="w-2.5 h-2.5 rounded-full bg-brand-500" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Cuotas</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Intereses</span>
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Intereses</span>
                 </div>
              </div>
           </div>
@@ -323,116 +321,116 @@ export default function IncomeAnalyticsPage() {
           {filteredData.chart.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={filteredData.chart} margin={{ top: 20, right: 30, left: 20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                <XAxis 
-                  dataKey="label" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#ffffff30', fontSize: 10, fontWeight: 900 }}
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#64748B', fontSize: 10, fontWeight: 600 }}
                   dy={15}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#ffffff30', fontSize: 10, fontWeight: 900 }}
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#64748B', fontSize: 10, fontWeight: 600 }}
                   tickFormatter={(val) => `$${(val / 1000000).toFixed(0)}M`}
                 />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                <Bar dataKey="cuotas" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={40} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(15,23,42,0.04)' }} />
+                <Bar dataKey="cuotas" stackId="a" fill="#4ba646" radius={[0, 0, 0, 0]} barSize={40} />
                 <Bar dataKey="penalty" stackId="a" fill="#ef4444" radius={[10, 10, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-center opacity-30">
-              <Filter className="w-12 h-12 mb-4" />
-              <p className="text-[10px] font-black uppercase tracking-widest">No hay datos en este rango</p>
+            <div className="w-full h-full flex flex-col items-center justify-center text-center">
+              <Filter className="w-12 h-12 mb-4 text-slate-300" />
+              <p className="text-sm font-semibold text-[#64748B]">No hay datos en este rango</p>
             </div>
           )}
         </div>
       </div>
 
       {/* Detailed Table */}
-      <div className="rounded-[3.5rem] p-12 glass-card">
-        <div className="flex flex-col lg:flex-row items-center justify-between mb-12 gap-8">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-[#E2E8F0]">
           <div>
-            <h3 className="text-3xl font-black tracking-tighter uppercase italic text-glow">Libro de Ingresos</h3>
-            <p className="label-premium mt-2">Detalle cronológico de los pagos</p>
+            <h3 className="text-xl font-bold tracking-tight text-slate-800">Libro de Ingresos</h3>
+            <p className="text-sm text-[#64748B] mt-1">Detalle cronológico de los pagos</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-            <div className="relative flex-1 lg:flex-none lg:min-w-[300px]">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-              <input 
-                type="text" 
-                placeholder="BUSCAR CLIENTE O LOTE..."
+            <div className="relative flex-1 lg:flex-none lg:min-w-[280px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]/50" />
+              <input
+                type="text"
+                placeholder="Buscar cliente o lote..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-14 pr-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none transition-all placeholder:text-[#64748B]/40 text-[#191c1e]"
               />
             </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-[2rem] border border-white/5">
+        <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-white/5">
-                <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-white/30 border-b border-white/5">Fecha</th>
-                <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-white/30 border-b border-white/5">Cliente</th>
-                <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-white/30 border-b border-white/5">Lote</th>
-                <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-white/30 border-b border-white/5">Categoría</th>
-                <th className="px-8 py-6 text-[9px] font-black uppercase tracking-[0.3em] text-white/30 border-b border-white/5 text-right">Monto</th>
+              <tr className="bg-slate-50">
+                <th className="px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-[#64748B] border-b border-[#E2E8F0]">Fecha</th>
+                <th className="px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-[#64748B] border-b border-[#E2E8F0]">Cliente</th>
+                <th className="px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-[#64748B] border-b border-[#E2E8F0]">Lote</th>
+                <th className="px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-[#64748B] border-b border-[#E2E8F0]">Categoría</th>
+                <th className="px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-[#64748B] border-b border-[#E2E8F0] text-right">Monto</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.02]">
+            <tbody className="divide-y divide-[#E2E8F0]">
               {filteredData.records.length > 0 ? filteredData.records.map((rec: any) => (
-                <tr key={rec.id} className="group hover:bg-white/[0.02] transition-colors">
-                  <td className="px-8 py-6">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-white/40 group-hover:text-white transition-colors">
+                <tr key={rec.id} className="group hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-3">
+                    <span className="text-xs font-medium text-slate-600 tabular-nums whitespace-nowrap">
                       {new Date(rec.paidAt).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </span>
                   </td>
-                  <td className="px-8 py-6">
+                  <td className="px-6 py-3">
                     <div className="flex flex-col">
-                      <span className="text-xs font-black uppercase tracking-tight text-white group-hover:text-accent transition-colors">{rec.clientName}</span>
-                      <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1">{rec.description || 'Sin descripción'}</span>
+                      <span className="text-sm font-semibold text-slate-800">{rec.clientName}</span>
+                      <span className="text-xs text-[#64748B] mt-0.5">{rec.description || 'Sin descripción'}</span>
                     </div>
                   </td>
-                  <td className="px-8 py-6">
-                    <div className="inline-flex px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/60">
+                  <td className="px-6 py-3">
+                    <div className="inline-flex px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap">
                       {rec.lotStage ? `${rec.lotStage} ` : ''}{rec.lotNumber}
                     </div>
                   </td>
-                  <td className="px-8 py-6">
+                  <td className="px-6 py-3">
                     <div className={`
-                      inline-flex px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border
-                      ${rec.category === 'CUOTA' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
-                        'bg-red-500/10 text-red-400 border-red-500/20'}
+                      inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border
+                      ${rec.category === 'CUOTA' ? 'bg-slate-100 text-slate-700 border-slate-200' :
+                        'bg-red-50 text-red-700 border-red-200'}
                     `}>
                       {rec.category === 'CUOTA' ? 'Cuota' : 'Interés'}
                     </div>
                   </td>
-                  <td className="px-8 py-6 text-right">
-                    <span className="text-sm font-black text-white">{formatCLP(rec.amount)}</span>
+                  <td className="px-6 py-3 text-right">
+                    <span className="text-sm font-bold text-slate-800 tabular-nums whitespace-nowrap">{formatCLP(rec.amount)}</span>
                   </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/10 italic">No se encontraron registros de ingresos</p>
+                  <td colSpan={5} className="px-6 py-20 text-center">
+                    <p className="text-sm font-semibold text-[#64748B]">No se encontraron registros de ingresos</p>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        
-        <div className="mt-10 flex items-center justify-between px-8">
-           <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Mostrando {filteredData.records.length} transacciones</p>
-           <button 
-             className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white hover:bg-accent hover:border-accent hover:text-[#061010] transition-all"
+
+        <div className="flex items-center justify-between gap-4 p-6 border-t border-[#E2E8F0]">
+           <p className="text-xs font-medium text-[#64748B]">Mostrando {filteredData.records.length} transacciones</p>
+           <button
+             className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer shadow-sm"
            >
-             <Download className="w-4 h-4" />
+             <Download className="w-4 h-4 text-slate-500" />
              Exportar Reporte
            </button>
         </div>

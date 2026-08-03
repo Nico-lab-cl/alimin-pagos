@@ -140,7 +140,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const handleSignOut = () => signOut({ callbackUrl: "/login" });
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex overflow-hidden font-outfit">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex overflow-hidden font-outfit">
       {/* Sidebar Placeholder - Desktop Only */}
       <div className={cn(
         "hidden lg:block flex-shrink-0 transition-all duration-300",
@@ -165,7 +165,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           <div className={cn("flex items-center justify-between mb-10 px-2", isCollapsed && "lg:px-0 lg:justify-center")}>
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="Alimin Logo" className="w-8 h-8 object-contain" />
-              {!isCollapsed && <h1 className="text-xl font-bold tracking-tight text-blue-650 whitespace-nowrap animate-fade-in">Alimin</h1>}
+              {!isCollapsed && <h1 className="text-xl font-bold tracking-tight text-brand-600 whitespace-nowrap animate-fade-in">Alimin</h1>}
             </div>
           </div>
 
@@ -186,8 +186,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "group flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200",
                       isActive 
-                        ? "bg-blue-600 text-white font-semibold shadow-sm" 
-                        : "text-slate-650 hover:text-slate-900 hover:bg-slate-50",
+                        ? "bg-brand-600 text-white font-semibold shadow-sm" 
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
                       isCollapsed && "lg:px-0 lg:justify-center"
                     )}
                     title={isCollapsed ? item.label : undefined}
@@ -217,7 +217,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                             href={sub.href}
                             className={cn(
                               "flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs font-medium transition-all",
-                              isSubActive ? "text-blue-600 bg-blue-50/50 font-semibold" : "text-slate-550 hover:text-slate-800 hover:bg-slate-50"
+                              isSubActive ? "text-brand-600 bg-brand-50/50 font-semibold" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                             )}
                           >
                             <sub.icon className="w-4 h-4 flex-shrink-0" />
@@ -237,7 +237,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => toast.info("Soporte Técnico y de Operaciones disponible próximamente")}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-655 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all text-left cursor-pointer",
+                "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all text-left cursor-pointer",
                 isCollapsed && "lg:px-0 lg:justify-center"
               )}
               title={isCollapsed ? "Soporte" : undefined}
@@ -269,14 +269,14 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           scrolled ? "bg-white/95 backdrop-blur-xl border-slate-200/80 shadow-sm" : "bg-white border-slate-100"
         )}>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center">
               <Zap className="w-4.5 h-4.5 text-white" />
             </div>
             <span className="font-bold uppercase tracking-tight text-slate-800 text-base">Alimin</span>
           </div>
           <button 
             onClick={() => setIsOpen(!isOpen)}
-            className="p-2.5 rounded-xl bg-slate-50 text-slate-600 border border-slate-250"
+            className="p-2.5 rounded-xl bg-slate-50 text-slate-600 border border-slate-200"
           >
             {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -284,7 +284,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
         {/* Top Internal Header (Desktop Only) */}
         <header className="hidden lg:flex items-center justify-between px-12 py-5 bg-white border-b border-slate-200/80">
-          <h2 className="text-base font-bold text-slate-850">Alimin Admin</h2>
+          <h2 className="text-base font-bold text-slate-800">Alimin Admin</h2>
           
           {/* Search Input in Center */}
           <div className="relative max-w-md w-full mx-8">
@@ -296,7 +296,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               onFocus={() => setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-55 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-850 placeholder-slate-400 focus:border-blue-500 outline-none transition-all font-medium"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-brand-500 outline-none transition-all font-medium"
             />
             
             {showDropdown && searchResults.length > 0 && (
@@ -316,7 +316,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
                       <span>RUT: {client.rut}</span>
                       <span>•</span>
-                      <span className="text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.2 rounded font-extrabold">{client.projectName} - Lote {client.lotNumber}</span>
+                      <span className="text-brand-600 bg-brand-50 border border-brand-100 px-1.5 py-0.2 rounded font-extrabold">{client.projectName} - Lote {client.lotNumber}</span>
                     </div>
                   </button>
                 ))}
@@ -325,12 +325,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
           
           <div className="flex items-center gap-6">
-            <button className="relative p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-550 hover:text-slate-850 transition-all shadow-sm">
+            <button className="relative p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-800 transition-all shadow-sm">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />
             </button>
             
-            <button className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-550 hover:text-slate-850 transition-all shadow-sm">
+            <button className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-800 transition-all shadow-sm">
               <BookOpen className="w-4 h-4" />
             </button>
           </div>

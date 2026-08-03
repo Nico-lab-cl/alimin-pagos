@@ -15,7 +15,9 @@ interface DatePickerProps {
   lightMode?: boolean;
 }
 
-export function DatePicker({ date, onChange, label, className, lightMode = false }: DatePickerProps) {
+// `lightMode` por defecto: el portal es claro. La rama oscura queda solo para
+// las superficies oscuras a proposito (/mantenimiento, /change-password).
+export function DatePicker({ date, onChange, label, className, lightMode = true }: DatePickerProps) {
   // Helper to parse YYYY-MM-DD string as local date to avoid timezone shifts
   const parseLocalDate = (dateStr: string | Date | null | undefined): Date => {
     if (!dateStr) return new Date();
@@ -82,7 +84,7 @@ export function DatePicker({ date, onChange, label, className, lightMode = false
               className={cn(
                 "w-full flex items-center justify-between rounded-xl pl-4 pr-10 py-2.5 text-sm outline-none font-bold transition-all text-left border",
                 lightMode
-                  ? "bg-white border-slate-200 text-slate-800 hover:bg-slate-50 focus:border-blue-500"
+                  ? "bg-white border-slate-200 text-slate-800 hover:bg-slate-50 focus:border-brand-500"
                   : "bg-black/40 border-white/10 text-white hover:bg-white/5 focus:border-accent",
                 !date && (lightMode ? "text-slate-400" : "text-white/20")
               )}
@@ -206,12 +208,12 @@ export function DatePicker({ date, onChange, label, className, lightMode = false
                       isCurrentMonth && !isSelected && (lightMode ? "text-slate-700 hover:bg-slate-100" : "text-white/60 hover:bg-white/5 hover:text-white"),
                       isSelected && (
                         lightMode 
-                          ? "bg-blue-600 text-white shadow-sm" 
-                          : "bg-accent text-[#061010] shadow-[0_0_15px_rgba(212,168,75,0.3)]"
+                          ? "bg-brand-600 text-white shadow-sm" 
+                          : "bg-accent text-[#061010] shadow-[0_0_15px_rgba(75,166,70,0.3)]"
                       ),
                       isTdy && !isSelected && (
                         lightMode 
-                          ? "border border-blue-200 text-blue-600 font-bold" 
+                          ? "border border-brand-200 text-brand-600 font-bold" 
                           : "border border-accent/30 text-accent font-black"
                       )
                     )}

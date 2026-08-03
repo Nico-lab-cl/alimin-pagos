@@ -46,7 +46,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen items-center justify-center font-body-md text-on-surface p-4 bg-[#F8FAFC]">
+    <div className="flex flex-col min-h-screen items-center justify-center font-body-md text-on-surface p-4 bg-slate-50">
       <main className="w-full max-w-md animate-slide-up">
         {/* Central Card */}
         <div className="bg-white rounded-2xl p-6 md:p-10 flex flex-col items-center border border-border-subtle shadow-[0_10px_15px_-3px_rgba(0,0,0,0.05),0_4px_6px_-2px_rgba(0,0,0,0.02)]">
@@ -57,7 +57,7 @@ export default function LoginPage() {
               className="w-20 h-20 mb-4 object-contain" 
               src="/logo.png"
             />
-            <h1 className="font-headline-sm text-headline-sm text-cobalt-blue">Alimin Cobranzas</h1>
+            <h1 className="font-headline-sm text-headline-sm text-brand-600">Alimin Cobranzas</h1>
             <p className="font-headline-md text-headline-md text-on-surface-variant mt-1 text-center">
               Ingreso al Portal Administrativo
             </p>
@@ -70,7 +70,7 @@ export default function LoginPage() {
               <label className="font-label-md text-label-md text-text-muted" htmlFor="email">
                 RUT o Correo Electrónico
               </label>
-              <div className="relative border border-outline-variant rounded-lg transition-all focus-within:border-cobalt-blue focus-within:ring-2 focus-within:ring-cobalt-blue/10 bg-transparent">
+              <div className="relative border border-outline-variant rounded-lg transition-all focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600/10 bg-transparent">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="w-5 h-5 text-outline-variant" />
                 </span>
@@ -92,11 +92,11 @@ export default function LoginPage() {
                 <label className="font-label-md text-label-md text-text-muted" htmlFor="password">
                   Contraseña
                 </label>
-                <a className="font-body-sm text-body-sm text-cobalt-blue hover:underline" href="/forgot-password">
+                <a className="font-body-sm text-body-sm text-brand-600 hover:underline" href="/forgot-password">
                   ¿Olvidaste tu contraseña?
                 </a>
               </div>
-              <div className="relative border border-outline-variant rounded-lg transition-all focus-within:border-cobalt-blue focus-within:ring-2 focus-within:ring-cobalt-blue/10 bg-transparent">
+              <div className="relative border border-outline-variant rounded-lg transition-all focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600/10 bg-transparent">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="w-5 h-5 text-outline-variant" />
                 </span>
@@ -128,7 +128,7 @@ export default function LoginPage() {
 
             {/* Primary Action */}
             <button 
-              className="w-full bg-cobalt-blue text-white font-headline-md text-headline-md py-4 rounded-lg shadow-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer" 
+              className="w-full bg-brand-600 text-white font-headline-md text-headline-md py-4 rounded-lg shadow-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer" 
               type="submit"
               disabled={loading}
             >
@@ -152,9 +152,9 @@ export default function LoginPage() {
         {/* External Footer Links */}
         <div className="mt-6 flex flex-col items-center gap-2">
           <nav className="flex gap-6 font-body-sm text-body-sm text-text-muted">
-            <a className="hover:text-cobalt-blue transition-colors" href="#">Términos y Condiciones</a>
-            <a className="hover:text-cobalt-blue transition-colors" href="#">Privacidad</a>
-            <a className="hover:text-cobalt-blue transition-colors" href="#">Soporte</a>
+            <a className="hover:text-brand-600 transition-colors" href="#">Términos y Condiciones</a>
+            <a className="hover:text-brand-600 transition-colors" href="#">Privacidad</a>
+            <a className="hover:text-brand-600 transition-colors" href="#">Soporte</a>
           </nav>
         </div>
       </main>

@@ -117,9 +117,9 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
       <div className="relative w-full h-full max-w-6xl bg-white border border-slate-200 rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-zoom-in">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-5 border-b border-slate-150 bg-slate-50/50">
+        <div className="flex items-center justify-between px-8 py-5 border-b border-slate-200 bg-slate-50/50">
           <div className="flex flex-col">
-            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-600">Previsualización de Documento</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-600">Previsualización de Documento</p>
             <h3 className="text-base font-bold text-slate-800 uppercase tracking-tight truncate max-w-[300px] sm:max-w-md">
               {title}
             </h3>
@@ -129,7 +129,7 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
              {!isMissingFile && (
                <button
                 onClick={() => downloadDocument(url, title, fileType)}
-                className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-250 transition-all shadow-sm cursor-pointer"
+                className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all shadow-sm cursor-pointer"
                 title="Descargar"
               >
                 <Download className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
         <div className="flex-1 relative bg-slate-50/50 overflow-auto">
           {loading && !error && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-20 bg-white">
-              <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+              <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 opacity-60">Preparando Visor...</p>
             </div>
           )}
@@ -178,7 +178,7 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
               </div>
               <button
                 onClick={() => downloadDocument(url, title, fileType)}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                className="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm cursor-pointer"
               >
                 <span>Descargar Archivo Original</span>
                 <Download className="w-3.5 h-3.5" />
@@ -207,12 +207,12 @@ export default function PreviewModal({ isOpen, onClose, url, title, fileType }: 
         </div>
 
         {/* Footer / Info */}
-        <div className="px-8 py-4 border-t border-slate-150 bg-slate-50/50 flex items-center justify-between">
+        <div className="px-8 py-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-between">
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
               © 2026 ALIMIN SPA • SISTEMA DE GESTIÓN DE PAGOS
             </p>
             <div className="flex items-center gap-4">
-                <div className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-bold uppercase tracking-widest border border-emerald-100 flex items-center gap-1.5">
+                <div className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-bold uppercase tracking-widest border border-emerald-100 flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span>Servidor Seguro</span>
                 </div>
