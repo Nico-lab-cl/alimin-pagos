@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { getAdminProjects, getAdminLots, updateLot } from "@/actions/postventa";
-import { formatCLP } from "@/lib/utils";
+import { formatCLP, downloadCsv } from "@/lib/utils";
 import { 
   Loader2, Search, Map as MapIcon, Layers, ChevronRight, Zap, Filter, 
   LayoutGrid, List, Plus, MoreVertical, UserPlus, ShieldAlert, CheckCircle2,
@@ -122,7 +122,7 @@ export default function AdminLotsPage() {
     );
   }, [filteredLots, currentPage]);
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     const listToExport = selectedLotIds.length > 0
       ? lots.filter(l => selectedLotIds.includes(l.id))
       : filteredLots;
@@ -138,14 +138,7 @@ export default function AdminLotsPage() {
     ]);
 
     const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map((row: any) => row.map((val: any) => `"${val.toString().replace(/"/g, '""')}"`).join(";"))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Lotes_${selectedProject}_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    await downloadCsv(csvContent, `Lotes_${selectedProject}_${new Date().toISOString().split("T")[0]}.csv`);
   };
 
   return (
@@ -169,7 +162,7 @@ export default function AdminLotsPage() {
               placeholder="Buscar lote o dueño..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none transition-all placeholder:text-[#64748B]/40 text-[#191c1e]"
+              className="w-full pl-9 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none transition-all placeholder:text-[#64748B]/40 text-[#191c1e]"
             />
           </div>
 
@@ -177,7 +170,7 @@ export default function AdminLotsPage() {
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[200px]"
+            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[200px]"
             style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
           >
             {projects.map((p) => (
@@ -191,7 +184,7 @@ export default function AdminLotsPage() {
               onClick={() => setView("grid")}
               className={cn(
                 "p-1.5 rounded-md transition-all cursor-pointer",
-                view === "grid" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                view === "grid" ? "bg-white text-brand-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
               )}
               title="Vista Cuadrícula"
             >
@@ -201,7 +194,7 @@ export default function AdminLotsPage() {
               onClick={() => setView("list")}
               className={cn(
                 "p-1.5 rounded-md transition-all cursor-pointer",
-                view === "list" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                view === "list" ? "bg-white text-brand-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
               )}
               title="Vista Lista"
             >
@@ -221,7 +214,7 @@ export default function AdminLotsPage() {
           {/* New Lot Button */}
           <button 
             onClick={() => setIsCreateLotOpen(true)}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Nuevo Lote</span>
@@ -237,13 +230,13 @@ export default function AdminLotsPage() {
             onClick={() => setActiveTab("ALL")}
             className={`px-4 py-2 text-xs font-semibold tracking-wider whitespace-nowrap transition-all border-b-2 cursor-pointer ${
               activeTab === "ALL" 
-                ? "border-[#1D4ED8] text-[#1D4ED8] font-bold" 
-                : "border-transparent text-[#64748B] hover:text-[#1D4ED8]"
+                ? "border-brand-600 text-brand-600 font-bold" 
+                : "border-transparent text-[#64748B] hover:text-brand-600"
             }`}
           >
             Todos los Lotes
             <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === "ALL" ? "bg-[#1D4ED8]/10 text-[#1D4ED8]" : "bg-slate-100 text-slate-650"
+              activeTab === "ALL" ? "bg-brand-600/10 text-brand-600" : "bg-slate-100 text-slate-600"
             }`}>
               {stats.total}
             </span>
@@ -260,7 +253,7 @@ export default function AdminLotsPage() {
           >
             Vendidos
             <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === "SOLD" ? "bg-red-50 text-red-550 border border-red-100" : "bg-slate-100 text-slate-655"
+              activeTab === "SOLD" ? "bg-red-50 text-red-500 border border-red-100" : "bg-slate-100 text-slate-600"
             }`}>
               {stats.sold}
             </span>
@@ -271,13 +264,13 @@ export default function AdminLotsPage() {
             onClick={() => setActiveTab("AVAILABLE")}
             className={`px-4 py-2 text-xs font-semibold tracking-wider whitespace-nowrap transition-all border-b-2 cursor-pointer ${
               activeTab === "AVAILABLE" 
-                ? "border-emerald-600 text-emerald-600 font-bold" 
-                : "border-transparent text-[#64748B] hover:text-emerald-600"
+                ? "border-emerald-600 text-emerald-700 font-bold" 
+                : "border-transparent text-[#64748B] hover:text-emerald-700"
             }`}
           >
             Disponibles
             <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === "AVAILABLE" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-slate-100 text-slate-655"
+              activeTab === "AVAILABLE" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-slate-100 text-slate-600"
             }`}>
               {stats.available}
             </span>
@@ -290,12 +283,12 @@ export default function AdminLotsPage() {
               className={`px-4 py-2 text-xs font-semibold tracking-wider whitespace-nowrap transition-all border-b-2 cursor-pointer ${
                 activeTab === "TEST" 
                   ? "border-indigo-600 text-indigo-600 font-bold" 
-                  : "border-transparent text-[#64748B] hover:text-indigo-650"
+                  : "border-transparent text-[#64748B] hover:text-indigo-600"
               }`}
             >
               Pruebas
               <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${
-                activeTab === "TEST" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" : "bg-slate-100 text-slate-655"
+                activeTab === "TEST" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" : "bg-slate-100 text-slate-600"
               }`}>
                 {stats.test}
               </span>
@@ -306,7 +299,7 @@ export default function AdminLotsPage() {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-40 gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+          <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#64748B] opacity-65">Analizando Inventario...</p>
         </div>
       ) : (
@@ -317,15 +310,15 @@ export default function AdminLotsPage() {
               {paginatedLots.map((lot, i) => {
                 const hasOwner = !!lot.assignedClient;
                 const badgeStyle = hasOwner 
-                  ? "bg-red-50 text-red-650 border-red-150"
-                  : "bg-emerald-50 text-emerald-600 border-emerald-150";
+                  ? "bg-red-50 text-red-600 border-red-200"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200";
                 const dotColor = hasOwner ? "bg-red-500" : "bg-emerald-500";
                 const badgeText = hasOwner ? "Vendido" : "Disponible";
 
                 return (
                   <div
                     key={lot.id}
-                    className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md hover:border-slate-350 transition-all duration-300 flex flex-col justify-between"
+                    className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col justify-between"
                   >
                     <div>
                       {/* Card Header */}
@@ -339,7 +332,7 @@ export default function AdminLotsPage() {
                                 prev.includes(lot.id) ? prev.filter(id => id !== lot.id) : [...prev, lot.id]
                               );
                             }}
-                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                            className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 cursor-pointer"
                           />
                           <div>
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Unidad Catastral</p>
@@ -361,7 +354,7 @@ export default function AdminLotsPage() {
                                   onClick={() => setAssignOwnerLot(lot)}
                                   className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors cursor-pointer"
                                 >
-                                  <UserPlus className="w-3.5 h-3.5 text-blue-600" /> Asignar Dueño
+                                  <UserPlus className="w-3.5 h-3.5 text-brand-600" /> Asignar Dueño
                                 </button>
                                 <button 
                                   onClick={() => handleStatusToggle(lot, 'reserved')}
@@ -405,8 +398,8 @@ export default function AdminLotsPage() {
 
                       {/* Owner Section */}
                       {lot.assignedClient ? (
-                        <div className="mb-4 p-3 rounded-xl bg-slate-50 border border-slate-150">
-                          <p className="text-[9px] font-bold text-slate-450 uppercase tracking-wider mb-1">Cliente Adjudicado</p>
+                        <div className="mb-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cliente Adjudicado</p>
                           <p className="text-xs font-bold text-slate-800 uppercase truncate">{lot.assignedClient}</p>
                           {lot.assignmentStatus === 'ARCHIVED' && (
                             <span className="text-[8px] font-bold text-slate-400 uppercase mt-0.5 block tracking-wider">Histórico</span>
@@ -414,7 +407,7 @@ export default function AdminLotsPage() {
                         </div>
                       ) : (
                         <div className="mb-4 p-3 rounded-xl border border-dashed border-slate-200 flex flex-col items-center justify-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
-                          <UserPlus className="w-4 h-4 text-slate-350" />
+                          <UserPlus className="w-4 h-4 text-slate-300" />
                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Sin Adjudicar</p>
                         </div>
                       )}
@@ -424,9 +417,9 @@ export default function AdminLotsPage() {
                     <div className="flex items-center justify-between mt-2 pt-3 border-t border-slate-100">
                       <div>
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Valuación</p>
-                        <p className="text-lg font-bold text-blue-600 tracking-tight">{formatCLP(lot.price_total_clp)}</p>
+                        <p className="text-lg font-bold text-brand-600 tracking-tight">{formatCLP(lot.price_total_clp)}</p>
                       </div>
-                      <button className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all cursor-pointer">
+                      <button className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center hover:bg-brand-600 hover:text-white hover:border-brand-600 transition-all cursor-pointer">
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
@@ -452,7 +445,7 @@ export default function AdminLotsPage() {
                               setSelectedLotIds([]);
                             }
                           }}
-                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                          className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 cursor-pointer"
                         />
                       </th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Lote / Unidad</th>
@@ -468,8 +461,8 @@ export default function AdminLotsPage() {
                     {paginatedLots.map((lot) => {
                       const hasOwner = !!lot.assignedClient;
                       const badgeStyle = hasOwner 
-                        ? "bg-red-50 text-red-650 border-red-150"
-                        : "bg-emerald-50 text-emerald-600 border-emerald-150";
+                        ? "bg-red-50 text-red-600 border-red-200"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200";
                       const dotColor = hasOwner ? "bg-red-500" : "bg-emerald-500";
                       const badgeText = hasOwner ? "Vendido" : "Disponible";
 
@@ -484,7 +477,7 @@ export default function AdminLotsPage() {
                                   prev.includes(lot.id) ? prev.filter(id => id !== lot.id) : [...prev, lot.id]
                                 );
                               }}
-                              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                              className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 cursor-pointer"
                             />
                           </td>
                           <td className="px-6 py-4">
@@ -517,7 +510,7 @@ export default function AdminLotsPage() {
                               <span className="text-xs text-slate-400 font-semibold italic">Sin Propietario</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-right font-bold text-blue-600">
+                          <td className="px-6 py-4 text-right font-bold text-brand-600">
                             {formatCLP(lot.price_total_clp)}
                           </td>
                           <td className="px-6 py-4">
@@ -526,14 +519,14 @@ export default function AdminLotsPage() {
                                 <>
                                   <button
                                     onClick={() => setAssignOwnerLot(lot)}
-                                    className="p-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition-all cursor-pointer"
+                                    className="p-1.5 rounded bg-brand-50 text-brand-600 hover:bg-brand-100 border border-brand-200 transition-all cursor-pointer"
                                     title="Asignar Dueño"
                                   >
                                     <UserPlus className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleStatusToggle(lot, 'reserved')}
-                                    className="p-1.5 rounded bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-250 transition-all cursor-pointer"
+                                    className="p-1.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-all cursor-pointer"
                                     title="Marcar Pacto"
                                   >
                                     <ShieldAlert className="w-3.5 h-3.5" />
@@ -553,7 +546,7 @@ export default function AdminLotsPage() {
 
           {filteredLots.length === 0 && (
             <div className="col-span-full py-40 text-center border border-[#E2E8F0] rounded-2xl bg-white shadow-sm">
-              <Layers className="w-16 h-16 mx-auto mb-4 text-slate-350 opacity-50" />
+              <Layers className="w-16 h-16 mx-auto mb-4 text-slate-300 opacity-50" />
               <p className="text-sm font-semibold uppercase tracking-wider text-[#64748B]">Búsqueda sin resultados en este proyecto</p>
             </div>
           )}
@@ -562,7 +555,7 @@ export default function AdminLotsPage() {
           {totalPages > 1 && (
             <div className="border-t border-[#E2E8F0] bg-slate-50 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl shadow-sm">
               <p className="text-xs font-semibold text-[#64748B]">
-                Mostrando <span className="text-[#1D4ED8] font-bold">{((currentPage - 1) * itemsPerPage) + 1}</span> a <span className="text-slate-600 font-bold">{Math.min(currentPage * itemsPerPage, filteredLots.length)}</span> de <span className="text-slate-650 font-bold">{filteredLots.length}</span> Lotes
+                Mostrando <span className="text-brand-600 font-bold">{((currentPage - 1) * itemsPerPage) + 1}</span> a <span className="text-slate-600 font-bold">{Math.min(currentPage * itemsPerPage, filteredLots.length)}</span> de <span className="text-slate-600 font-bold">{filteredLots.length}</span> Lotes
               </p>
               <div className="flex items-center gap-2">
                 <button

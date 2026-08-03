@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { getAdminProjects, approveReceipt, approveReceiptAsInterestPayment, rejectReceipt, getAllReceipts } from "@/actions/postventa";
-import { formatCLP, cn, getReceiptDownloadFilename, downloadDocument } from "@/lib/utils";
+import { formatCLP, cn, getReceiptDownloadFilename, downloadDocument, downloadCsv } from "@/lib/utils";
 import { toast } from "sonner";
 import { 
   Loader2, 
@@ -212,7 +212,7 @@ export default function ReceiptsPage() {
   }, [filteredReceipts, currentPage]);
 
   // Export to Excel/CSV function (Spanish Excel compatible)
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const headers = [
       "Fecha de Pago", 
       "Cliente", 
@@ -244,14 +244,7 @@ export default function ReceiptsPage() {
       ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(";"))
     ].join("\r\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `bandeja_pagos_${activeTab.toLowerCase()}_${selectedProject}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    await downloadCsv(csvContent, `bandeja_pagos_${activeTab.toLowerCase()}_${selectedProject}.csv`);
     toast.success("Excel/CSV exportado exitosamente");
   };
 
@@ -300,7 +293,7 @@ export default function ReceiptsPage() {
           className={cn(
             "w-8 h-8 rounded-lg text-xs font-bold transition-all border",
             currentPage === p 
-              ? "bg-blue-600 text-white border-blue-600 shadow-sm" 
+              ? "bg-brand-600 text-white border-brand-600 shadow-sm" 
               : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
           )}
         >
@@ -327,7 +320,7 @@ export default function ReceiptsPage() {
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider outline-none cursor-pointer hover:bg-slate-50 transition-all shadow-sm focus:border-blue-500"
+            className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider outline-none cursor-pointer hover:bg-slate-50 transition-all shadow-sm focus:border-brand-500"
             style={{ 
               appearance: "none", 
               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, 
@@ -345,7 +338,7 @@ export default function ReceiptsPage() {
 
           <button
             onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-250 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-all shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-all shadow-sm"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
             Exportar Excel
@@ -353,7 +346,7 @@ export default function ReceiptsPage() {
 
           <Link
             href="/admin/clients"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition-all shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             Nuevo Ingreso
@@ -420,7 +413,7 @@ export default function ReceiptsPage() {
             placeholder="Buscar cliente o proyecto..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:border-blue-500 outline-none transition-all shadow-sm"
+            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:border-brand-500 outline-none transition-all shadow-sm"
           />
         </div>
       </div>
@@ -428,21 +421,21 @@ export default function ReceiptsPage() {
       {/* Main Table Container */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-40 gap-4 bg-slate-50 rounded-[2rem] border border-slate-200/50">
-          <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+          <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Cargando registros...</p>
         </div>
       ) : paginatedReceipts.length === 0 ? (
         <div className="text-center py-32 rounded-[2rem] border border-slate-200/60 bg-slate-50 flex flex-col items-center justify-center p-6">
-          <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mb-4 border border-blue-100 shadow-sm">
-            <Check className="w-6 h-6 text-blue-600" />
+          <div className="w-16 h-16 rounded-full bg-brand-50 flex items-center justify-center mb-4 border border-brand-100 shadow-sm">
+            <Check className="w-6 h-6 text-brand-600" />
           </div>
           <h3 className="text-lg font-bold text-slate-900 mb-1 tracking-tight">Sin Comprobantes</h3>
-          <p className="text-xs font-medium text-slate-505 max-w-sm">
+          <p className="text-xs font-medium text-slate-500 max-w-sm">
             No se encontraron comprobantes con el estado actual o los criterios de búsqueda.
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-slate-250/60 rounded-[2rem] p-6 shadow-sm">
+        <div className="bg-white border border-slate-200/60 rounded-[2rem] p-6 shadow-sm">
           
           {/* Table Header Row (Desktop only) */}
           <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-[10px] font-black text-slate-400 tracking-wider uppercase border-b border-slate-100 mb-2">
@@ -489,13 +482,13 @@ export default function ReceiptsPage() {
                   </div>
 
                   {/* Column 2: Proyecto */}
-                  <div className="col-span-2 text-slate-650 text-xs font-semibold">
+                  <div className="col-span-2 text-slate-600 text-xs font-semibold">
                     <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Proyecto:</span>
                     {projectName}
                   </div>
 
                   {/* Column 3: Cuota */}
-                  <div className="col-span-1 text-slate-650 text-xs font-bold md:text-center">
+                  <div className="col-span-1 text-slate-600 text-xs font-bold md:text-center">
                     <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cuota:</span>
                     <div>{quotaText}</div>
                     {receipt.scope !== "PIE" && (
@@ -542,14 +535,14 @@ export default function ReceiptsPage() {
                     <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mr-auto">Comprobante:</span>
                     <button
                       onClick={() => setPreviewUrl(receipt.receipt_url)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-650 hover:bg-slate-100 transition-colors"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                       title="Previsualizar Comprobante"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => downloadDocument(receipt.receipt_url, `comprobante_${receipt.id}`)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-655 hover:bg-slate-100 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                       title="Descargar Comprobante"
                     >
                       <Download className="w-4 h-4" />
@@ -565,7 +558,7 @@ export default function ReceiptsPage() {
                         setShowRejectionForm(false);
                         setRejectionReason("");
                       }}
-                      className="px-3 py-1.5 border border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-[11px] rounded-lg transition-all shadow-sm"
+                      className="px-3 py-1.5 border border-brand-600 text-brand-600 hover:bg-brand-50 font-bold text-[11px] rounded-lg transition-all shadow-sm"
                     >
                       Ver Detalle
                     </button>
@@ -679,20 +672,20 @@ export default function ReceiptsPage() {
               </div>
 
               {/* Status Indicator */}
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-150">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
                 <span className="text-xs font-semibold text-slate-400">Estado del Pago:</span>
                 {selectedReceipt.status === "PENDING" && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-250">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
                     Pendiente de Aprobación
                   </span>
                 )}
                 {selectedReceipt.status === "APPROVED" && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-250">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Aprobado
                   </span>
                 )}
                 {selectedReceipt.status === "REJECTED" && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-250">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
                     Rechazado
                   </span>
                 )}
@@ -707,8 +700,8 @@ export default function ReceiptsPage() {
                 </div>
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contacto</span>
-                  <span className="text-slate-650 block truncate">{selectedReceipt.reservation?.email || "Sin Email"}</span>
-                  <span className="text-slate-650 block mt-0.5">{selectedReceipt.reservation?.phone || "Sin Teléfono"}</span>
+                  <span className="text-slate-600 block truncate">{selectedReceipt.reservation?.email || "Sin Email"}</span>
+                  <span className="text-slate-600 block mt-0.5">{selectedReceipt.reservation?.phone || "Sin Teléfono"}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Proyecto y Lote</span>
@@ -717,10 +710,10 @@ export default function ReceiptsPage() {
                 </div>
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Concepto y Cuota</span>
-                  <span className="text-slate-850 block">
+                  <span className="text-slate-800 block">
                     {selectedReceipt.scope === "PIE" ? "Pie (Capital)" : "Cuotas de Financiamiento"}
                   </span>
-                  <span className="text-blue-600 block mt-0.5 font-bold">
+                  <span className="text-brand-600 block mt-0.5 font-bold">
                     {selectedReceipt.scope === "PIE" ? "Ingreso Inicial" : `Cuota ${String(selectedReceipt.nominal_installment_number || selectedReceipt.reservation?.installments_paid || 1).padStart(2, '0')} / ${String(selectedReceipt.lot?.cuotas || 24).padStart(2, '0')}`}
                   </span>
                   {selectedReceipt.scope !== "PIE" && (
@@ -735,14 +728,14 @@ export default function ReceiptsPage() {
                 </div>
                 <div className="col-span-2">
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha de Carga</span>
-                  <span className="text-slate-650 font-medium block">{formatReceiptDateSimple(selectedReceipt.created_at)}</span>
+                  <span className="text-slate-600 font-medium block">{formatReceiptDateSimple(selectedReceipt.created_at)}</span>
                 </div>
               </div>
 
               {/* Rejection Details */}
               {selectedReceipt.status === "REJECTED" && selectedReceipt.rejection_reason && (
-                <div className="p-4 bg-red-50 border border-red-150 rounded-2xl flex items-start gap-2.5 text-xs text-red-800">
-                  <AlertCircle className="w-5 h-5 text-red-650 flex-shrink-0 mt-0.5" />
+                <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2.5 text-xs text-red-800">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold block mb-0.5">Motivo del Rechazo:</span>
                     <p className="font-semibold text-red-700/90 leading-relaxed">{selectedReceipt.rejection_reason}</p>
@@ -758,7 +751,7 @@ export default function ReceiptsPage() {
                       <button
                         onClick={() => handleApproveInModal(selectedReceipt.id)}
                         disabled={processing === selectedReceipt.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all disabled:opacity-30"
+                        className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all disabled:opacity-30"
                       >
                         {processing === selectedReceipt.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                         Aprobar Pago
@@ -766,7 +759,7 @@ export default function ReceiptsPage() {
                       <button
                         onClick={() => setShowRejectionForm(true)}
                         disabled={processing === selectedReceipt.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 hover:bg-red-50 text-slate-650 hover:text-red-600 hover:border-red-200 font-bold text-xs rounded-xl transition-all disabled:opacity-30"
+                        className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 hover:bg-red-50 text-slate-600 hover:text-red-600 hover:border-red-200 font-bold text-xs rounded-xl transition-all disabled:opacity-30"
                       >
                         <X className="w-3.5 h-3.5" />
                         Rechazar Pago
@@ -791,7 +784,7 @@ export default function ReceiptsPage() {
                         setShowRejectionForm(false);
                         setRejectionReason("");
                       }}
-                      className="w-full py-2.5 border border-slate-200 text-xs font-bold text-slate-650 hover:bg-slate-50 transition-colors rounded-xl"
+                      className="w-full py-2.5 border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors rounded-xl"
                     >
                       Cerrar Ventana
                     </button>
@@ -800,13 +793,13 @@ export default function ReceiptsPage() {
               ) : (
                 /* Inline Rejection Reason Panel */
                 <div className="pt-4 border-t border-slate-100 space-y-3 animate-fade-in">
-                  <label className="block text-[10px] font-bold text-red-650 uppercase tracking-wider">Especifica el Motivo del Rechazo:</label>
+                  <label className="block text-[10px] font-bold text-red-600 uppercase tracking-wider">Especifica el Motivo del Rechazo:</label>
                   <textarea
                     rows={3}
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="Escribe aquí el motivo del rechazo para que el cliente lo reciba en su portal..."
-                    className="w-full bg-slate-50 border border-slate-250 rounded-xl p-3 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:border-red-500 focus:bg-white outline-none transition-all resize-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:border-red-500 focus:bg-white outline-none transition-all resize-none"
                   />
                   <div className="flex gap-2 justify-end">
                     <button
@@ -814,7 +807,7 @@ export default function ReceiptsPage() {
                         setShowRejectionForm(false);
                         setRejectionReason("");
                       }}
-                      className="px-3.5 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-650 hover:bg-slate-50 transition-colors"
+                      className="px-3.5 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                     >
                       Cancelar
                     </button>
@@ -833,7 +826,7 @@ export default function ReceiptsPage() {
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between items-center h-[280px] md:h-auto min-h-[300px]">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider self-start mb-2">Comprobante de Respaldo</span>
               
-              <div className="flex-1 w-full bg-white border border-slate-150 rounded-xl overflow-hidden shadow-inner flex items-center justify-center relative">
+              <div className="flex-1 w-full bg-white border border-slate-200 rounded-xl overflow-hidden shadow-inner flex items-center justify-center relative">
                 {selectedReceipt.receipt_url && selectedReceipt.receipt_url.startsWith("data:image") ? (
                   <img
                     src={selectedReceipt.receipt_url}
@@ -857,7 +850,7 @@ export default function ReceiptsPage() {
               <div className="w-full flex gap-2 mt-4">
                 <button
                   onClick={() => setPreviewUrl(selectedReceipt.receipt_url)}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-slate-200 bg-white rounded-xl text-xs text-slate-650 hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm font-bold"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-slate-200 bg-white rounded-xl text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm font-bold"
                 >
                   <Eye className="w-4 h-4" />
                   Previsualizar

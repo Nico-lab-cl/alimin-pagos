@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { getFullPostventaData, getAdminProjects } from "@/actions/postventa";
 import { getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
-import { formatCLP, formatDate, downloadDocument } from "@/lib/utils";
+import { formatCLP, formatDate, downloadDocument, downloadCsv } from "@/lib/utils";
 import { signOut, useSession } from "next-auth/react";
 import {
   Loader2,
@@ -47,7 +47,7 @@ export default function LegalDashboardPage() {
 
   const handleSignOut = () => signOut({ callbackUrl: "/login" });
 
-  const exportAllToExcel = (clientsList: any[]) => {
+  const exportAllToExcel = async (clientsList: any[]) => {
     const listToExport = selectedClientIds.length > 0
       ? clientsList.filter((c: any) => selectedClientIds.includes(c.id))
       : clientsList;
@@ -79,17 +79,10 @@ export default function LegalDashboardPage() {
     ]);
 
     const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(";"))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Morosos_Contactos_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    await downloadCsv(csvContent, `Morosos_Contactos_${new Date().toISOString().split('T')[0]}.csv`);
   };
 
-  const exportIndividualToExcel = (client: any) => {
+  const exportIndividualToExcel = async (client: any) => {
     const headers = ["Campo", "Valor"];
     const rows = [
       ["Nombre Completo", client.clientName || ""],
@@ -111,14 +104,7 @@ export default function LegalDashboardPage() {
     ];
 
     const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(";"))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Ficha_${client.clientName?.replace(/\s+/g, '_')}_${client.lotNumber}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    await downloadCsv(csvContent, `Ficha_${client.clientName?.replace(/\s+/g, '_')}_${client.lotNumber}.csv`);
   };
 
   useEffect(() => {
@@ -200,7 +186,7 @@ export default function LegalDashboardPage() {
   }, [selectedClient?.id]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans relative overflow-x-hidden">
       {/* Top Header */}
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-4 flex items-center justify-between">
@@ -217,7 +203,7 @@ export default function LegalDashboardPage() {
           <div className="flex items-center gap-6">
             <div className="hidden md:flex items-center gap-3">
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Estado:</span>
-              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-bold uppercase tracking-widest border border-emerald-100 flex items-center gap-1.5">
+              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-bold uppercase tracking-widest border border-emerald-100 flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Operativo
               </span>
@@ -227,7 +213,7 @@ export default function LegalDashboardPage() {
 
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-750 uppercase tracking-[0.1em] leading-none mb-0.5">
+                <p className="text-xs font-bold text-slate-700 uppercase tracking-[0.1em] leading-none mb-0.5">
                   Alimin legal
                 </p>
                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
@@ -237,7 +223,7 @@ export default function LegalDashboardPage() {
 
               <button
                 onClick={handleSignOut}
-                className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-650 hover:bg-red-50 hover:border-red-250 transition-all flex items-center gap-1.5 text-xs font-semibold cursor-pointer shadow-sm"
+                className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-all flex items-center gap-1.5 text-xs font-semibold cursor-pointer shadow-sm"
                 title="Cerrar Sesión"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -276,19 +262,19 @@ export default function LegalDashboardPage() {
             </button>
 
             <div className="relative group w-full sm:w-80">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-500 transition-colors" />
               <input
                 type="text"
                 placeholder="Filtrar cliente, lote o proyecto..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 placeholder:text-slate-400 outline-none focus:border-blue-500 transition-all shadow-sm"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 placeholder:text-slate-400 outline-none focus:border-brand-500 transition-all shadow-sm"
               />
             </div>
 
             <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white border border-slate-200 shrink-0 w-full sm:w-auto justify-between sm:justify-start shadow-sm">
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Morosos:</span>
-              <span className="px-2.5 py-0.5 rounded-lg bg-red-50 text-red-650 text-xs font-bold border border-red-100">
+              <span className="px-2.5 py-0.5 rounded-lg bg-red-50 text-red-600 text-xs font-bold border border-red-100">
                 {totalCount}
               </span>
             </div>
@@ -302,13 +288,13 @@ export default function LegalDashboardPage() {
             className={`
               group relative flex items-center gap-2 pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer
               ${projectFilter === "ALL" 
-                ? "text-blue-600 border-b-2 border-blue-600 font-bold" 
-                : "text-slate-400 hover:text-slate-650 border-b-2 border-transparent"}
+                ? "text-brand-600 border-b-2 border-brand-600 font-bold" 
+                : "text-slate-400 hover:text-slate-600 border-b-2 border-transparent"}
             `}
           >
             <span>Todos los Proyectos</span>
             <span className={`px-2 py-0.5 rounded-lg text-[9px] ${
-              projectFilter === "ALL" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
+              projectFilter === "ALL" ? "bg-brand-50 text-brand-600" : "bg-slate-100 text-slate-500"
             }`}>{totalCount}</span>
           </button>
 
@@ -319,13 +305,13 @@ export default function LegalDashboardPage() {
               className={`
                 group relative flex items-center gap-2 pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer
                 ${projectFilter === p.slug
-                  ? "text-blue-600 border-b-2 border-blue-600 font-bold"
-                  : "text-slate-400 hover:text-slate-650 border-b-2 border-transparent"}
+                  ? "text-brand-600 border-b-2 border-brand-600 font-bold"
+                  : "text-slate-400 hover:text-slate-600 border-b-2 border-transparent"}
               `}
             >
               <span>{p.name}</span>
               <span className={`px-2 py-0.5 rounded-lg text-[9px] ${
-                projectFilter === p.slug ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
+                projectFilter === p.slug ? "bg-brand-50 text-brand-600" : "bg-slate-100 text-slate-500"
               }`}>{countsBySlug[p.slug] || 0}</span>
             </button>
           ))}
@@ -334,7 +320,7 @@ export default function LegalDashboardPage() {
         {/* Table Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-40 gap-4">
-            <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+            <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 opacity-60">Analizando Carteras Morosas...</p>
           </div>
         ) : (
@@ -354,7 +340,7 @@ export default function LegalDashboardPage() {
                             setSelectedClientIds([]);
                           }
                         }}
-                        className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                        className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 cursor-pointer"
                       />
                     </th>
                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Cliente</th>
@@ -383,15 +369,15 @@ export default function LegalDashboardPage() {
                               prev.includes(client.id) ? prev.filter(id => id !== client.id) : [...prev, client.id]
                             );
                           }}
-                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                          className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 cursor-pointer"
                         />
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="font-bold text-slate-800 uppercase group-hover:text-blue-600 transition-colors leading-snug">
+                          <div className="font-bold text-slate-800 uppercase group-hover:text-brand-600 transition-colors leading-snug">
                             {client.clientName}
                           </div>
-                          <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-100">
+                          <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-brand-50 text-brand-600 border border-brand-100">
                             {client.projectName}
                           </span>
                         </div>
@@ -414,12 +400,12 @@ export default function LegalDashboardPage() {
                         {client.overdueInstallments?.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {(client.penalty_mode === "FIXED" || client.penalty_mode === "MIXED") && client.manual_penalty > 0 && (
-                              <span className="text-[9px] font-bold uppercase bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100">
+                              <span className="text-[9px] font-bold uppercase bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100">
                                 Fija: {formatCLP(client.manual_penalty)}
                               </span>
                             )}
                             {client.overdueInstallments.slice(0, 3).map((inst: any) => (
-                              <span key={inst.number} className="text-[9px] font-semibold bg-red-50 text-red-650 px-1.5 py-0.5 rounded border border-red-100">
+                              <span key={inst.number} className="text-[9px] font-semibold bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100">
                                 C{inst.number}: {inst.lateDays}d
                               </span>
                             ))}
@@ -430,11 +416,11 @@ export default function LegalDashboardPage() {
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-450 italic">Sin desglose</span>
+                          <span className="text-xs text-slate-400 italic">Sin desglose</span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="px-2 py-0.5 rounded bg-red-50 text-red-650 font-bold text-xs border border-red-100">
+                        <span className="px-2 py-0.5 rounded bg-red-50 text-red-600 font-bold text-xs border border-red-100">
                           {client.lateDays} d
                         </span>
                       </td>
@@ -447,7 +433,7 @@ export default function LegalDashboardPage() {
                         <div className="flex items-center justify-center gap-1.5">
                           <button 
                             onClick={() => exportIndividualToExcel(client)}
-                            className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-450 hover:text-emerald-600 transition-all shadow-sm cursor-pointer"
+                            className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-400 hover:text-emerald-700 transition-all shadow-sm cursor-pointer"
                             title="Exportar Ficha (Excel)"
                           >
                             <Download className="w-4 h-4" />
@@ -455,7 +441,7 @@ export default function LegalDashboardPage() {
                           
                           <button 
                             onClick={() => setSelectedClient(client)}
-                            className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:border-blue-200 text-slate-455 hover:text-blue-600 transition-all shadow-sm cursor-pointer"
+                            className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-brand-50 hover:border-brand-200 text-slate-400 hover:text-brand-600 transition-all shadow-sm cursor-pointer"
                             title="Ver Expediente Completo (Solo Lectura)"
                           >
                             <ChevronRight className="w-4 h-4" />
@@ -530,11 +516,11 @@ export default function LegalDashboardPage() {
               {/* Resumen de Mora Total */}
               <div className="bg-red-50/70 border border-red-100 rounded-2xl p-5 flex items-center justify-between shadow-sm">
                 <div>
-                  <p className="text-[10px] text-red-650/70 font-bold uppercase tracking-wider mb-1">Total Multa Vigente</p>
-                  <p className="text-2xl font-black text-red-650">+{formatCLP(selectedClient.penaltyAmount)}</p>
+                  <p className="text-[10px] text-red-600/70 font-bold uppercase tracking-wider mb-1">Total Multa Vigente</p>
+                  <p className="text-2xl font-black text-red-600">+{formatCLP(selectedClient.penaltyAmount)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] text-red-650/70 font-bold uppercase tracking-wider mb-1">Atraso Contable</p>
+                  <p className="text-[10px] text-red-600/70 font-bold uppercase tracking-wider mb-1">Atraso Contable</p>
                   <p className="text-lg font-bold text-red-600">{selectedClient.lateDays} Días</p>
                 </div>
               </div>
@@ -543,19 +529,19 @@ export default function LegalDashboardPage() {
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Información del Contrato</h4>
                 <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-700">
-                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-xs">
+                  <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
                     <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Proyecto</span>
                     <span className="text-slate-800 uppercase">{selectedClient.projectName}</span>
                   </div>
-                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-xs">
+                  <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
                     <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Unidad Catastral</span>
                     <span className="text-slate-800 uppercase">Lote {selectedClient.lotNumber}</span>
                   </div>
-                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-xs">
+                  <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
                     <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Cuotas Pagadas</span>
                     <span className="text-slate-800">{selectedClient.paidCuotas} de {selectedClient.totalCuotas}</span>
                   </div>
-                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-xs">
+                  <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
                     <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Valor de la Cuota</span>
                     <span className="text-slate-800">{formatCLP(selectedClient.valor_cuota)}/mes</span>
                   </div>
@@ -565,7 +551,7 @@ export default function LegalDashboardPage() {
               {/* Mora Histórica Fija */}
               {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED") && selectedClient.manual_penalty > 0 && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-amber-600">
+                  <div className="flex items-center gap-1.5 text-amber-700">
                     <ShieldAlert className="w-4 h-4" />
                     <h4 className="text-[10px] font-bold uppercase tracking-wider">Mora Histórica (Acuerdo Fijo)</h4>
                   </div>
@@ -573,8 +559,8 @@ export default function LegalDashboardPage() {
                     <p className="text-[10px] font-semibold text-amber-700/80 leading-normal uppercase tracking-wide">
                       El cliente tiene un monto de penalización fijo acordado y configurado manualmente. Este monto se suma al total de la deuda.
                     </p>
-                    <div className="flex items-center justify-between bg-amber-50 border border-amber-250 rounded-xl px-4 py-3 shadow-xs">
-                      <span className="text-[10px] font-bold text-amber-850 uppercase tracking-wider">Monto Fijo Pactado</span>
+                    <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 shadow-xs">
+                      <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Monto Fijo Pactado</span>
                       <span className="text-sm font-bold text-amber-700">{formatCLP(selectedClient.manual_penalty)}</span>
                     </div>
                   </div>
@@ -590,7 +576,7 @@ export default function LegalDashboardPage() {
                   </div>
                   <div className="space-y-2">
                     {selectedClient.overdueInstallments.map((inst: any) => (
-                      <div key={inst.number} className="bg-slate-50/50 border border-slate-150 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors shadow-xs">
+                      <div key={inst.number} className="bg-slate-50/50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors shadow-xs">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Cuota {inst.number}</span>
@@ -601,8 +587,8 @@ export default function LegalDashboardPage() {
                           </p>
                         </div>
                         <div className="text-right flex flex-col items-end gap-1.5">
-                          <span className="text-sm font-bold text-red-650">+{formatCLP(inst.penaltyAmount)}</span>
-                          <span className="text-[8px] font-bold text-red-650 bg-red-50 px-2 py-0.5 rounded border border-red-100 uppercase tracking-wider">
+                          <span className="text-sm font-bold text-red-600">+{formatCLP(inst.penaltyAmount)}</span>
+                          <span className="text-[8px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100 uppercase tracking-wider">
                             {inst.lateDays} {inst.lateDays === 1 ? 'día' : 'días'} de atraso
                           </span>
                         </div>
@@ -614,7 +600,7 @@ export default function LegalDashboardPage() {
 
               {/* Documentos del Cliente (solo lectura) */}
               <div className="space-y-3">
-                <div className="flex items-center gap-1.5 text-blue-600">
+                <div className="flex items-center gap-1.5 text-brand-600">
                   <FolderOpen className="w-4 h-4" />
                   <h4 className="text-[10px] font-bold uppercase tracking-wider">Documentos del Cliente (Promesa, Contratos y más)</h4>
                 </div>
@@ -625,7 +611,7 @@ export default function LegalDashboardPage() {
                     <span className="text-[10px] font-bold uppercase tracking-widest">Cargando documentos...</span>
                   </div>
                 ) : clientDocs.length === 0 ? (
-                  <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 text-center">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center">
                     <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sin documentos cargados</p>
                   </div>
@@ -634,9 +620,9 @@ export default function LegalDashboardPage() {
                     {clientDocs.map((doc: any) => {
                       const url = `/api/documents/${doc.id}`;
                       return (
-                        <div key={doc.id} className="bg-slate-50/50 border border-slate-150 rounded-2xl p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors shadow-xs">
+                        <div key={doc.id} className="bg-slate-50/50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors shadow-xs">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                            <div className="w-9 h-9 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                               <FileText className="w-4 h-4" />
                             </div>
                             <div className="min-w-0">
@@ -661,14 +647,14 @@ export default function LegalDashboardPage() {
                                     setPreviewData({ url, title: doc.name, type: doc.file_type });
                                     setIsPreviewOpen(true);
                                   }}
-                                  className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-450 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm cursor-pointer"
+                                  className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 transition-all shadow-sm cursor-pointer"
                                   title="Previsualizar"
                                 >
                                   <Eye className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => downloadDocument(url, doc.name, doc.file_type)}
-                                  className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-450 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm cursor-pointer"
+                                  className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all shadow-sm cursor-pointer"
                                   title="Descargar"
                                 >
                                   <Download className="w-4 h-4" />
@@ -688,7 +674,7 @@ export default function LegalDashboardPage() {
             <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
               <button
                 onClick={() => setSelectedClient(null)}
-                className="px-6 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer shadow-xs border border-slate-250"
+                className="px-6 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer shadow-xs border border-slate-200"
               >
                 Cerrar Detalle
               </button>

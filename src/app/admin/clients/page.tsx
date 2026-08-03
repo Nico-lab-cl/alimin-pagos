@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile, deletePaymentReceipt, updateMoraDates, getFinancialHistory, generateTemporaryPassword } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
-import { formatCLP, formatDate } from "@/lib/utils";
+import { formatCLP, formatDate, downloadCsv } from "@/lib/utils";
 import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye, Key, ShieldAlert, Lock } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
@@ -359,7 +359,7 @@ export default function ClientsPage() {
     return 0;
   });
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     const listToExport = selectedClientIds.length > 0
       ? filteredClients.filter((c: any) => selectedClientIds.includes(c.id))
       : filteredClients;
@@ -379,14 +379,7 @@ export default function ClientsPage() {
     ]);
 
     const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map((row: any) => row.map((val: any) => `"${val.toString().replace(/"/g, '""')}"`).join(";"))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Clientes_${selectedProject}_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    await downloadCsv(csvContent, `Clientes_${selectedProject}_${new Date().toISOString().split("T")[0]}.csv`);
   };
 
   const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
@@ -429,7 +422,7 @@ export default function ClientsPage() {
               placeholder="Filtrar por nombre o RUT..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none transition-all placeholder:text-[#64748B]/40 text-[#191c1e]"
+              className="w-full pl-9 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none transition-all placeholder:text-[#64748B]/40 text-[#191c1e]"
             />
           </div>
           
@@ -437,7 +430,7 @@ export default function ClientsPage() {
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[200px]"
+            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[200px]"
             style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
           >
             {projects.map((p) => (
@@ -450,7 +443,7 @@ export default function ClientsPage() {
             <select
               value={selectedStage}
               onChange={(e) => setSelectedStage(e.target.value)}
-              className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[150px]"
+              className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[150px]"
               style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
             >
               <option value="ALL">Filtro de Etapas: Todas</option>
@@ -465,7 +458,7 @@ export default function ClientsPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[190px]"
+            className="w-full sm:w-auto px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-[#191c1e] font-medium focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 focus:outline-none cursor-pointer hover:bg-slate-50 transition-all min-w-[190px]"
             style={{ appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "1rem" }}
           >
             <option value="none">Ordenar: Sin orden</option>
@@ -498,13 +491,13 @@ export default function ClientsPage() {
             onClick={() => setActiveTab("ALL")}
             className={`px-4 py-2 text-xs font-semibold tracking-wider whitespace-nowrap transition-all border-b-2 cursor-pointer ${
               activeTab === "ALL" 
-                ? "border-[#1D4ED8] text-[#1D4ED8] font-bold" 
-                : "border-transparent text-[#64748B] hover:text-[#1D4ED8]"
+                ? "border-brand-600 text-brand-600 font-bold" 
+                : "border-transparent text-[#64748B] hover:text-brand-600"
             }`}
           >
             Todos los Clientes 
             <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === "ALL" ? "bg-[#1D4ED8]/10 text-[#1D4ED8]" : "bg-slate-100 text-slate-600"
+              activeTab === "ALL" ? "bg-brand-600/10 text-brand-600" : "bg-slate-100 text-slate-600"
             }`}>
               {stats.total}
             </span>
@@ -532,13 +525,13 @@ export default function ClientsPage() {
             onClick={() => setActiveTab("GRACE")}
             className={`px-4 py-2 text-xs font-semibold tracking-wider whitespace-nowrap transition-all border-b-2 cursor-pointer ${
               activeTab === "GRACE" 
-                ? "border-[#F59E0B] text-[#F59E0B] font-bold" 
-                : "border-transparent text-[#64748B] hover:text-[#F59E0B]"
+                ? "border-[#F59E0B] text-amber-700 font-bold" 
+                : "border-transparent text-[#64748B] hover:text-amber-700"
             }`}
           >
             Días de Gracia 
             <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === "GRACE" ? "bg-[#F59E0B]/10 text-[#F59E0B]" : "bg-amber-50 text-amber-600 border border-amber-100"
+              activeTab === "GRACE" ? "bg-[#F59E0B]/10 text-amber-700" : "bg-amber-50 text-amber-700 border border-amber-100"
             }`}>
               {stats.grace}
             </span>
@@ -566,13 +559,13 @@ export default function ClientsPage() {
             onClick={() => setActiveTab("OK")}
             className={`px-4 py-2 text-xs font-semibold tracking-wider whitespace-nowrap transition-all border-b-2 cursor-pointer ${
               activeTab === "OK" 
-                ? "border-[#10B981] text-[#10B981] font-bold" 
-                : "border-transparent text-[#64748B] hover:text-[#10B981]"
+                ? "border-[#10B981] text-emerald-700 font-bold" 
+                : "border-transparent text-[#64748B] hover:text-emerald-700"
             }`}
           >
             Al Día 
             <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === "OK" ? "bg-[#10B981]/10 text-[#10B981]" : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+              activeTab === "OK" ? "bg-[#10B981]/10 text-emerald-700" : "bg-emerald-50 text-emerald-700 border border-emerald-100"
             }`}>
               {stats.ok}
             </span>
@@ -582,7 +575,7 @@ export default function ClientsPage() {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-40 gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-[#1D4ED8]" />
+          <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#64748B] opacity-60">Analizando Base de Datos...</p>
         </div>
       ) : (
@@ -602,7 +595,7 @@ export default function ClientsPage() {
                           setSelectedClientIds([]);
                         }
                       }}
-                      className="w-4 h-4 text-blue-600 border-[#E2E8F0] rounded focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-brand-600 border-[#E2E8F0] rounded focus:ring-brand-500 cursor-pointer"
                     />
                   </th>
                   <th className="px-6 py-4 text-xs font-semibold text-[#64748B] uppercase tracking-wider">Nombre del Cliente</th>
@@ -622,16 +615,16 @@ export default function ClientsPage() {
                   const isContado = c.status === "COMPLETED";
 
                   let clientNameColor = "text-slate-800";
-                  if (isLate) clientNameColor = "text-red-650";
+                  if (isLate) clientNameColor = "text-red-600";
                   else if (isGrace) clientNameColor = "text-amber-700";
 
-                  let avatarBg = "bg-blue-50 text-blue-600 border border-blue-100";
+                  let avatarBg = "bg-brand-50 text-brand-600 border border-brand-100";
                   if (isLate) avatarBg = "bg-red-50 text-red-600 border border-red-200";
                   else if (isGrace) avatarBg = "bg-amber-50 text-amber-700 border border-amber-200";
                   else if (isUpcoming) avatarBg = "bg-indigo-50 text-indigo-700 border border-indigo-200";
                   else if (isContado) avatarBg = "bg-emerald-50 text-emerald-700 border border-emerald-200";
 
-                  let progressBarColor = "bg-[#1D4ED8]";
+                  let progressBarColor = "bg-brand-500";
                   if (isLate) progressBarColor = "bg-[#EF4444]";
                   else if (isGrace) progressBarColor = "bg-[#F59E0B]";
                   else if (isUpcoming) progressBarColor = "bg-[#6366F1]";
@@ -640,7 +633,7 @@ export default function ClientsPage() {
                   let balanceColor = "text-[#191c1e]";
                   if (isLate) balanceColor = "text-[#EF4444]";
 
-                  let badgeStyle = "bg-[#D1FAE5] text-[#10B981] border-[#10B981]/20";
+                  let badgeStyle = "bg-[#D1FAE5] text-emerald-700 border-[#10B981]/20";
                   let dotColor = "bg-[#10B981]";
                   let badgeText = "Al Día";
 
@@ -649,7 +642,7 @@ export default function ClientsPage() {
                     dotColor = "bg-[#EF4444]";
                     badgeText = `En Mora (${c.lateDays}d)`;
                   } else if (isGrace) {
-                    badgeStyle = "bg-[#FEF3C7] text-[#F59E0B] border-[#F59E0B]/20";
+                    badgeStyle = "bg-[#FEF3C7] text-amber-700 border-[#F59E0B]/20";
                     dotColor = "bg-[#F59E0B]";
                     badgeText = "Días de Gracia";
                   } else if (isUpcoming) {
@@ -657,12 +650,12 @@ export default function ClientsPage() {
                     dotColor = "bg-[#6366F1]";
                     badgeText = "Aviso Próximo";
                   } else if (isContado) {
-                    badgeStyle = "bg-[#D1FAE5] text-[#10B981] border-[#10B981]/20";
+                    badgeStyle = "bg-[#D1FAE5] text-emerald-700 border-[#10B981]/20";
                     dotColor = "bg-[#10B981]";
                     badgeText = "Contado";
                   } else if (c.status === "FROZEN") {
                     badgeStyle = "bg-slate-100 text-slate-500 border-slate-200";
-                    dotColor = "bg-slate-450";
+                    dotColor = "bg-slate-400";
                     badgeText = "Congelado";
                   }
 
@@ -722,7 +715,7 @@ export default function ClientsPage() {
                               prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id]
                             );
                           }}
-                          className="w-4 h-4 text-blue-600 border-slate-350 rounded focus:ring-blue-500 cursor-pointer"
+                          className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 cursor-pointer"
                         />
                       </td>
                       <td className="px-6 py-4">
@@ -742,7 +735,7 @@ export default function ClientsPage() {
                                 <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[9px] font-semibold text-slate-500 uppercase tracking-wider">H-VERIFY</span>
                               )}
                               {c.observation && (
-                                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#1D4ED8]/10 border border-[#1D4ED8]/20 text-[9px] font-semibold text-[#1D4ED8] uppercase tracking-wider">
+                                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-brand-600/10 border border-brand-600/20 text-[9px] font-semibold text-brand-600 uppercase tracking-wider">
                                   <FileText className="w-2.5 h-2.5" />
                                   <span>NOTA</span>
                                 </div>
@@ -754,12 +747,12 @@ export default function ClientsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs font-semibold text-slate-650">
+                      <td className="px-6 py-4 text-xs font-semibold text-slate-600">
                         {c.rut || "SIN RUT"}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col items-center">
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 group-hover:border-[#1D4ED8]/30 transition-colors">
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 group-hover:border-brand-600/30 transition-colors">
                             <Hash className="w-3.5 h-3.5 text-[#B45309]" />
                             <span className="text-xs font-bold text-[#191c1e]">Lote {c.lotNumber}</span>
                           </div>
@@ -770,7 +763,7 @@ export default function ClientsPage() {
                         <div className="space-y-2 min-w-[150px]">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-[#64748B] font-medium">{c.paidCuotas}/{c.totalCuotas} Cuotas</span>
-                            <span className={`${isLate ? 'text-red-500 font-bold' : 'text-[#1D4ED8] font-bold'}`}>{c.totalCuotas > 0 ? Math.round((c.paidCuotas / c.totalCuotas) * 100) : 0}%</span>
+                            <span className={`${isLate ? 'text-red-500 font-bold' : 'text-brand-600 font-bold'}`}>{c.totalCuotas > 0 ? Math.round((c.paidCuotas / c.totalCuotas) * 100) : 0}%</span>
                           </div>
                           <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200/50">
                             <div 
@@ -833,7 +826,7 @@ export default function ClientsPage() {
                             title="Gestionar Contraseña"
                             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
                               c.temp_password 
-                                ? "bg-[#1D4ED8]/10 text-[#1D4ED8] border border-[#1D4ED8]/20 shadow-sm" 
+                                ? "bg-brand-600/10 text-brand-600 border border-brand-600/20 shadow-sm" 
                                 : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200 hover:text-slate-600"
                             }`}
                           >
@@ -904,7 +897,7 @@ export default function ClientsPage() {
           {totalPages > 1 && (
             <div className="border-t border-[#E2E8F0] bg-slate-50 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-xs font-semibold text-[#64748B]">
-                Página <span className="text-[#1D4ED8] font-bold">{currentPage}</span> de <span className="text-slate-600">{totalPages}</span>
+                Página <span className="text-brand-600 font-bold">{currentPage}</span> de <span className="text-slate-600">{totalPages}</span>
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -919,7 +912,7 @@ export default function ClientsPage() {
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-all cursor-pointer ${currentPage === page ? "bg-[#1D4ED8] text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-all cursor-pointer ${currentPage === page ? "bg-brand-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}
                     >
                       {page}
                     </button>

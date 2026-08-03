@@ -14,7 +14,7 @@ import {
   Plus
 } from "lucide-react";
 import { getFullPostventaData, getProjectLedgerStats, getAdminProjects } from "@/actions/postventa";
-import { formatCLP } from "@/lib/utils";
+import { formatCLP, downloadCsv } from "@/lib/utils";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -209,7 +209,7 @@ export default function ReportsPage() {
     loadReports();
   }, [period, selectedProject]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const headers = ["Cliente", "Proyecto", "Lote", "RUT", "Monto Pendiente", "Días en Mora", "Estado"];
     const rows = stats.topDebtors.map((d: any) => [
       d.clientName || "",
@@ -222,14 +222,7 @@ export default function ReportsPage() {
     ]);
 
     const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(";"))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Reporte_Deuda_Morosos_${selectedProject}_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    await downloadCsv(csvContent, `Reporte_Deuda_Morosos_${selectedProject}_${new Date().toISOString().split("T")[0]}.csv`);
   };
 
   const handleExportPDF = () => {
@@ -239,7 +232,7 @@ export default function ReportsPage() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 opacity-60">Generando Informes y Análisis...</p>
       </div>
     );
@@ -253,7 +246,7 @@ export default function ReportsPage() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
             Informes y Análisis
           </h1>
-          <span className="text-[9px] font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded shadow-xs">
+          <span className="text-[9px] font-extrabold text-brand-600 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded shadow-xs">
             V2.0
           </span>
         </div>
@@ -263,7 +256,7 @@ export default function ReportsPage() {
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 transition-all shadow-sm focus:border-blue-500 uppercase"
+            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 transition-all shadow-sm focus:border-brand-500 uppercase"
           >
             <option value="ALL">Todos los Proyectos</option>
             {projects.map((p) => (
@@ -275,7 +268,7 @@ export default function ReportsPage() {
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 transition-all shadow-sm focus:border-blue-500"
+            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 transition-all shadow-sm focus:border-brand-500"
           >
             <option value="Este mes">Este mes</option>
             <option value="Mes anterior">Mes anterior</option>
@@ -285,7 +278,7 @@ export default function ReportsPage() {
 
           {/* Date Picker Range Display */}
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm text-xs font-semibold text-slate-600">
-            <Calendar className="w-4 h-4 text-slate-450" />
+            <Calendar className="w-4 h-4 text-slate-400" />
             <span>{getPeriodRangeText()}</span>
           </div>
 
@@ -300,7 +293,7 @@ export default function ReportsPage() {
 
           <button 
             onClick={handleExportPDF}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5" />
             Exportar PDF
@@ -314,7 +307,7 @@ export default function ReportsPage() {
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative">
           <div className="flex items-center justify-between mb-4">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recaudación</span>
-            <span className="text-[9px] font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
+            <span className="text-[9px] font-extrabold text-brand-600 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded">
               Total del Mes
             </span>
           </div>
@@ -322,7 +315,7 @@ export default function ReportsPage() {
             {formatCLP(stats.revenue)}
           </p>
           <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-            <span className="text-emerald-600">↑ 12%</span>
+            <span className="text-emerald-700">↑ 12%</span>
             <span>vs mes anterior</span>
           </p>
         </div>
@@ -331,7 +324,7 @@ export default function ReportsPage() {
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative">
           <div className="flex items-center justify-between mb-4">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cuotas Cobradas</span>
-            <span className="text-[10px] font-bold text-blue-600">
+            <span className="text-[10px] font-bold text-brand-600">
               {stats.tasaCobro.toFixed(0)}%
             </span>
           </div>
@@ -339,7 +332,7 @@ export default function ReportsPage() {
             {stats.paidCuotas} <span className="text-sm font-medium text-slate-400">de {stats.totalCuotas}</span>
           </p>
           <div className="w-full bg-slate-100 rounded-full h-1.5 mt-4">
-            <div className="bg-blue-650 h-1.5 rounded-full" style={{ width: `${stats.tasaCobro.toFixed(0)}%` }} />
+            <div className="bg-brand-600 h-1.5 rounded-full" style={{ width: `${stats.tasaCobro.toFixed(0)}%` }} />
           </div>
         </div>
 
@@ -373,9 +366,9 @@ export default function ReportsPage() {
           <div className="relative w-12 h-12 flex items-center justify-center shrink-0 mt-1">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
               <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <path className="text-blue-600" strokeDasharray={`${stats.tasaCobro.toFixed(0)}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path className="text-brand-600" strokeDasharray={`${stats.tasaCobro.toFixed(0)}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
             </svg>
-            <span className="absolute text-[8px] font-extrabold text-blue-600 uppercase">OK</span>
+            <span className="absolute text-[8px] font-extrabold text-brand-600 uppercase">OK</span>
           </div>
         </div>
       </div>
@@ -390,10 +383,10 @@ export default function ReportsPage() {
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Ene - Jun 2026</p>
             </div>
             <div className="flex bg-slate-50 border border-slate-200 rounded-lg p-0.5">
-              <button className="px-3 py-1 text-[10px] font-bold text-blue-650 bg-white border border-slate-200/50 shadow-xs rounded-md uppercase cursor-pointer">
+              <button className="px-3 py-1 text-[10px] font-bold text-brand-600 bg-white border border-slate-200/50 shadow-xs rounded-md uppercase cursor-pointer">
                 Mensual
               </button>
-              <button className="px-3 py-1 text-[10px] font-bold text-slate-450 hover:text-slate-700 uppercase cursor-pointer">
+              <button className="px-3 py-1 text-[10px] font-bold text-slate-400 hover:text-slate-700 uppercase cursor-pointer">
                 Diaria
               </button>
             </div>
@@ -402,17 +395,17 @@ export default function ReportsPage() {
           <div className="h-60 w-full flex items-end justify-between px-4 pt-8 pb-2">
             {stats.monthlyChart.map((bar) => (
               <div key={bar.month} className="flex flex-col items-center gap-2 w-1/6 group/bar">
-                <div className="relative w-10 sm:w-12 bg-blue-50 rounded-t-lg overflow-visible h-32 flex flex-col justify-end">
+                <div className="relative w-10 sm:w-12 bg-brand-50 rounded-t-lg overflow-visible h-32 flex flex-col justify-end">
                   {/* Tooltip on hover */}
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-bold px-2 py-0.5 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-sm z-10">
                     {formatCLP(bar.value)}
                   </div>
                   
                   <div 
-                    className="w-full bg-blue-600 hover:bg-blue-700 transition-all rounded-t-md relative" 
+                    className="w-full bg-brand-600 hover:bg-brand-700 transition-all rounded-t-md relative" 
                     style={{ height: `${Math.max(bar.percent, 3)}%` }} 
                   >
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-blue-700 rounded-t-md" />
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-brand-700 rounded-t-md" />
                   </div>
                 </div>
                 <span className="text-[10px] font-bold text-slate-400">{bar.month}</span>
@@ -427,7 +420,7 @@ export default function ReportsPage() {
             <div>
               <h3 className="text-base font-bold text-slate-800">Cobros por Proyecto</h3>
             </div>
-            <button className="p-1 hover:bg-slate-50 border border-transparent rounded-lg text-slate-400 hover:text-slate-650 transition-colors">
+            <button className="p-1 hover:bg-slate-50 border border-transparent rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <MoreVertical className="w-4 h-4" />
             </button>
           </div>
@@ -437,8 +430,8 @@ export default function ReportsPage() {
               .filter((p: any) => selectedProject === "ALL" || selectedProject === p.slug)
               .map((p: any, idx: number) => {
                 const rev = stats.revenueBySlug[p.slug] || 0;
-                const barColor = idx % 2 === 0 ? "bg-blue-600" : "bg-amber-600";
-                const barColorLight = idx % 2 === 0 ? "bg-blue-300" : "bg-amber-250";
+                const barColor = idx % 2 === 0 ? "bg-brand-600" : "bg-amber-600";
+                const barColorLight = idx % 2 === 0 ? "bg-brand-300" : "bg-amber-200";
                 return (
                   <div className="space-y-2" key={p.slug}>
                     <div className="flex justify-between text-xs font-bold text-slate-700">
@@ -456,11 +449,11 @@ export default function ReportsPage() {
 
           <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 pt-4 border-t border-slate-100">
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+              <div className="w-2.5 h-2.5 rounded-full bg-brand-600" />
               <span>Cobrado</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-blue-300" />
+              <div className="w-2.5 h-2.5 rounded-full bg-brand-300" />
               <span>Proyectado</span>
             </div>
           </div>
@@ -469,9 +462,9 @@ export default function ReportsPage() {
 
       {/* Top 5 Debtors Table Section */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="flex items-center justify-between p-6 border-b border-slate-150 bg-slate-50/50">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-50/50">
           <h3 className="text-base font-bold text-slate-800">Top 5 Clientes con Mayor Deuda</h3>
-          <Link href="/admin/clients" className="text-xs font-bold text-blue-600 hover:text-blue-750 transition-colors">
+          <Link href="/admin/clients" className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors">
             Ver reporte completo
           </Link>
         </div>
@@ -486,7 +479,7 @@ export default function ReportsPage() {
                 <th className="px-6 py-4 text-center">Estado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-sm text-slate-850">
+            <tbody className="divide-y divide-slate-100 text-sm text-slate-800">
               {stats.topDebtors.map((debtor: any) => (
                 <tr key={debtor.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4 font-bold text-slate-800 uppercase">{debtor.clientName}</td>
@@ -495,8 +488,8 @@ export default function ReportsPage() {
                   <td className="px-6 py-4 text-center">
                     <span className={cn(
                       "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                      debtor.lateDays > 90 ? "bg-red-50 text-red-650 border border-red-100" :
-                      debtor.lateDays > 30 ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                      debtor.lateDays > 90 ? "bg-red-50 text-red-600 border border-red-100" :
+                      debtor.lateDays > 30 ? "bg-amber-50 text-amber-700 border border-amber-100" :
                       "bg-slate-100 text-slate-600 border border-slate-200"
                     )}>
                       {debtor.lateDays} días

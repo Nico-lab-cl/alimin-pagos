@@ -6,7 +6,6 @@ const config: CapacitorConfig = {
   webDir: 'public',
   server: {
     url: 'https://pagos.aliminspa.cl',
-    cleartext: true
   },
   plugins: {
     PushNotifications: {

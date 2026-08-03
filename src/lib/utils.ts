@@ -1,5 +1,8 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -113,6 +116,58 @@ export function getReceiptDownloadFilename(url: string | null | undefined, recei
   return `${prefix}.pdf`; // default fallback
 }
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Entrega un archivo al usuario.
+ *
+ * En el navegador usa el truco clasico del <a download>. Dentro de la app Android
+ * eso no sirve: el WebView ignora por completo las URLs blob:, el boton no hace nada
+ * y no aparece ningun error. Ahi el archivo se escribe en el almacenamiento de la app
+ * y se abre la hoja de compartir del sistema, para guardarlo o enviarlo desde el celular.
+ */
+export async function deliverFile(blob: Blob, filename: string) {
+  if (typeof window === "undefined") return;
+
+  if (Capacitor.isNativePlatform()) {
+    const data = await blobToBase64(blob);
+    const { uri } = await Filesystem.writeFile({
+      path: filename,
+      data,
+      directory: Directory.Cache,
+    });
+    await Share.share({ title: filename, files: [uri] });
+    return;
+  }
+
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
+/**
+ * Entrega un CSV ya armado. El contenido debe traer su propio BOM si se abre en Excel.
+ */
+export async function downloadCsv(csvContent: string, filename: string) {
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  await deliverFile(blob, filename);
+}
+
 /**
  * Unified document downloader that handles HTTP URLs and base64 data URIs.
  * It tries to extract the server-provided filename from Content-Disposition headers.
@@ -124,7 +179,7 @@ export async function downloadDocument(url: string, fallbackName: string, fallba
     if (url.startsWith("data:")) {
       const prefix = fallbackName || "documento";
       let extension = "pdf"; // fallback
-      
+
       const parts = url.split(";");
       if (parts.length > 0) {
         const mime = parts[0].split(":")[1] || "";
@@ -135,28 +190,23 @@ export async function downloadDocument(url: string, fallbackName: string, fallba
         else if (mime.includes("word") || mime.includes("officedocument.word")) extension = "docx";
         else if (mime.includes("sheet") || mime.includes("officedocument.spreadsheet")) extension = "xlsx";
       }
-      
+
       let finalName = prefix;
       if (!finalName.toLowerCase().endsWith(`.${extension}`)) {
         finalName = `${finalName}.${extension}`;
       }
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = finalName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const dataBlob = await (await fetch(url)).blob();
+      await deliverFile(dataBlob, finalName);
       return;
     }
 
     const fetchUrl = `${url}${url.includes('?') ? '&' : '?'}download=true`;
     const res = await fetch(fetchUrl);
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    
+
     const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    
+
     const disposition = res.headers.get("Content-Disposition") || "";
     let filename = "";
     
@@ -171,16 +221,13 @@ export async function downloadDocument(url: string, fallbackName: string, fallba
     if (!filename) {
       filename = getDownloadFilename({ name: fallbackName, fileType: fallbackFileType });
     }
-    
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(blobUrl);
+
+    await deliverFile(blob, filename);
   } catch (error) {
     console.error("Error downloading file:", error);
+    // En la app abrir una pestana nueva tampoco descarga nada, asi que el error se propaga
+    // para que la pantalla pueda avisarle al usuario en vez de fallar en silencio.
+    if (Capacitor.isNativePlatform()) throw error;
     window.open(url, "_blank");
   }
 }
