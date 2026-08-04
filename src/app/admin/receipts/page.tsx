@@ -29,6 +29,28 @@ const MONTHS_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
 
+/**
+ * Etiqueta del lote para la bandeja, sirviendo a los tres proyectos.
+ *
+ * La etapa no significa lo mismo en todos: en Lomas del Mar y Arena y Sol es
+ * un numero ("1", "2") y en Libertad y Alegria es un nombre ("Libertad",
+ * "Alegria"). Por eso solo se antepone "Etapa" cuando es un numero; si no,
+ * "Etapa Libertad" quedaria raro.
+ */
+function getLotLabel(receipt: any): string {
+  const number = receipt?.lot?.number;
+  if (!number) return "Sin lote asignado";
+
+  const stage = receipt?.lot?.stage;
+  if (stage === null || stage === undefined || String(stage).trim() === "") {
+    return `Lote ${number}`;
+  }
+
+  const stageStr = String(stage).trim();
+  const stageLabel = /^\d+$/.test(stageStr) ? `Etapa ${stageStr}` : stageStr;
+  return `Lote ${number} · ${stageLabel}`;
+}
+
 function getInstallmentMonthStr(receipt: any): string {
   if (!receipt || receipt.scope === "PIE") return "";
   
@@ -440,7 +462,7 @@ export default function ReceiptsPage() {
           {/* Table Header Row (Desktop only) */}
           <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-[10px] font-black text-slate-400 tracking-wider uppercase border-b border-slate-100 mb-2">
             <div className="col-span-3">Cliente</div>
-            <div className="col-span-2">Proyecto</div>
+            <div className="col-span-2">Proyecto y Lote</div>
             <div className="col-span-1 text-center">Cuota</div>
             <div className="col-span-2">Monto</div>
             <div className="col-span-1.5">Fecha de Pago</div>
@@ -481,10 +503,11 @@ export default function ReceiptsPage() {
                     <div className="text-slate-400 text-xs mt-0.5 font-medium">{clientRut}</div>
                   </div>
 
-                  {/* Column 2: Proyecto */}
+                  {/* Column 2: Proyecto y Lote */}
                   <div className="col-span-2 text-slate-600 text-xs font-semibold">
-                    <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Proyecto:</span>
-                    {projectName}
+                    <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Proyecto y Lote:</span>
+                    <div>{projectName}</div>
+                    <div className="text-[11px] text-slate-500 font-medium mt-0.5">{getLotLabel(receipt)}</div>
                   </div>
 
                   {/* Column 3: Cuota */}
@@ -706,7 +729,7 @@ export default function ReceiptsPage() {
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Proyecto y Lote</span>
                   <span className="text-slate-800 block text-sm">{selectedReceipt.reservation?.project?.name || "Sin Proyecto"}</span>
-                  <span className="text-slate-500 block mt-0.5">Lote {selectedReceipt.lot?.number || "—"}{selectedReceipt.lot?.stage ? ` - ${selectedReceipt.lot.stage}` : ""}</span>
+                  <span className="text-slate-500 block mt-0.5">{getLotLabel(selectedReceipt)}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Concepto y Cuota</span>
