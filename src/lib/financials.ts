@@ -29,6 +29,66 @@ export function getInstallmentDueDate(
 }
 
 /**
+ * Mes y año al que corresponde una cuota, tomado de su fecha de vencimiento.
+ * Ej: "Agosto 2026". Se formatea en UTC porque getInstallmentDueDate devuelve
+ * la fecha fijada a las 12:00 UTC (leerla en horario local podría correr el mes).
+ */
+export function getInstallmentPeriodLabel(
+  installmentStartDate: Date | string | null | undefined,
+  installmentNumber: number,
+  dueDayOfMonth?: number
+): string | null {
+  if (!installmentStartDate) return null;
+  const due = getInstallmentDueDate(installmentStartDate, installmentNumber, dueDayOfMonth);
+  if (isNaN(due.getTime())) return null;
+  // formatToParts en vez de format() para quedar en "Agosto 2026" y no en el
+  // "agosto de 2026" que arma es-CL (y así calzar con el recibo oficial).
+  const parts = new Intl.DateTimeFormat("es-CL", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).formatToParts(due);
+  const month = parts.find((p) => p.type === "month")?.value || "";
+  const year = parts.find((p) => p.type === "year")?.value || "";
+  if (!month || !year) return null;
+  return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${year}`;
+}
+
+/**
+ * Concepto que se imprime en los comprobantes digitales de cuota: número de
+ * cuota + mes y año al que corresponde.
+ *   "Cuota 3 - Agosto 2026"
+ *   "Cuotas 3-4 - Agosto 2026 a Septiembre 2026"
+ * Si no se conoce el número nominal o la fecha de inicio de cuotas, degrada al
+ * texto genérico anterior en vez de inventar un período.
+ */
+export function buildInstallmentConcept(opts: {
+  installmentStartDate?: Date | string | null;
+  dueDay?: number | null;
+  firstInstallmentNumber?: number | null;
+  installmentsCount?: number | null;
+}): string {
+  const count = Math.max(1, opts.installmentsCount || 1);
+  const first = opts.firstInstallmentNumber || null;
+
+  if (!first) {
+    return count > 1 ? `Pago Cuota(s) x${count}` : "Pago de Cuota";
+  }
+
+  const last = first + count - 1;
+  const numbers = count > 1 ? `Cuotas ${first}-${last}` : `Cuota ${first}`;
+  const dueDay = opts.dueDay ?? undefined;
+  const firstPeriod = getInstallmentPeriodLabel(opts.installmentStartDate, first, dueDay);
+  if (!firstPeriod) return numbers;
+  if (count === 1) return `${numbers} - ${firstPeriod}`;
+
+  const lastPeriod = getInstallmentPeriodLabel(opts.installmentStartDate, last, dueDay);
+  return lastPeriod && lastPeriod !== firstPeriod
+    ? `${numbers} - ${firstPeriod} a ${lastPeriod}`
+    : `${numbers} - ${firstPeriod}`;
+}
+
+/**
  * Helper to get a UTC Date set at 12:00:00 UTC representing the calendar day in Chile (America/Santiago) timezone.
  */
 export function getSantiagoUTCDate(date: Date): Date {

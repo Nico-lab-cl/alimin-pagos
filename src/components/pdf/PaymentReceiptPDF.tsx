@@ -204,8 +204,15 @@ export const PaymentReceiptPDF = ({
   logoPath,
 }: PaymentReceiptPDFProps) => {
   const isCuotas = paymentScope === 'INSTALLMENT';
+
+  // Mes y año al que corresponde la cuota (según su vencimiento): "Agosto 2026".
+  const periodLabel = (date: Date) => {
+    const label = format(date, 'MMMM yyyy', { locale: es });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  };
+
   const monthYear = isCuotas && installmentDueDate
-    ? ` (${format(installmentDueDate, 'MMMM yyyy', { locale: es }).toUpperCase()})`
+    ? ` - ${periodLabel(installmentDueDate)}`
     : '';
 
   let installmentLabel = '';
@@ -286,7 +293,7 @@ export const PaymentReceiptPDF = ({
               <View style={styles.tableRow} key={item.number}>
                 <View style={{ width: '60%' }}>
                   <Text style={styles.tableCellItem}>
-                    Cuota #{String(item.number).padStart(2, '0')}/{totalInstallments} - Lote {lotNumber}
+                    Cuota #{String(item.number).padStart(2, '0')}/{totalInstallments} - {periodLabel(item.dueDate)} - Lote {lotNumber}
                   </Text>
                   <Text style={{ fontSize: 9, color: '#666', marginTop: 4 }}>
                     Fecha de vencimiento: {format(item.dueDate, "dd 'de' MMMM, yyyy", { locale: es })}

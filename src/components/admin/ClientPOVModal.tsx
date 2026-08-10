@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { getClientPOV } from "@/actions/postventa";
 import { uploadPaymentReceipt } from "@/actions/user";
-import { formatCLP, getDownloadFilename, downloadDocument, cn } from "@/lib/utils";
+import { formatCLP, getDownloadFilename, downloadDocument, cn, formatInstallmentsLabel } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   X,
@@ -690,9 +690,11 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
                     const hist = selectedObjects.find((c: any) => c.number === 0 || c.isHistorical);
                     const histMora = hist ? (hist.penaltyAmount || hist.amount || 0) : 0;
                     const total = realBase + realPenalty + histMora;
+                    // Se nombra QUÉ cuota se está pagando y de qué mes, no solo cuántas.
+                    const label = formatInstallmentsLabel(realCuotas) || `${realCount} ${realCount === 1 ? 'Cuota' : 'Cuotas'}`;
                     return (
                       <option key={q} value={q}>
-                        {realCount} {realCount === 1 ? 'Cuota' : 'Cuotas'} — {formatCLP(total)}{histMora > 0 ? ' (incl. mora histórica)' : ''}
+                        {label} — {formatCLP(total)}{histMora > 0 ? ' (incl. mora histórica)' : ''}
                       </option>
                     );
                   }
@@ -1180,10 +1182,14 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
                       const realCuotas = selectedObjects.filter((c: any) => c.number > 0);
                       const realCuotasCount = realCuotas.length;
                       const realCuotasBaseAmount = realCuotas.reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
+                      // Se nombra QUÉ cuota se está pagando y de qué mes, no solo cuántas.
+                      const label =
+                        formatInstallmentsLabel(realCuotas) ||
+                        (realCuotasCount === 1 ? "1 Cuota" : `${realCuotasCount} Cuotas`);
 
                       return (
                         <option key={q} value={q} className="font-bold text-slate-800 bg-white">
-                          {realCuotasCount === 1 ? "1 Cuota" : `${realCuotasCount} Cuotas`} ({formatCLP(realCuotasBaseAmount)})
+                          {label} ({formatCLP(realCuotasBaseAmount)})
                         </option>
                       );
                     }

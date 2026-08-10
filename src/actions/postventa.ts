@@ -10,6 +10,7 @@ import {
   calculateGrowingFixedPenalty,
   getProjectConfig,
   getChileToday,
+  buildInstallmentConcept,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
@@ -953,8 +954,20 @@ export async function approveReceipt(receiptId: string) {
       const projectName = receipt.reservation.project?.name || "Alimin SPA";
       const lotNumber = (receipt.reservation.lot as any)?.number || receipt.lot_id.toString();
       const stage = receipt.reservation.lot?.stage || "";
-      const concept = receipt.scope === "PIE" ? "Pago de Pie" : `Pago Cuota(s) x${receipt.installments_count || 1}`;
-      
+      // El comprobante debe decir QUÉ cuota se pagó y a qué mes/año corresponde,
+      // no solo cuántas cuotas venían en el pago.
+      const concept = receipt.scope === "PIE"
+        ? "Pago de Pie"
+        : buildInstallmentConcept({
+            installmentStartDate: receipt.reservation.installment_start_date,
+            dueDay: receipt.reservation.due_day,
+            // reservation.installments_paid es el valor PRE-aprobación (se leyó
+            // antes de la transacción que lo incrementa).
+            firstInstallmentNumber:
+              receipt.nominal_installment_number || (receipt.reservation.installments_paid || 0) + 1,
+            installmentsCount: receipt.installments_count || 1,
+          });
+
       const pdfBase64 = await generateReceiptPDF({
         clientName,
         rut,
@@ -1469,7 +1482,14 @@ export async function updateFinancialLedgerAmount(
           const projectName = res.project?.name || "Alimin SPA";
           const lotNumber = res.lot?.number || res.lot_id.toString();
           const stage = res.lot?.stage || "";
-          const concept = receipt.scope === "PIE" ? "Pago de Pie" : `Pago Cuota(s) x${installmentsCountToUse}`;
+          const concept = receipt.scope === "PIE"
+            ? "Pago de Pie"
+            : buildInstallmentConcept({
+                installmentStartDate: res.installment_start_date,
+                dueDay: res.due_day,
+                firstInstallmentNumber: receipt.nominal_installment_number,
+                installmentsCount: installmentsCountToUse,
+              });
 
           const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
           const pdfBase64 = await generateReceiptPDF({
@@ -2303,6 +2323,9 @@ export async function registerManualPayment(
 
     const paymentDate = new Date(data.paidAt + "T12:00:00");
     const receiptId = crypto.randomUUID();
+    // Primera cuota que cubre este pago (installments_paid es el valor PRE-pago).
+    // Se calcula acá arriba porque también lo necesita el comprobante PDF.
+    const nextInstNum = (res.installments_paid || 0) + 1;
 
     if (data.isPie) {
       const operations: any[] = [
@@ -2346,7 +2369,6 @@ export async function registerManualPayment(
           ? JSON.parse(res.installment_ranges)
           : res.installment_ranges
         : [];
-      const nextInstNum = (res.installments_paid || 0) + 1;
       const range = (ranges as any[]).find(
         (r: any) => nextInstNum >= Number(r.from) && nextInstNum <= Number(r.to)
       );
@@ -2459,8 +2481,15 @@ export async function registerManualPayment(
         const projectName = res.project?.name || "Alimin SPA";
         const lotNumber = (res.lot as any)?.number || res.lot_id.toString();
         const stage = res.lot?.stage || "";
-        const concept = data.isPie ? "Pago de Pie" : `Pago Cuota(s) x${data.installmentsCount || 1}`;
-        
+        const concept = data.isPie
+          ? "Pago de Pie"
+          : buildInstallmentConcept({
+              installmentStartDate: res.installment_start_date,
+              dueDay: res.due_day,
+              firstInstallmentNumber: nextInstNum,
+              installmentsCount: data.installmentsCount || 1,
+            });
+
         const pdfBase64 = await generateReceiptPDF({
           clientName,
           rut,

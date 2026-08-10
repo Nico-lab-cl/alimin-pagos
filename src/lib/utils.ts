@@ -46,6 +46,49 @@ export function formatDateTime(date: Date | string | null | undefined): string {
 }
 
 /**
+ * Mes y año de una fecha, en formato "Agosto 2026".
+ */
+export function formatMonthYear(date: Date | string | null | undefined): string {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("es-CL", {
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Santiago",
+  }).formatToParts(d);
+  const month = parts.find((p) => p.type === "month")?.value || "";
+  const year = parts.find((p) => p.type === "year")?.value || "";
+  if (!month || !year) return "";
+  return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${year}`;
+}
+
+/**
+ * Etiqueta de la(s) cuota(s) que cubre un pago: número de cuota + mes y año.
+ *   "Cuota 3 - Agosto 2026"
+ *   "Cuotas 3-6 - Agosto 2026 a Noviembre 2026"
+ * Espera solo cuotas reales (sin la fila de mora histórica, que no tiene número).
+ */
+export function formatInstallmentsLabel(
+  cuotas: { number: number; dueDate?: string | Date | null }[]
+): string {
+  if (!cuotas.length) return "";
+
+  const first = cuotas[0];
+  const last = cuotas[cuotas.length - 1];
+  const numbers = cuotas.length === 1 ? `Cuota ${first.number}` : `Cuotas ${first.number}-${last.number}`;
+
+  const firstPeriod = formatMonthYear(first.dueDate);
+  if (!firstPeriod) return numbers;
+  if (cuotas.length === 1) return `${numbers} - ${firstPeriod}`;
+
+  const lastPeriod = formatMonthYear(last.dueDate);
+  return lastPeriod && lastPeriod !== firstPeriod
+    ? `${numbers} - ${firstPeriod} a ${lastPeriod}`
+    : `${numbers} - ${firstPeriod}`;
+}
+
+/**
  * Extract initials from a name.
  */
 export function getInitials(name: string): string {
