@@ -85,6 +85,7 @@ model User {
   password_changed_at    DateTime?      @db.Timestamptz(6)
   last_login_at          DateTime?      @db.Timestamptz(6)
   auditLogs              AuditLog[]
+  feedback               Feedback[]
   notifications          Notification[]
   reservations           Reservation[]
 
@@ -140,6 +141,7 @@ model Reservation {
   penalty_mode           String?               @default("AUTO") @db.VarChar(10)
   is_multilote           Boolean?              @default(false)
   last_notified_status   String?               @db.VarChar(20)
+  feedback               Feedback[]
   financialLedgers       FinancialLedger[]
   receipts               PaymentReceipt[]
   documents              ReservationDocument[]
@@ -243,6 +245,35 @@ model FinancialLedger {
   @@index([reservation_id], map: "idx_financial_ledger_reservation")
   @@index([paid_at], map: "idx_financial_ledger_paid_at")
   @@map("financial_ledger")
+  @@schema("pagos")
+}
+
+/// Retroalimentación del portal del cliente: comentarios/sugerencias libres y
+/// respuestas de la encuesta NPS. `type` distingue:
+///   COMMENT  → sugerencia, problema o felicitación (usa `category` y `message`)
+///   NPS      → respuesta a la encuesta (usa `score` 0-10 y `message` opcional)
+///   NPS_SKIP → el cliente pospuso la encuesta; se le vuelve a preguntar a los 90 días
+model Feedback {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String       @db.Uuid
+  reservation_id String?      @db.Uuid
+  type           String       @db.VarChar(20)
+  category       String?      @db.VarChar(30)
+  score          Int?
+  message        String?
+  status         String?      @default("NEW") @db.VarChar(20)
+  page_context   String?      @db.VarChar(160)
+  admin_note     String?
+  created_at     DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?    @default(now()) @updatedAt @db.Timestamptz(6)
+  reservation    Reservation? @relation(fields: [reservation_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  user           User         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_feedback_created")
+  @@index([status], map: "idx_feedback_status")
+  @@index([type], map: "idx_feedback_type")
+  @@index([user_id], map: "idx_feedback_user")
+  @@map("feedback")
   @@schema("pagos")
 }
 

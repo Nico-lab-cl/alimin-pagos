@@ -7,15 +7,17 @@ import {
   Home, 
   FileText, 
   LogOut, 
-  Menu, 
+  Menu,
   X,
   ChevronRight,
   Zap,
-  Bell
+  Bell,
+  MessageSquarePlus
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { FeedbackFab, FeedbackModal } from "@/components/feedback/FeedbackWidget";
 
 const menuItems = [
   { href: "/user", label: "Dashboard", icon: Home },
@@ -25,6 +27,9 @@ const menuItems = [
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  // El formulario de sugerencias se abre desde tres lugares (botón flotante,
+  // menú móvil y footer), así que el estado vive acá, en el layout.
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { data: session } = useSession();
   const pathname = usePathname();
 
@@ -164,6 +169,17 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                     </Link>
                   );
                 })}
+
+                <button
+                  onClick={() => { setIsOpen(false); setFeedbackOpen(true); }}
+                  className="flex items-center justify-between p-3 rounded-xl text-xs font-bold uppercase tracking-wider text-brand-700 bg-brand-50 border border-brand-200 hover:bg-brand-100 transition-all cursor-pointer"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <MessageSquarePlus className="w-4 h-4" />
+                    Sugerencias
+                  </span>
+                  <ChevronRight className="w-4 h-4 opacity-50" />
+                </button>
               </nav>
             </div>
 
@@ -179,10 +195,15 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
         </div>
       )}
 
+      {/* Botón flotante + modal de sugerencias */}
+      <FeedbackFab onClick={() => setFeedbackOpen(true)} />
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+
       {/* Footer */}
       <footer className="py-8 border-t border-slate-200 bg-white text-center text-xs text-slate-500 font-medium">
         <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap gap-4">
+            <button onClick={() => setFeedbackOpen(true)} className="hover:text-brand-600 font-medium cursor-pointer">Sugerencias</button>
             <Link href="/legal?type=terms" className="hover:text-brand-600">Términos y Condiciones</Link>
             <Link href="/legal?type=privacy" className="hover:text-brand-600">Privacidad</Link>
             <Link href="/legal?type=support" className="hover:text-brand-600">Soporte</Link>

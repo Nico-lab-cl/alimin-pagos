@@ -17,6 +17,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import Link from "next/link";
+import NpsCard from "@/components/feedback/NpsCard";
 
 export default function UserDashboard() {
   const [data, setData] = useState<any>(null);
@@ -169,6 +170,9 @@ export default function UserDashboard() {
           ))}
         </div>
       )}
+
+      {/* Encuesta NPS (se oculta sola si el cliente ya respondió o la pospuso) */}
+      <NpsCard />
 
       {/* Lot selector if user owns more than one */}
       {data.lots.length > 1 && (

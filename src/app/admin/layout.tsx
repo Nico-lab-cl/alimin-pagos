@@ -23,7 +23,8 @@ import {
   TrendingUp,
   Settings,
   BarChart3,
-  History
+  History,
+  MessageSquare
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { SearchProvider, useSearch } from "@/context/SearchContext";
@@ -48,6 +49,7 @@ const menuItems = [
   },
   { href: "/admin/lots", label: "Lotes", icon: Map },
   { href: "/admin/email-marketing", label: "Informes", icon: BarChart3 },
+  { href: "/admin/feedback", label: "Retroalimentación", icon: MessageSquare },
   { href: "/admin/audit", label: "Auditoría", icon: History },
   { href: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
