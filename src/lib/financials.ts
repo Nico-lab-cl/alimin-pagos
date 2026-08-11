@@ -288,6 +288,96 @@ export function calculateGrowingFixedPenalty(
   return { amount: base + dailyPenalty * growthDays, growthDays };
 }
 
+export type AbonoMora = {
+  amount_clp: number | null;
+  created_at: Date | string | null;
+  nominal_installment_number: number | null;
+};
+
+/**
+ * Reparte los abonos de mora (recibos con scope="MORA") sobre las cuotas vencidas.
+ *
+ * Regla central: UN ABONO SOLO PUEDE CUBRIR INTERES QUE YA EXISTIA EL DIA EN QUE
+ * SE PAGO. Nadie paga por adelantado una mora que todavia no se ha devengado.
+ *
+ * Antes esto se resolvia restando el total historico de abonos contra la mora de
+ * HOY. El efecto era que un abono viejo seguia perdonando el interes de todas las
+ * cuotas siguientes, mes tras mes: la cuota vencia, se generaba su multa, y el
+ * mismo abono de hace meses la volvia a borrar. El cliente aparecia "en gracia"
+ * indefinidamente.
+ *
+ * Como se aplica ahora:
+ *   - El abono que nombra una cuota (nominal_installment_number) se aplica solo a
+ *     esa cuota, topado a su interes.
+ *   - El abono que NO nombra cuota (los importados de Lomas vienen asi) se aplica
+ *     de la cuota vencida mas antigua hacia adelante, en orden de antiguedad del
+ *     abono, y topado al interes que esa cuota tenia a la fecha del abono.
+ *   - Cada peso abonado se consume UNA sola vez.
+ *
+ * El llamador entrega `moraALaFecha`, que calcula el interes de la cuota en curso
+ * a una fecha dada. Debe usar exactamente la misma formula y los mismos parametros
+ * con que calculo el interes de hoy, cambiando solo la fecha; asi el tope y el
+ * monto que se descuenta son siempre comparables.
+ */
+export function crearAplicadorDeAbonosMora(abonos: AbonoMora[]) {
+  const sinCuota = abonos
+    .filter((a) => !a.nominal_installment_number)
+    .sort(
+      (a, b) =>
+        new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime(),
+    );
+  const saldos = sinCuota.map((a) => a.amount_clp || 0);
+  let acumulado = 0;
+
+  return {
+    /**
+     * Devuelve cuanto interes de esta cuota queda cubierto por abonos.
+     * Descuenta de los saldos disponibles, por lo que debe llamarse una sola vez
+     * por cuota y en orden ascendente de numero de cuota.
+     */
+    aplicar(
+      installmentNumber: number,
+      moraDeHoy: number,
+      moraALaFecha: (fecha: Date) => number,
+    ): number {
+      if (moraDeHoy <= 0) return 0;
+
+      // 1) Abonos que nombran explicitamente esta cuota.
+      const directo = Math.min(
+        abonos
+          .filter((a) => a.nominal_installment_number === installmentNumber)
+          .reduce((s, a) => s + (a.amount_clp || 0), 0),
+        moraDeHoy,
+      );
+
+      // 2) Abonos sin cuota, del mas antiguo al mas nuevo.
+      let cubierto = directo;
+      for (let k = 0; k < sinCuota.length && cubierto < moraDeHoy; k++) {
+        if (saldos[k] <= 0) continue;
+        const fecha = sinCuota[k].created_at;
+        if (!fecha) continue;
+
+        // Tope: el interes que esta cuota tenia el dia del abono.
+        const tope = Math.min(moraALaFecha(new Date(fecha)), moraDeHoy);
+        const cubrible = tope - cubierto;
+        if (cubrible <= 0) continue;
+
+        const usar = Math.min(saldos[k], cubrible);
+        saldos[k] -= usar;
+        cubierto += usar;
+      }
+
+      acumulado += cubierto;
+      return cubierto;
+    },
+
+    /** Total efectivamente aplicado a cuotas vencidas. */
+    get totalAplicado() {
+      return acumulado;
+    },
+  };
+}
+
 /**
  * Calculates the total aggregated automatic penalty across all pending installments.
  * It loops through each pending installment, calculates its due date, and evaluates its penalty independently.

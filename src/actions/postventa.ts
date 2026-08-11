@@ -8,6 +8,7 @@ import {
   calculateLomasInterest,
   calculateAggregatedAutoPenalty,
   calculateGrowingFixedPenalty,
+  crearAplicadorDeAbonosMora,
   getProjectConfig,
   getChileToday,
   buildInstallmentConcept,
@@ -247,11 +248,13 @@ export async function getFullPostventaData({
           lateDays = autoLateDays;
         }
 
-        // Abonos/condonaciones de mora (scope=MORA) reducen el interes efectivo adeudado.
-        const moraCredits = (res.receipts || [])
-          .filter((r: any) => r.scope === "MORA")
-          .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
-        penaltyAmount = Math.max(0, penaltyAmount - moraCredits);
+        // Abonos/condonaciones de mora (scope=MORA). El descuento al total se hace
+        // DESPUES del loop, con lo que cada abono cubrio realmente: un abono solo
+        // puede pagar interes que ya existia el dia en que se abono. Ver
+        // crearAplicadorDeAbonosMora. La query ya trae solo recibos APROBADOS.
+        const aplicadorAbonos = crearAplicadorDeAbonosMora(
+          (res.receipts || []).filter((r: any) => r.scope === "MORA")
+        );
 
         // Build per-installment overdue breakdown for admin display
         const formatMonthAdmin = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'America/Santiago' });
@@ -311,10 +314,34 @@ export async function getFullPostventaData({
             const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
             const interestStart = new Date(currentDue);
             interestStart.setDate(interestStart.getDate() + graceDays + 1);
-            // Abonos/condonaciones de mora registrados especificamente para esta cuota
-            const instMoraCredits = (res.receipts || [])
-              .filter((r: any) => r.scope === "MORA" && r.nominal_installment_number === installmentNumber)
-              .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
+            // Cuanto de la mora de ESTA cuota alcanzan a cubrir los abonos. El tope
+            // se evalua con la misma formula de arriba, movida a la fecha del abono.
+            const instMoraCredits = aplicadorAbonos.aplicar(
+              installmentNumber,
+              autoPenaltyForThis,
+              (fecha) =>
+                isLomasProject
+                  ? calculateLomasInterest(
+                      currentDue,
+                      fecha,
+                      false,
+                      res.grace_days ?? project.grace_period_days ?? 5,
+                      activeDailyPenalty,
+                      res.debt_start_date,
+                      project.penalty_start_date,
+                      res.debt_end_date
+                    )
+                  : calculateTotalInterest(
+                      currentDue,
+                      fecha,
+                      false,
+                      res.grace_days ?? project.grace_period_days ?? 5,
+                      activeDailyPenalty,
+                      (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+                      project.penalty_start_date,
+                      res.debt_end_date
+                    )
+            );
             overdueInstallments.push({
               number: installmentNumber,
               dueDate: currentDue.toISOString(),
@@ -330,6 +357,10 @@ export async function getFullPostventaData({
             break;
           }
         }
+
+        // El total solo descuenta lo que los abonos cubrieron de verdad. Lo que
+        // sobre queda sin usar: es plata que ya pago la mora de su momento.
+        penaltyAmount = Math.max(0, penaltyAmount - aplicadorAbonos.totalAplicado);
       }
 
       // Status flags
@@ -571,7 +602,7 @@ function calculateCurrentMoraOwed(
     debt_start_date: Date | null;
     debt_end_date: Date | null;
     next_payment_date: Date | null;
-    receipts?: { scope: string; status: string | null; amount_clp: number }[] | null;
+    receipts?: { scope: string; status: string | null; amount_clp: number; created_at?: Date | string | null }[] | null;
   },
   project: {
     due_day_of_month: number | null;
@@ -590,35 +621,54 @@ function calculateCurrentMoraOwed(
   const fixedMode = res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED";
   const currentDate = asOfDate;
   const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
-  const { amount: fixedPenalty } = fixedMode
-    ? calculateGrowingFixedPenalty(res.manual_penalty, res.debt_start_date, activeDailyPenalty, currentDate)
-    : { amount: 0 };
+  // Mora total (automatica + fija) vigente a una fecha cualquiera.
+  const moraAlDia = (fecha: Date): number => {
+    const { amount: fixed } = fixedMode
+      ? calculateGrowingFixedPenalty(res.manual_penalty, res.debt_start_date, activeDailyPenalty, fecha)
+      : { amount: 0 };
 
-  // Abonos/condonaciones de mora (scope=MORA) reducen el interes efectivo adeudado.
-  const moraCredits = (res.receipts || [])
+    if (paidCuotas >= totalCuotas || !res.installment_start_date) return fixed;
+
+    const { totalPenaltyAmount: auto } = calculateAggregatedAutoPenalty(
+      totalCuotas - paidCuotas,
+      paidCuotas,
+      res.installment_start_date,
+      res.due_day ?? project.due_day_of_month ?? 5,
+      fecha,
+      res.mora_frozen || false,
+      res.grace_days ?? project.grace_period_days ?? 5,
+      activeDailyPenalty,
+      fixedMode ? null : res.debt_start_date,
+      project.penalty_start_date,
+      res.debt_end_date,
+      res.next_payment_date
+    );
+    return auto + fixed;
+  };
+
+  const moraDeHoy = moraAlDia(currentDate);
+
+  // Abonos/condonaciones de mora (scope=MORA). Igual que en pantalla: cada abono
+  // solo puede cubrir la mora que YA existia el dia en que se pago, y se consume
+  // una sola vez. Antes se restaba el total historico contra la mora de hoy, con
+  // lo que un abono viejo seguia borrando la multa de cada cuota nueva.
+  const abonos = (res.receipts || [])
     .filter((r) => r.scope === "MORA" && r.status === "APPROVED")
-    .reduce((sum, r) => sum + (r.amount_clp || 0), 0);
+    .sort(
+      (a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
+    );
 
-  if (paidCuotas >= totalCuotas || !res.installment_start_date) {
-    return Math.max(0, fixedPenalty - moraCredits);
+  let cubierto = 0;
+  for (const abono of abonos) {
+    if (cubierto >= moraDeHoy) break;
+    if (!abono.created_at) continue;
+    const tope = Math.min(moraAlDia(new Date(abono.created_at)), moraDeHoy);
+    const cubrible = tope - cubierto;
+    if (cubrible <= 0) continue;
+    cubierto += Math.min(abono.amount_clp || 0, cubrible);
   }
 
-  const { totalPenaltyAmount: autoPenalty } = calculateAggregatedAutoPenalty(
-    totalCuotas - paidCuotas,
-    paidCuotas,
-    res.installment_start_date,
-    res.due_day ?? project.due_day_of_month ?? 5,
-    currentDate,
-    res.mora_frozen || false,
-    res.grace_days ?? project.grace_period_days ?? 5,
-    activeDailyPenalty,
-    fixedMode ? null : res.debt_start_date,
-    project.penalty_start_date,
-    res.debt_end_date,
-    res.next_payment_date
-  );
-
-  return Math.max(0, autoPenalty + fixedPenalty - moraCredits);
+  return Math.max(0, moraDeHoy - cubierto);
 }
 
 /**
@@ -2837,11 +2887,11 @@ export async function getClientPOV(reservationId: string) {
         lateDays = autoLateDays;
       }
 
-      // Abonos/condonaciones de mora (scope=MORA) reducen el interes efectivo adeudado.
-      const moraCreditsTotal = (res.receipts || [])
-        .filter((r: any) => r.scope === "MORA")
-        .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
-      penaltyAmount = Math.max(0, penaltyAmount - moraCreditsTotal);
+      // Abonos de mora: mismo criterio que getFullPostventaData. El descuento al
+      // total se aplica despues del loop, con lo efectivamente cubierto.
+      const aplicadorAbonos = crearAplicadorDeAbonosMora(
+        (res.receipts || []).filter((r: any) => r.scope === "MORA")
+      );
 
       // Upcoming installments
       const totalPendingRemaining = totalCuotas - paidCuotas;
@@ -2919,10 +2969,33 @@ export async function getClientPOV(reservationId: string) {
           }
         }
 
-        // Abonos/condonaciones de mora registrados especificamente para esta cuota
-        const instMoraCredits = (res.receipts || [])
-          .filter((r: any) => r.scope === "MORA" && r.nominal_installment_number === installmentNumber)
-          .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
+        // Cuanto de la mora de ESTA cuota alcanzan a cubrir los abonos.
+        const instMoraCredits = aplicadorAbonos.aplicar(
+          installmentNumber,
+          autoPenaltyForThis,
+          (fecha) =>
+            project.slug === "lomas-del-mar"
+              ? calculateLomasInterest(
+                  currentDue,
+                  fecha,
+                  res.mora_frozen || false,
+                  res.grace_days ?? project.grace_period_days ?? 5,
+                  activeDailyPenalty,
+                  res.debt_start_date,
+                  project.penalty_start_date,
+                  res.debt_end_date
+                )
+              : calculateTotalInterest(
+                  currentDue,
+                  fecha,
+                  res.mora_frozen || false,
+                  res.grace_days ?? project.grace_period_days ?? 5,
+                  activeDailyPenalty,
+                  (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+                  project.penalty_start_date,
+                  res.debt_end_date
+                )
+        );
         installmentPenaltyAmount = Math.max(0, autoPenaltyForThis - instMoraCredits);
 
         if (autoPenaltyForThis > 0) {
@@ -2981,6 +3054,8 @@ export async function getClientPOV(reservationId: string) {
           isOverdue
         });
       }
+
+      penaltyAmount = Math.max(0, penaltyAmount - aplicadorAbonos.totalAplicado);
     }
 
     // Documents

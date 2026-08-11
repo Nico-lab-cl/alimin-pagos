@@ -8,6 +8,7 @@ import {
   calculateLomasInterest,
   calculateAggregatedAutoPenalty,
   calculateGrowingFixedPenalty,
+  crearAplicadorDeAbonosMora,
   getChileToday,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
@@ -202,7 +203,13 @@ export async function getUserLots() {
         // Calculate upcoming installments (up to 12)
         const totalPendingRemaining = totalCuotas - paidCuotas;
         const maxToShow = totalPendingRemaining; // Show all available installments
-        
+
+        // Abonos de mora: mismo criterio que el lado admin (ver postventa.ts), para
+        // que el cliente y postventa vean siempre el mismo interes.
+        const aplicadorAbonos = crearAplicadorDeAbonosMora(
+          (res.receipts || []).filter((r: any) => r.scope === "MORA")
+        );
+
         // 1. Add historical penalty as a separate item if in FIXED or MIXED mode
         if ((res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") && res.manual_penalty != null && res.manual_penalty > 0) {
           const { amount: growingFixedAmount, growthDays: fixedGrowthDaysForItem } = calculateGrowingFixedPenalty(
@@ -283,10 +290,33 @@ export async function getUserLots() {
             }
           }
 
-          // Abonos/condonaciones de mora registrados especificamente para esta cuota
-          const instMoraCredits = (res.receipts || [])
-            .filter((r: any) => r.scope === "MORA" && r.nominal_installment_number === installmentNumber)
-            .reduce((sum: number, r: any) => sum + (r.amount_clp || 0), 0);
+          // Cuanto de la mora de ESTA cuota alcanzan a cubrir los abonos.
+          const instMoraCredits = aplicadorAbonos.aplicar(
+            installmentNumber,
+            autoPenaltyForThis,
+            (fecha) =>
+              project.slug === "lomas-del-mar"
+                ? calculateLomasInterest(
+                    currentDue,
+                    fecha,
+                    res.mora_frozen || false,
+                    res.grace_days ?? project.grace_period_days ?? 5,
+                    activeDailyPenalty,
+                    res.debt_start_date,
+                    project.penalty_start_date,
+                    res.debt_end_date
+                  )
+                : calculateTotalInterest(
+                    currentDue,
+                    fecha,
+                    res.mora_frozen || false,
+                    res.grace_days ?? project.grace_period_days ?? 5,
+                    activeDailyPenalty,
+                    (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+                    project.penalty_start_date,
+                    res.debt_end_date
+                  )
+          );
           installmentPenaltyAmount = Math.max(0, autoPenaltyForThis - instMoraCredits);
 
           if (autoPenaltyForThis > 0) {
