@@ -143,6 +143,7 @@ model Reservation {
   last_notified_status   String?               @db.VarChar(20)
   feedback               Feedback[]
   financialLedgers       FinancialLedger[]
+  whatsappMessages       WhatsappMessage[]
   receipts               PaymentReceipt[]
   documents              ReservationDocument[]
   lot                    Lot                   @relation(fields: [lot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -274,6 +275,59 @@ model Feedback {
   @@index([type], map: "idx_feedback_type")
   @@index([user_id], map: "idx_feedback_user")
   @@map("feedback")
+  @@schema("pagos")
+}
+
+/// Plantillas de los mensajes de WhatsApp, editables desde /admin/whatsapp.
+/// Hay una por categoria de cobranza; `body` admite variables entre llaves
+/// ({nombre}, {lote}, {multa}...) que se reemplazan al momento de enviar.
+///   MORA         → la cuota ya genera multa
+///   GRACIA       → vencio pero sigue dentro de los dias de gracia
+///   PROXIMO      → vence dentro de los proximos 5 dias
+///   VENCIMIENTO  → vence hoy
+model WhatsappTemplate {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category   String    @unique @db.VarChar(20)
+  name       String    @db.VarChar(100)
+  body       String
+  active     Boolean?  @default(true)
+  updated_by String?   @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at DateTime? @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("whatsapp_templates")
+  @@schema("pagos")
+}
+
+/// Bitacora de cada mensaje de WhatsApp que sale del portal. Es la fuente del
+/// dashboard (cuantos mensajes por categoria) y del bloqueo antirrepeticion
+/// (no volver a escribirle al mismo cliente por lo mismo dentro de 24h).
+///
+/// `reservation_id` es opcional y con ON DELETE SET NULL a proposito: si se
+/// borra una reserva el historial de lo que ya se envio no se pierde, porque
+/// el nombre y el telefono quedan copiados en la propia fila.
+model WhatsappMessage {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reservation_id String?      @db.Uuid
+  project_slug   String       @db.VarChar(100)
+  instance       String       @db.VarChar(50)
+  category       String       @db.VarChar(20)
+  client_name    String       @db.VarChar(255)
+  phone          String       @db.VarChar(30)
+  message        String
+  status         String       @default("SENT") @db.VarChar(20)
+  error          String?
+  evolution_id   String?      @db.VarChar(160)
+  sent_by        String?      @db.VarChar(255)
+  created_at     DateTime?    @default(now()) @db.Timestamptz(6)
+  reservation    Reservation? @relation(fields: [reservation_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_whatsapp_messages_created")
+  @@index([category], map: "idx_whatsapp_messages_category")
+  @@index([project_slug], map: "idx_whatsapp_messages_project")
+  @@index([reservation_id], map: "idx_whatsapp_messages_reservation")
+  @@index([instance], map: "idx_whatsapp_messages_instance")
+  @@map("whatsapp_messages")
   @@schema("pagos")
 }
 

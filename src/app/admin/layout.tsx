@@ -24,7 +24,8 @@ import {
   Settings,
   BarChart3,
   History,
-  MessageSquare
+  MessageSquare,
+  MessageCircle
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { SearchProvider, useSearch } from "@/context/SearchContext";
@@ -48,6 +49,7 @@ const menuItems = [
     ]
   },
   { href: "/admin/lots", label: "Lotes", icon: Map },
+  { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/admin/email-marketing", label: "Informes", icon: BarChart3 },
   { href: "/admin/feedback", label: "Retroalimentación", icon: MessageSquare },
   { href: "/admin/audit", label: "Auditoría", icon: History },
