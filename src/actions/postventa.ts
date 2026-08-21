@@ -428,6 +428,7 @@ export async function getFullPostventaData({
           ? `${res.name} ${res.last_name}`.trim()
           : res.name,
         clientEmail: res.user?.email || res.email,
+        secondaryEmail: res.secondary_email,
         clientPhone: res.phone,
         rut: res.rut,
         lotNumber: lot.number,
@@ -1847,7 +1848,7 @@ export async function updateClientAdvisor(reservationId: string, advisor: string
   }
 }
 
-export async function updateClientProfile(reservationId: string, data: { name: string, email: string, rut: string, phone: string, observation?: string, marital_status?: string, profession?: string, nationality?: string, address_street?: string, address_number?: string, address_region?: string, address_commune?: string }) {
+export async function updateClientProfile(reservationId: string, data: { name: string, email: string, secondary_email?: string, rut: string, phone: string, observation?: string, marital_status?: string, profession?: string, nationality?: string, address_street?: string, address_number?: string, address_region?: string, address_commune?: string }) {
   const session = await auth();
   const adminUser = session?.user as any;
   if (!session?.user || adminUser?.role !== "ADMIN") {
@@ -1866,6 +1867,24 @@ export async function updateClientProfile(reservationId: string, data: { name: s
 
     const sanitizedEmail = data.email.toLowerCase().trim();
 
+    // Correo secundario: dato de contacto que vive SOLO en la reserva. No se
+    // espeja en la cuenta de usuario (users.email es unico y es la llave de
+    // acceso al portal), asi que no se valida contra otros clientes: varios
+    // pueden compartir el correo de un familiar. Vacio se guarda como null.
+    let sanitizedSecondaryEmail: string | null | undefined = undefined;
+    if (data.secondary_email !== undefined) {
+      const raw = data.secondary_email.toLowerCase().trim();
+      if (raw === "") {
+        sanitizedSecondaryEmail = null;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+        return { error: "El correo secundario no tiene un formato válido." };
+      } else if (raw === sanitizedEmail) {
+        return { error: "El correo secundario debe ser distinto al correo principal." };
+      } else {
+        sanitizedSecondaryEmail = raw;
+      }
+    }
+
     // Check if new email conflicts with another user (excluding the current one)
     if (sanitizedEmail !== reservation.user.email) {
       const existingUserWithNewEmail = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
@@ -1881,6 +1900,9 @@ export async function updateClientProfile(reservationId: string, data: { name: s
     }
     if (data.email !== undefined && sanitizedEmail !== reservation.email) {
       changes.push(`Email: "${reservation.email}" -> "${sanitizedEmail}"`);
+    }
+    if (sanitizedSecondaryEmail !== undefined && sanitizedSecondaryEmail !== reservation.secondary_email) {
+      changes.push(`Correo secundario: "${reservation.secondary_email || 'No registrado'}" -> "${sanitizedSecondaryEmail || 'No registrado'}"`);
     }
     if (data.rut !== undefined && data.rut !== reservation.rut) {
       changes.push(`RUT: "${reservation.rut || 'No registrado'}" -> "${data.rut}"`);
@@ -1970,6 +1992,7 @@ export async function updateClientProfile(reservationId: string, data: { name: s
           name: data.name,
           last_name: null,
           email: sanitizedEmail,
+          secondary_email: sanitizedSecondaryEmail,
           rut: data.rut,
           phone: data.phone,
           observation: data.observation,
@@ -2003,6 +2026,7 @@ export async function updateClientProfile(reservationId: string, data: { name: s
             // proxima vez que se muestre el cliente.
             last_name: null,
             email: sanitizedEmail,
+            secondary_email: sanitizedSecondaryEmail,
             rut: data.rut,
             phone: data.phone,
             observation: data.observation,

@@ -49,6 +49,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
   const [profileForm, setProfileForm] = useState({
     name: selectedClient.clientName || "",
     email: selectedClient.clientEmail || "",
+    secondary_email: selectedClient.secondaryEmail || "",
     rut: selectedClient.rut || "",
     phone: selectedClient.clientPhone || "",
     address_street: selectedClient.address_street || "",
@@ -136,6 +137,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     setProfileForm({
       name: selectedClient.clientName || "",
       email: selectedClient.clientEmail || "",
+    secondary_email: selectedClient.secondaryEmail || "",
       rut: selectedClient.rut || "",
       phone: selectedClient.clientPhone || "",
       address_street: selectedClient.address_street || "",
@@ -383,6 +385,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
       const res = await updateClientProfile(selectedClient.id, {
         name: profileForm.name.trim(),
         email: profileForm.email.trim(),
+        secondary_email: profileForm.secondary_email.trim(),
         rut: profileForm.rut.trim(),
         phone: profileForm.phone.trim(),
         address_street: profileForm.address_street.trim(),
@@ -955,6 +958,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                         setProfileForm({
                           name: selectedClient.clientName || "",
                           email: selectedClient.clientEmail || "",
+    secondary_email: selectedClient.secondaryEmail || "",
                           rut: selectedClient.rut || "",
                           phone: selectedClient.clientPhone || "",
                           address_street: selectedClient.address_street || "",
@@ -988,6 +992,14 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   <div>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email</p>
                     <p className="font-semibold text-brand-600 underline truncate select-all">{selectedClient.clientEmail}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Secundario</p>
+                    {selectedClient.secondaryEmail ? (
+                      <p className="font-semibold text-brand-600 underline truncate select-all">{selectedClient.secondaryEmail}</p>
+                    ) : (
+                      <p className="font-bold text-slate-400">—</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Teléfono</p>
@@ -1133,6 +1145,17 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
                       required
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Email Secundario</label>
+                    <input
+                      type="email"
+                      value={profileForm.secondary_email}
+                      onChange={(e) => setProfileForm({ ...profileForm, secondary_email: e.target.value })}
+                      placeholder="Opcional"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none"
+                    />
+                    <p className="text-[9px] font-semibold text-slate-400">Solo contacto: no da acceso al portal.</p>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Teléfono</label>

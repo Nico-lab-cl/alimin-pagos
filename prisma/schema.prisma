@@ -103,6 +103,7 @@ model Reservation {
   name                   String                @db.VarChar(255)
   last_name              String?               @db.VarChar(255)
   email                  String                @db.VarChar(255)
+  secondary_email        String?               @db.VarChar(255)
   phone                  String                @db.VarChar(50)
   rut                    String?               @db.VarChar(20)
   status                 String?               @default("active") @db.VarChar(20)
