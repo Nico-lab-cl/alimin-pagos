@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAdminProjects, getFullPostventaData, getProjectLedgerStats } from "@/actions/postventa";
-import { formatCLP } from "@/lib/utils";
+import { formatCLP, esAlContado, downloadCsv, formatFechaCsv } from "@/lib/utils";
 import { 
   Loader2, 
   AlertTriangle, 
@@ -113,31 +113,37 @@ export default function AdminDashboard() {
     return `L-${c.lotNumber}`;
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     const listToExport = selectedClientIds.length > 0
       ? clientsList.filter((c: any) => selectedClientIds.includes(c.id))
       : clientsList;
 
-    const headers = ["Cliente", "RUT", "Email", "Lote", "Cuotas Pagadas", "Total Cuotas", "Estado", "Saldo Pendiente"];
+    const headers = ["Cliente", "RUT", "Email", "Lote", "Valor Total Terreno", "Reserva", "Pie", "Modalidad", "Valor Cuota", "Cuotas Pagadas", "Total Cuotas", "Día de Pago", "Fecha Cuota Actual", "Fecha Cuota Siguiente", "Estado", "Saldo Pendiente"];
     const rows = listToExport.map((c: any) => [
       c.clientName || "",
       c.rut || "",
       c.clientEmail || "",
       c.lotNumber || "",
+      c.totalToPay || 0,
+      c.reservation_price || 0,
+      c.pie || 0,
+      esAlContado(c) ? "AL CONTADO" : "EN CUOTAS",
+      c.currentInstallmentAmount || 0,
       c.paidCuotas || 0,
       c.totalCuotas || 0,
+      c.due_day || "",
+      formatFechaCsv(c.nextDueDate),
+      formatFechaCsv(c.followingDueDate),
       c.status || "",
       c.pendingBalance || 0
     ]);
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
-      + [headers.join(";"), ...rows.map((e: any) => e.join(";"))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `actividad_cartera_${selectedProject}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Cada celda va entre comillas: un nombre con ";" o "#" partia el archivo a la
+    // mitad cuando se armaba como data URI, y ahi se perdian filas completas.
+    const csvContent = "\uFEFF" + [
+      headers.join(";"),
+      ...rows.map((row: any) => row.map((val: any) => `"${val.toString().replace(/"/g, '""')}"`).join(";")),
+    ].join("\n");
+    await downloadCsv(csvContent, `actividad_cartera_${selectedProject}.csv`);
   };
 
   if (selectedClient) {

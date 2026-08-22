@@ -417,6 +417,43 @@ export async function getFullPostventaData({
         } catch {}
       }
 
+      // Datos del plan de pago para los exportables. Son solo lectura: repiten la
+      // misma regla que ya usa el desglose de cuotas vencidas (rangos pactados y,
+      // si no hay rango, el valor_cuota del lote). No tocan saldo, pie ni mora.
+      const montoDeCuota = (numeroCuota: number): number => {
+        let monto = lot.valor_cuota || 0;
+        const listaRangos = (ranges as any[]) || [];
+        if (listaRangos.length > 0) {
+          const range = listaRangos.find(
+            (r: any) =>
+              numeroCuota >= Number(r.from ?? r.start ?? 0) &&
+              numeroCuota <= Number(r.to ?? r.end ?? 0)
+          );
+          if (range) monto = Number(range.amount ?? range.value ?? monto);
+        }
+        return monto;
+      };
+
+      // La cuota vigente es la que sigue a las ya pagadas; la siguiente es la de
+      // despues. next_payment_date (override del admin) solo mueve a la vigente,
+      // igual que en el desglose de cuotas vencidas.
+      const currentInstallmentNumber = paidCuotas < totalCuotas ? paidCuotas + 1 : null;
+      const followingInstallmentNumber =
+        currentInstallmentNumber && currentInstallmentNumber < totalCuotas
+          ? currentInstallmentNumber + 1
+          : null;
+      const followingDueDate =
+        followingInstallmentNumber && res.installment_start_date
+          ? getInstallmentDueDate(
+              res.installment_start_date,
+              followingInstallmentNumber,
+              res.due_day ?? project.due_day_of_month ?? 5
+            )
+          : null;
+      const currentInstallmentAmount = currentInstallmentNumber
+        ? montoDeCuota(currentInstallmentNumber)
+        : 0;
+
       const formatMonth = new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Santiago' });
       const nextInstallmentMonth = nextDueDate ? formatMonth.format(nextDueDate).toUpperCase() : null;
 
@@ -441,6 +478,9 @@ export async function getFullPostventaData({
         totalCuotas,
         nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
         nextInstallmentMonth,
+        followingInstallmentNumber,
+        followingDueDate,
+        currentInstallmentAmount,
         pieStatus: res.pie_status,
         pieAmount,
         nextDueDate,

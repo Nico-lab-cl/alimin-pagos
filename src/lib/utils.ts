@@ -204,6 +204,48 @@ export async function deliverFile(blob: Blob, filename: string) {
 }
 
 /**
+ * ¿Este cliente compró al contado?
+ *
+ * Hay dos formas de serlo y las dos cuentan:
+ *   1) El lote quedó con 0 cuotas pactadas (pago de una sola vez).
+ *   2) Postventa lo marcó con el botón "AL CONTADO" de la ficha, que deja la
+ *      reserva en status COMPLETED (ver toggleAlContado).
+ *
+ * Sin esta distinción todos ellos se ven "AL DÍA" en el exportable, mezclados
+ * con los que sí están pagando cuotas al día. Es solo una etiqueta de lectura:
+ * no toca ningún cálculo de saldo, pie ni mora.
+ */
+export function esAlContado(cliente: {
+  totalCuotas?: number | null;
+  status?: string | null;
+  internalStatus?: string | null;
+}): boolean {
+  if ((cliente?.totalCuotas || 0) === 0) return true;
+  return cliente?.internalStatus === "COMPLETED" || cliente?.status === "COMPLETED";
+}
+
+/**
+ * Fecha para una celda de CSV, en dd-mm-aaaa y hora de Santiago.
+ *
+ * No usa formatDate porque "05 ago 2026" no lo ordena ni lo filtra Excel, y
+ * porque una celda vacia es mejor que un "—" cuando el cliente simplemente no
+ * tiene esa fecha (compro al contado o ya no le quedan cuotas).
+ */
+export function formatFechaCsv(date: Date | string | null | undefined): string {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  const partes = new Intl.DateTimeFormat("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Santiago",
+  }).formatToParts(d);
+  const buscar = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
+  return `${buscar("day")}-${buscar("month")}-${buscar("year")}`;
+}
+
+/**
  * Entrega un CSV ya armado. El contenido debe traer su propio BOM si se abre en Excel.
  */
 export async function downloadCsv(csvContent: string, filename: string) {

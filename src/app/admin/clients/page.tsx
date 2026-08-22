@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile, deletePaymentReceipt, updateMoraDates, getFinancialHistory, generateTemporaryPassword } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
-import { formatCLP, formatDate, downloadCsv } from "@/lib/utils";
+import { formatCLP, formatDate, downloadCsv, esAlContado, formatFechaCsv } from "@/lib/utils";
 import { Loader2, Search, User, Mail, ChevronRight, MapPin, Hash, Target, Phone, Users, X, Calendar, DollarSign, Activity, FileText, AlertTriangle, CheckCircle2, Save, Edit3, Upload, Trash2, FolderOpen, FileCheck2, Download, Eye, Key, ShieldAlert, Lock } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
@@ -364,7 +364,7 @@ export default function ClientsPage() {
       ? filteredClients.filter((c: any) => selectedClientIds.includes(c.id))
       : filteredClients;
 
-    const headers = ["Cliente", "RUT", "Email", "Teléfono", "Lote", "Etapa", "Cuotas Pagadas", "Total Cuotas", "Estado", "Saldo Pendiente"];
+    const headers = ["Cliente", "RUT", "Email", "Teléfono", "Lote", "Etapa", "Valor Total Terreno", "Reserva", "Pie", "Modalidad", "Valor Cuota", "Cuotas Pagadas", "Total Cuotas", "Día de Pago", "Fecha Cuota Actual", "Fecha Cuota Siguiente", "Estado", "Saldo Pendiente"];
     const rows = listToExport.map((c: any) => [
       c.clientName || "",
       c.rut || "",
@@ -372,8 +372,16 @@ export default function ClientsPage() {
       c.clientPhone || "",
       `Lote ${c.lotNumber || ""}`,
       c.lotStage || "",
+      c.totalToPay || 0,
+      c.reservation_price || 0,
+      c.pie || 0,
+      esAlContado(c) ? "AL CONTADO" : "EN CUOTAS",
+      c.currentInstallmentAmount || 0,
       c.paidCuotas || 0,
       c.totalCuotas || 0,
+      c.due_day || "",
+      formatFechaCsv(c.nextDueDate),
+      formatFechaCsv(c.followingDueDate),
       c.status === "LATE" ? "MORA" : c.status === "FROZEN" ? "CONGELADO" : c.status === "GRACE" ? "GRACIA" : c.status === "UPCOMING" ? "AVISO" : "AL DÍA",
       c.pendingBalance || 0
     ]);
