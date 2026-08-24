@@ -3,9 +3,13 @@
  *
  * Postventa escribe SOLO el asunto y el cuerpo, en texto plano con saltos de
  * linea (como un WhatsApp largo). Esta funcion es la unica que sabe convertir
- * eso en el HTML de marca que le llega al cliente: logo/nombre, colores del
- * proyecto y un pie legal. Nadie fuera de este archivo arma HTML de correo, asi
- * que solo hay un lugar donde el diseño se puede desalinear entre proyectos.
+ * eso en el HTML de marca que le llega al cliente: logo, cabecera verde y el
+ * cuerpo. Nadie fuera de este archivo arma HTML de correo, asi que solo hay
+ * un lugar donde el diseño se puede desalinear entre proyectos.
+ *
+ * Sin "use server": es una libreria comun, no acciones de servidor. Por eso
+ * la puede importar directo un componente de cliente (EmailComposer) para
+ * armar la vista previa en el navegador sin ir al servidor por cada tecla.
  */
 
 export const EMAIL_SUBJECT_MAX = 120;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Loader2,
   Send,
@@ -11,6 +11,7 @@ import {
   X,
   FileText,
   Users,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -21,7 +22,13 @@ import {
   sendEmailTest,
   type EmailAudience,
 } from "@/actions/email";
-import { EMAIL_SUBJECT_MAX, EMAIL_BODY_MAX, EMAIL_TEMPLATE_VARIABLES } from "@/lib/emailTemplate";
+import {
+  EMAIL_SUBJECT_MAX,
+  EMAIL_BODY_MAX,
+  EMAIL_TEMPLATE_VARIABLES,
+  buildEmailHtml,
+  renderEmailVariables,
+} from "@/lib/emailTemplate";
 import { cn } from "@/lib/utils";
 
 const CHUNK_SIZE = 5;
@@ -130,6 +137,42 @@ export default function EmailComposer({
   const selectedList = sendableList.filter((r) => selected.has(r.id));
 
   const visibleList = manualMode ? recipients : sendableList;
+
+  // Vista previa en vivo: el cliente marcado (o, si nadie está marcado
+  // todavía, el primero de la lista cargada) manda sus datos reales al
+  // marco de correo real -- el mismo buildEmailHtml que arma el envío de
+  // verdad -- para que postventa vea el correo tal cual antes de mandar
+  // nada, sin tener que usar "Enviar prueba" para eso.
+  const previewSource = selectedList[0] || recipients[0] || null;
+
+  const previewHtml = useMemo(() => {
+    const values = {
+      nombre: previewSource?.clientName || "Nombre del cliente",
+      proyecto: previewSource?.projectName || "Proyecto",
+      lote: previewSource ? String(previewSource.lotNumber ?? "") : "N°",
+      etapa: previewSource ? String(previewSource.lotStage ?? "") : "",
+      rut: previewSource?.rut || "",
+    };
+    const rendered = renderEmailVariables(
+      body.trim() ? body : "Escribe el cuerpo del correo para ver la vista previa acá.",
+      values
+    );
+    return buildEmailHtml({
+      projectSlug: previewSource?.projectSlug || "",
+      projectName: values.proyecto,
+      bodyText: rendered,
+    });
+  }, [body, previewSource]);
+
+  const previewSubject = subject.trim()
+    ? renderEmailVariables(subject, {
+        nombre: previewSource?.clientName || "Nombre del cliente",
+        proyecto: previewSource?.projectName || "Proyecto",
+        lote: previewSource ? String(previewSource.lotNumber ?? "") : "N°",
+        etapa: previewSource ? String(previewSource.lotStage ?? "") : "",
+        rut: previewSource?.rut || "",
+      })
+    : "(sin asunto)";
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -417,7 +460,7 @@ export default function EmailComposer({
             onChange={(e) => setBody(e.target.value)}
             rows={8}
             disabled={sending}
-            placeholder="Escribe el mensaje tal como lo leería el cliente. El logo, los colores y el pie se agregan solos."
+            placeholder="Escribe el mensaje tal como lo leería el cliente. El logo y la cabecera se agregan solos."
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[13px] text-slate-800 focus:border-brand-500 outline-none transition-all font-sans leading-relaxed resize-y disabled:opacity-60"
           />
         </div>
@@ -434,6 +477,34 @@ export default function EmailComposer({
               {v.key}
             </button>
           ))}
+        </div>
+
+        {/* Vista previa en vivo: se actualiza sola al marcar a alguien abajo
+            o al escribir, sin tener que mandar nada. */}
+        <div className="pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <Eye className="w-3.5 h-3.5" />
+              Vista previa
+            </div>
+            <p className="text-[10px] font-semibold text-slate-400">
+              {previewSource
+                ? `Con los datos de ${previewSource.clientName}`
+                : "Marca a un cliente abajo para ver sus datos acá"}
+            </p>
+          </div>
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-600 truncate">
+              <span className="text-slate-400">Asunto: </span>
+              {previewSubject}
+            </div>
+            <iframe
+              title="Vista previa del correo"
+              srcDoc={previewHtml}
+              className="w-full h-72 bg-white"
+              sandbox=""
+            />
+          </div>
         </div>
 
         {/* Prueba */}
