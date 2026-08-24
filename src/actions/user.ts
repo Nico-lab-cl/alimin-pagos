@@ -271,11 +271,16 @@ export async function getUserLots() {
                 res.mora_frozen || false,
                 res.grace_days ?? project.grace_period_days ?? 5,
                 activeDailyPenalty,
-                res.debt_start_date,
+                (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
                 project.penalty_start_date,
                 res.debt_end_date
               );
             } else {
+              // FIXED/MIXED: la multa fija ya cubre la deuda historica, asi que
+              // no se le pasa debt_start_date aca -- si no, cada cuota pendiente
+              // se ve con "1 dia de atraso" apenas se registra un pago o un
+              // abono (que re-fija debt_start_date a hoy), sin importar cuanto
+              // llevaba vencida de verdad. Mismo criterio que el lado admin.
               autoPenaltyForThis = calculateTotalInterest(
                 currentDue,
                 currentDate,
@@ -302,7 +307,7 @@ export async function getUserLots() {
                     res.mora_frozen || false,
                     res.grace_days ?? project.grace_period_days ?? 5,
                     activeDailyPenalty,
-                    res.debt_start_date,
+                    (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
                     project.penalty_start_date,
                     res.debt_end_date
                   )

@@ -284,14 +284,19 @@ export async function getFullPostventaData({
           if (res.mora_status !== "CONGELADO" && !res.mora_frozen) {
             if (isLomasProject) {
               // Lomas del Mar: misma formula que aliminlomasdelmar.com.
-              // La fecha de deuda aplica a TODAS las cuotas.
+              // La fecha de deuda aplica a TODAS las cuotas -- EXCEPTO en modo
+              // FIXED/MIXED, donde la multa fija ya cubre la deuda historica.
+              // Sin este null, cada vez que se registra un pago o un abono
+              // (que re-fija debt_start_date a hoy) TODAS las cuotas pendientes
+              // se veian con "1 dia de atraso" sin importar cuanto llevaran
+              // vencidas de verdad -- este desglose es lo que ve postventa.
               autoPenaltyForThis = calculateLomasInterest(
                 currentDue,
                 currentDate,
                 false,
                 res.grace_days ?? project.grace_period_days ?? 5,
                 activeDailyPenalty,
-                res.debt_start_date,
+                (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
                 project.penalty_start_date,
                 res.debt_end_date
               );
@@ -328,7 +333,7 @@ export async function getFullPostventaData({
                       false,
                       res.grace_days ?? project.grace_period_days ?? 5,
                       activeDailyPenalty,
-                      res.debt_start_date,
+                      (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
                       project.penalty_start_date,
                       res.debt_end_date
                     )
@@ -3080,10 +3085,15 @@ export async function getClientPOV(reservationId: string) {
               res.mora_frozen || false,
               res.grace_days ?? project.grace_period_days ?? 5,
               activeDailyPenalty,
-              res.debt_start_date,
+              (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
               project.penalty_start_date,
               res.debt_end_date
             );
+            // FIXED/MIXED: la multa fija ya cubre la deuda historica, asi que
+            // no se le pasa debt_start_date aca -- si no, cada cuota pendiente
+            // se ve con "1 dia de atraso" apenas se registra un pago o un
+            // abono (que re-fija debt_start_date a hoy), sin importar cuanto
+            // llevaba vencida de verdad. Mismo criterio que la rama de abajo.
           } else {
             autoPenaltyForThis = calculateTotalInterest(
               currentDue,
@@ -3111,7 +3121,7 @@ export async function getClientPOV(reservationId: string) {
                   res.mora_frozen || false,
                   res.grace_days ?? project.grace_period_days ?? 5,
                   activeDailyPenalty,
-                  res.debt_start_date,
+                  (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
                   project.penalty_start_date,
                   res.debt_end_date
                 )
