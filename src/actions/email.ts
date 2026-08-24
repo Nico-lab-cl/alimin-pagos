@@ -546,6 +546,13 @@ export async function sendEmailTest(data: {
   subject: string;
   body: string;
   to: string;
+  /**
+   * Reserva marcada en la pantalla, si hay alguna. Si viene, la prueba usa
+   * los datos REALES de ese cliente en vez de "el primero que aparezca en la
+   * lista" — que es justo lo que confundía a postventa: marcaban a un
+   * cliente abajo y la prueba mostraba los datos de otro.
+   */
+  reservationId?: string | null;
 }) {
   const user = await requireAdmin();
   if (!user) return { error: "No autorizado" };
@@ -566,7 +573,9 @@ export async function sendEmailTest(data: {
     if (!buzon) return { error: `No hay una cuenta de correo asignada al proyecto ${project.slug}` };
 
     const res = await getFullPostventaData({ projectSlug: project.slug });
-    const sample = (res.data || [])[0];
+    const sample = data.reservationId
+      ? (res.data || []).find((c: any) => c.id === data.reservationId) || (res.data || [])[0]
+      : (res.data || [])[0];
 
     const values = {
       nombre: sample?.clientName || "Cliente de ejemplo",

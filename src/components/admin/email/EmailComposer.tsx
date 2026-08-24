@@ -293,13 +293,28 @@ export default function EmailComposer({
       return;
     }
 
+    // Si hay alguien marcado, la prueba usa SUS datos reales (nombre, lote,
+    // rut) en vez de "el primer cliente del proyecto" — es lo que espera ver
+    // quien marcó a un cliente puntual antes de apretar "Enviar prueba".
+    const previewClient = selectedList[0];
+
     setTesting(true);
     try {
-      const res = await sendEmailTest({ projectSlug: targetProject, subject, body, to: testEmail });
+      const res = await sendEmailTest({
+        projectSlug: targetProject,
+        subject,
+        body,
+        to: testEmail,
+        reservationId: previewClient?.id ?? null,
+      });
       if ((res as any).error) {
         toast.error((res as any).error);
       } else {
-        toast.success(`Correo de prueba enviado a ${(res as any).sentTo}`);
+        toast.success(
+          previewClient
+            ? `Correo de prueba enviado a ${(res as any).sentTo}, con los datos de ${previewClient.clientName}`
+            : `Correo de prueba enviado a ${(res as any).sentTo}`
+        );
       }
     } catch (err) {
       console.error("Error en el correo de prueba:", err);
@@ -422,23 +437,30 @@ export default function EmailComposer({
         </div>
 
         {/* Prueba */}
-        <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-2">
-          <input
-            type="email"
-            value={testEmail}
-            onChange={(e) => setTestEmail(e.target.value)}
-            placeholder="tucorreo@aliminspa.cl"
-            disabled={sending || testing}
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none transition-all disabled:opacity-60"
-          />
-          <button
-            onClick={runTest}
-            disabled={sending || testing || !configured}
-            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
-            Enviar prueba
-          </button>
+        <div className="pt-4 border-t border-slate-100 space-y-2">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="tucorreo@aliminspa.cl"
+              disabled={sending || testing}
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-800 focus:border-brand-500 outline-none transition-all disabled:opacity-60"
+            />
+            <button
+              onClick={runTest}
+              disabled={sending || testing || !configured}
+              className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
+              Enviar prueba
+            </button>
+          </div>
+          <p className="text-[10px] font-semibold text-slate-400">
+            {selectedList[0]
+              ? `Va a llegar con los datos de ${selectedList[0].clientName} (el primero que marcaste abajo).`
+              : "Nadie marcado abajo todavía: va a llegar con los datos de un cliente de ejemplo del proyecto."}
+          </p>
         </div>
       </div>
 
