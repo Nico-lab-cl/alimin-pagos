@@ -15,6 +15,7 @@ import {
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
+import { notifyPaymentApproved } from "@/lib/whatsappPaymentNotice";
 import { hash } from "bcryptjs";
 import crypto from "crypto";
 import { ENTITY_GROUPS, getEntityLabel, getEntityGroupKey, GROUPS_KEYED_BY_RESERVATION } from "@/lib/auditLabels";
@@ -1085,6 +1086,31 @@ export async function approveReceipt(receiptId: string) {
     }
 
     memoryCache.deleteByPrefix("postventa_");
+    // Aviso por WhatsApp. Va después de todo lo demás y nunca lanza: el pago ya
+    // está aprobado y esa es la operación que importa. El número de cuota es el
+    // MISMO que se acaba de imprimir en el comprobante (valor pre-aprobación),
+    // para que el mensaje y el PDF no se contradigan.
+    //
+    // Solo PIE e INSTALLMENT: son los dos únicos scope que esta función procesa
+    // (las ramas de arriba). Un comprobante con otro scope —los "MORA" que
+    // llegaron importados desde Lomas, por ejemplo— sale de acá sin haber
+    // movido nada, y avisarle al cliente que su pago fue aprobado sería
+    // confirmarle algo que no ocurrió.
+    if (receipt.scope === "PIE" || receipt.scope === "INSTALLMENT") {
+      await notifyPaymentApproved({
+        eventKey: `receipt:${receipt.id}`,
+        reservationId: receipt.reservation_id,
+        kind: receipt.scope === "PIE" ? "PIE" : "CUOTA",
+        source: "RECEIPT",
+        amount: receipt.amount_clp,
+        paidAt: new Date(),
+        firstInstallmentNumber:
+          receipt.nominal_installment_number || (receipt.reservation.installments_paid || 0) + 1,
+        installmentsCount: receipt.installments_count || 1,
+        sentBy: user.email,
+      });
+    }
+
     memoryCache.deleteByPrefix("user_data_");
     memoryCache.deleteByPrefix("receipts_");
     revalidatePath("/admin");
@@ -1217,6 +1243,19 @@ export async function approveReceiptAsInterestPayment(receiptId: string) {
     }
 
     memoryCache.deleteByPrefix("postventa_");
+    // Se informa lo que efectivamente se aplicó a la mora, no lo que traía el
+    // comprobante: si el cliente pagó de más, el excedente no se aplicó y aún
+    // no le corresponde darlo por abonado. Es el mismo monto que sale en el PDF.
+    await notifyPaymentApproved({
+      eventKey: `receipt-interes:${receipt.id}`,
+      reservationId: receipt.reservation_id,
+      kind: "INTERES",
+      source: "RECEIPT",
+      amount: appliedToMora,
+      paidAt: new Date(),
+      sentBy: adminUser.email,
+    });
+
     memoryCache.deleteByPrefix("user_data_");
     memoryCache.deleteByPrefix("receipts_");
     revalidatePath("/admin");
@@ -2632,6 +2671,21 @@ export async function registerManualPayment(
     }
 
     memoryCache.deleteByPrefix("postventa_");
+    // Aviso por WhatsApp. Acá el cliente no subió nada, así que el texto le dice
+    // que su pago quedó registrado y publicado en su portal, no que "fue
+    // aprobado". La fecha que se informa es la del pago, no la de hoy.
+    await notifyPaymentApproved({
+      eventKey: `manual:${receiptId}`,
+      reservationId,
+      kind: data.isPie ? "PIE" : "CUOTA",
+      source: "MANUAL",
+      amount: data.amount,
+      paidAt: paymentDate,
+      firstInstallmentNumber: nextInstNum,
+      installmentsCount: data.installmentsCount || 1,
+      sentBy: adminUser.email,
+    });
+
     memoryCache.deleteByPrefix("user_data_");
     revalidatePath("/admin/clients");
 
@@ -2773,6 +2827,18 @@ export async function registerInterestPayment(
     }
 
     memoryCache.deleteByPrefix("postventa_");
+    // Igual que en la bandeja: se informa lo aplicado a la mora, no el total que
+    // trajo el depósito, porque el excedente todavía no está abonado a nada.
+    await notifyPaymentApproved({
+      eventKey: `manual-interes:${receiptId}`,
+      reservationId,
+      kind: "INTERES",
+      source: "MANUAL",
+      amount: appliedToMora,
+      paidAt: paymentDate,
+      sentBy: adminUser.email,
+    });
+
     memoryCache.deleteByPrefix("user_data_");
     revalidatePath("/admin/clients");
 

@@ -320,6 +320,17 @@ model WhatsappMessage {
   error          String?
   evolution_id   String?      @db.VarChar(160)
   sent_by        String?      @db.VarChar(255)
+  /// Llave del pago que originó el aviso ("receipt:<uuid>"). UNIQUE: dos clics
+  /// en "Aprobar" no le mandan dos mensajes al mismo cliente. Va en NULL en los
+  /// mensajes de cobranza, y Postgres admite varios NULL en un índice único.
+  event_key      String?      @unique @db.VarChar(80)
+  attempts       Int          @default(0)
+  next_attempt_at DateTime?   @db.Timestamptz(6)
+  /// Copias de lo que dijo el mensaje, para que el historial siga siendo legible
+  /// aunque después se borre la reserva (mismo criterio que client_name/phone).
+  notice_concept String?      @db.VarChar(120)
+  notice_amount  Int?
+  lot_label      String?      @db.VarChar(40)
   created_at     DateTime?    @default(now()) @db.Timestamptz(6)
   reservation    Reservation? @relation(fields: [reservation_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 

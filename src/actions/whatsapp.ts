@@ -17,7 +17,12 @@ import {
   CATEGORY_LABELS,
   DEFAULT_TEMPLATES,
   TEMPLATE_VARIABLES,
+  PAYMENT_CATEGORIES,
+  PAYMENT_CATEGORY_LABELS,
+  DEFAULT_PAYMENT_TEMPLATES,
+  PAYMENT_TEMPLATE_VARIABLES,
   type WhatsappCategory,
+  type PaymentCategory,
 } from "@/lib/whatsappTemplates";
 
 /**
@@ -185,21 +190,57 @@ async function scopedProjects(projectSlug: string) {
 // Plantillas
 // ---------------------------------------------------------------------------
 
-export async function getWhatsappTemplates() {
+/**
+ * Los dos grupos de plantillas que conviven en la misma tabla.
+ *
+ * COBRANZA son las cuatro de siempre, las que alguien elige y dispara a mano
+ * desde la pestana de envio. PAGO son los tres avisos automaticos que salen
+ * solos cuando se aprueba o se registra un pago: nadie los elige, la categoria
+ * la decide el objetivo del pago. Se editan igual, pero no se mezclan en
+ * ninguna pantalla ni en ningun conteo.
+ */
+export type TemplateKind = "COBRANZA" | "PAGO";
+
+const TEMPLATE_SETS = {
+  COBRANZA: {
+    categories: WHATSAPP_CATEGORIES as readonly string[],
+    labels: CATEGORY_LABELS as Record<string, string>,
+    defaults: DEFAULT_TEMPLATES as Record<string, { name: string; body: string }>,
+    variables: TEMPLATE_VARIABLES,
+  },
+  PAGO: {
+    categories: PAYMENT_CATEGORIES as readonly string[],
+    labels: PAYMENT_CATEGORY_LABELS as Record<string, string>,
+    defaults: DEFAULT_PAYMENT_TEMPLATES as Record<string, { name: string; body: string }>,
+    variables: PAYMENT_TEMPLATE_VARIABLES,
+  },
+} as const;
+
+function templateSetFor(category: string): (typeof TEMPLATE_SETS)[TemplateKind] | null {
+  if ((WHATSAPP_CATEGORIES as readonly string[]).includes(category)) return TEMPLATE_SETS.COBRANZA;
+  if ((PAYMENT_CATEGORIES as readonly string[]).includes(category)) return TEMPLATE_SETS.PAGO;
+  return null;
+}
+
+export async function getWhatsappTemplates(kind: TemplateKind = "COBRANZA") {
   const user = await requireAdmin();
   if (!user) return { error: "No autorizado", templates: [] };
 
+  const set = TEMPLATE_SETS[kind] ?? TEMPLATE_SETS.COBRANZA;
+
   try {
-    const stored = await prisma.whatsappTemplate.findMany();
+    const stored = await prisma.whatsappTemplate.findMany({
+      where: { category: { in: [...set.categories] } },
+    });
     const byCategory = new Map(stored.map((t) => [t.category, t]));
 
-    const templates = WHATSAPP_CATEGORIES.map((category) => {
+    const templates = set.categories.map((category) => {
       const found = byCategory.get(category);
       return {
         category,
-        label: CATEGORY_LABELS[category],
-        name: found?.name ?? DEFAULT_TEMPLATES[category].name,
-        body: found?.body ?? DEFAULT_TEMPLATES[category].body,
+        label: set.labels[category],
+        name: found?.name ?? set.defaults[category].name,
+        body: found?.body ?? set.defaults[category].body,
         active: found?.active ?? true,
         updated_by: found?.updated_by ?? null,
         updated_at: found?.updated_at ?? null,
@@ -208,7 +249,7 @@ export async function getWhatsappTemplates() {
       };
     });
 
-    return { success: true, templates, variables: TEMPLATE_VARIABLES };
+    return { success: true, templates, variables: set.variables };
   } catch (error) {
     console.error("Error cargando plantillas de WhatsApp:", error);
     return { error: "Error al cargar las plantillas", templates: [] };
@@ -216,7 +257,7 @@ export async function getWhatsappTemplates() {
 }
 
 export async function saveWhatsappTemplate(data: {
-  category: WhatsappCategory;
+  category: WhatsappCategory | PaymentCategory;
   name: string;
   body: string;
   active: boolean;
@@ -224,7 +265,8 @@ export async function saveWhatsappTemplate(data: {
   const user = await requireAdmin();
   if (!user) return { error: "No autorizado" };
 
-  if (!WHATSAPP_CATEGORIES.includes(data.category)) {
+  const set = templateSetFor(data.category);
+  if (!set) {
     return { error: "Categoría inválida" };
   }
   if (!data.body?.trim()) {
@@ -238,14 +280,14 @@ export async function saveWhatsappTemplate(data: {
     await prisma.whatsappTemplate.upsert({
       where: { category: data.category },
       update: {
-        name: data.name.trim() || CATEGORY_LABELS[data.category],
+        name: data.name.trim() || set.labels[data.category],
         body: data.body,
         active: data.active,
         updated_by: user.email,
       },
       create: {
         category: data.category,
-        name: data.name.trim() || CATEGORY_LABELS[data.category],
+        name: data.name.trim() || set.labels[data.category],
         body: data.body,
         active: data.active,
         updated_by: user.email,
@@ -257,7 +299,7 @@ export async function saveWhatsappTemplate(data: {
         action: "UPDATE",
         entity: "WhatsappTemplate",
         entity_id: data.category,
-        details: `Plantilla de WhatsApp "${CATEGORY_LABELS[data.category]}" editada.`,
+        details: `Plantilla de WhatsApp "${set.labels[data.category]}" editada.`,
         user_id: user.id,
         user_email: user.email,
       },
@@ -315,7 +357,13 @@ export async function getWhatsappOverview({ projectSlug }: { projectSlug: string
     // 2. Mensajes enviados, por categoria y por ventana de tiempo.
     const now = new Date();
     const since = (days: number) => new Date(now.getTime() - days * 86_400_000);
-    const where = { project_slug: { in: slugs } };
+    // Solo cobranza. Los avisos automaticos de pago viven en la misma tabla pero
+    // tienen su propia pestana: mezclarlos aca inflaria los conteos de la tanda
+    // manual con mensajes que nadie envio a mano.
+    const where = {
+      project_slug: { in: slugs },
+      category: { in: [...WHATSAPP_CATEGORIES] },
+    };
 
     const [byCategory, sentToday, sent7, sent30, sentTotal, failedTotal, recent, dailyRaw] =
       await Promise.all([
@@ -875,5 +923,185 @@ export async function getEvolutionDiagnostics() {
   } catch (error) {
     console.error("Error en el diagnóstico de Evolution:", error);
     return { error: "Error al consultar el servidor de WhatsApp" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Historial de los avisos automaticos de pago
+// ---------------------------------------------------------------------------
+
+/** Cuantas filas trae la pantalla de una vez. */
+const HISTORY_PAGE_SIZE = 50;
+/** Techo del CSV. Es una bitacora de avisos, no un respaldo de la base. */
+const HISTORY_EXPORT_LIMIT = 5_000;
+
+/**
+ * Bitacora de los avisos que salieron solos al aprobar o registrar un pago.
+ *
+ * Es una vista de SOLO LECTURA sobre whatsapp_messages, filtrada a las tres
+ * categorias de pago. Los mensajes de cobranza no aparecen aca, igual que estos
+ * no aparecen en el panel de cobranza.
+ *
+ * El alcance por proyecto sale de scopedProjects, o sea de los proyectos que la
+ * cuenta tiene permitidos: cada equipo de postventa ve lo suyo, sin cambios
+ * respecto a como funciona hoy el resto del modulo.
+ */
+export async function getPaymentNoticeHistory({
+  projectSlug = "ALL",
+  category = "ALL",
+  status = "ALL",
+  search = "",
+  page = 0,
+  forExport = false,
+}: {
+  projectSlug?: string;
+  category?: string;
+  status?: string;
+  search?: string;
+  page?: number;
+  forExport?: boolean;
+} = {}) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado", rows: [] };
+
+  try {
+    const projects = await scopedProjects(projectSlug);
+    const slugs = projects.map((p: any) => p.slug);
+
+    if (slugs.length === 0) {
+      return { error: "No tienes proyectos de WhatsApp habilitados", rows: [] };
+    }
+
+    const categories =
+      category !== "ALL" && (PAYMENT_CATEGORIES as readonly string[]).includes(category)
+        ? [category]
+        : [...PAYMENT_CATEGORIES];
+
+    const where: any = {
+      project_slug: { in: slugs },
+      category: { in: categories },
+    };
+
+    // SENDING es el instante en que el mensaje esta saliendo. Para postventa es
+    // lo mismo que estar en cola, asi que se muestran juntos.
+    if (status === "SENT") where.status = "SENT";
+    else if (status === "FAILED") where.status = "FAILED";
+    else if (status === "QUEUED") where.status = { in: ["QUEUED", "SENDING"] };
+
+    const term = search.trim();
+    if (term) {
+      where.OR = [
+        { client_name: { contains: term, mode: "insensitive" } },
+        { phone: { contains: term.replace(/\D/g, "") || term } },
+        { lot_label: { contains: term, mode: "insensitive" } },
+        { notice_concept: { contains: term, mode: "insensitive" } },
+        { reservation: { rut: { contains: term, mode: "insensitive" } } },
+      ];
+    }
+
+    const select = {
+      id: true,
+      client_name: true,
+      phone: true,
+      project_slug: true,
+      lot_label: true,
+      category: true,
+      notice_concept: true,
+      notice_amount: true,
+      status: true,
+      error: true,
+      instance: true,
+      sent_by: true,
+      attempts: true,
+      created_at: true,
+      reservation: { select: { rut: true } },
+    } as const;
+
+    const projectNames = new Map(projects.map((p: any) => [p.slug, p.name]));
+
+    if (forExport) {
+      const rows = await prisma.whatsappMessage.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        take: HISTORY_EXPORT_LIMIT,
+        select,
+      });
+      return {
+        success: true,
+        rows: rows.map((r) => ({
+          ...r,
+          rut: r.reservation?.rut ?? null,
+          projectName: projectNames.get(r.project_slug) || r.project_slug,
+        })),
+        total: rows.length,
+      };
+    }
+
+    const [rows, total, sent, failed, queued, lastSent] = await Promise.all([
+      prisma.whatsappMessage.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        skip: Math.max(0, page) * HISTORY_PAGE_SIZE,
+        take: HISTORY_PAGE_SIZE,
+        select,
+      }),
+      prisma.whatsappMessage.count({ where }),
+      prisma.whatsappMessage.count({ where: { ...where, status: "SENT" } }),
+      prisma.whatsappMessage.count({ where: { ...where, status: "FAILED" } }),
+      prisma.whatsappMessage.count({
+        where: { ...where, status: { in: ["QUEUED", "SENDING"] } },
+      }),
+      prisma.whatsappMessage.findFirst({
+        where: { ...where, status: "SENT" },
+        orderBy: { created_at: "desc" },
+        select: { created_at: true },
+      }),
+    ]);
+
+    return {
+      success: true,
+      projects: projects.map((p: any) => ({ slug: p.slug, name: p.name })),
+      rows: rows.map((r) => ({
+        ...r,
+        rut: r.reservation?.rut ?? null,
+        projectName: projectNames.get(r.project_slug) || r.project_slug,
+      })),
+      stats: { total, sent, failed, queued, lastSentAt: lastSent?.created_at ?? null },
+      page: Math.max(0, page),
+      pageSize: HISTORY_PAGE_SIZE,
+      hasMore: (Math.max(0, page) + 1) * HISTORY_PAGE_SIZE < total,
+    };
+  } catch (error) {
+    console.error("Error cargando el historial de avisos de pago:", error);
+    return { error: "Error al cargar el historial", rows: [] };
+  }
+}
+
+/**
+ * Texto completo de un aviso. Se pide aparte porque la tabla no necesita cargar
+ * el cuerpo de cincuenta mensajes para mostrar la lista.
+ */
+export async function getPaymentNoticeMessage(id: string) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado" };
+
+  try {
+    const row = await prisma.whatsappMessage.findUnique({
+      where: { id },
+      select: { message: true, project_slug: true, category: true },
+    });
+
+    if (!row) return { error: "Mensaje no encontrado" };
+    if (!(PAYMENT_CATEGORIES as readonly string[]).includes(row.category)) {
+      return { error: "Mensaje no encontrado" };
+    }
+    if (!canAccessProject(user, row.project_slug)) {
+      return { error: "Sin acceso a este proyecto" };
+    }
+
+    return { success: true, message: row.message };
+  } catch (error) {
+    console.error("Error cargando el texto del aviso:", error);
+    return { error: "Error al cargar el mensaje" };
   }
 }

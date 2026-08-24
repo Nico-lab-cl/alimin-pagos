@@ -1,22 +1,30 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, Save, AlertTriangle, Database } from "lucide-react";
+import { Loader2, Save, AlertTriangle, Database, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { getWhatsappTemplates, saveWhatsappTemplate } from "@/actions/whatsapp";
-import {
-  TEMPLATE_VARIABLES,
-  CATEGORY_LABELS,
-  type WhatsappCategory,
-} from "@/lib/whatsappTemplates";
+import type { PaymentCategory, WhatsappCategory } from "@/lib/whatsappTemplates";
 import { cn } from "@/lib/utils";
-import { CATEGORY_STYLES } from "./categoryStyles";
+import { ALL_CATEGORY_STYLES } from "./categoryStyles";
 
-const KNOWN_VARIABLES = new Set(TEMPLATE_VARIABLES.map((v) => v.key));
-
-export default function WhatsappTemplateEditor() {
+/**
+ * Editor de plantillas, servido para los dos grupos.
+ *
+ * `kind` decide cuales se editan: las cuatro de cobranza, que alguien elige y
+ * dispara a mano, o los tres avisos de pago, que salen solos. Las etiquetas, el
+ * texto por defecto y las variables disponibles vienen del servidor junto con
+ * las plantillas, asi que esta pantalla no necesita saber cual grupo esta
+ * mostrando mas alla de pedirlo.
+ */
+export default function WhatsappTemplateEditor({
+  kind = "COBRANZA",
+}: {
+  kind?: "COBRANZA" | "PAGO";
+}) {
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<any[]>([]);
+  const [variables, setVariables] = useState<{ key: string; description: string }[]>([]);
   const [drafts, setDrafts] = useState<Record<string, { name: string; body: string; active: boolean }>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const textareas = useRef<Record<string, HTMLTextAreaElement | null>>({});
@@ -25,11 +33,12 @@ export default function WhatsappTemplateEditor() {
     async function load() {
       setLoading(true);
       try {
-        const res = await getWhatsappTemplates();
+        const res = await getWhatsappTemplates(kind);
         if ((res as any).error) {
           toast.error((res as any).error);
         } else {
           setTemplates(res.templates || []);
+          setVariables((res as any).variables || []);
           setDrafts(
             Object.fromEntries(
               (res.templates || []).map((t: any) => [
@@ -47,7 +56,7 @@ export default function WhatsappTemplateEditor() {
       }
     }
     load();
-  }, []);
+  }, [kind]);
 
   const update = (category: string, patch: Partial<{ name: string; body: string; active: boolean }>) => {
     setDrafts((prev) => ({ ...prev, [category]: { ...prev[category], ...patch } }));
@@ -75,7 +84,7 @@ export default function WhatsappTemplateEditor() {
     });
   };
 
-  const save = async (category: WhatsappCategory) => {
+  const save = async (category: WhatsappCategory | PaymentCategory) => {
     const draft = drafts[category];
     if (!draft) return;
 
@@ -90,7 +99,8 @@ export default function WhatsappTemplateEditor() {
       if ((res as any).error) {
         toast.error((res as any).error);
       } else {
-        toast.success(`Plantilla «${CATEGORY_LABELS[category]}» guardada`);
+        const label = templates.find((t) => t.category === category)?.label ?? category;
+        toast.success(`Plantilla «${label}» guardada`);
         setTemplates((prev) =>
           prev.map((t) => (t.category === category ? { ...t, ...draft, persisted: true } : t))
         );
@@ -105,8 +115,9 @@ export default function WhatsappTemplateEditor() {
 
   /** Variables escritas en el texto que no existen: se enviarian tal cual. */
   const unknownVariables = (body: string): string[] => {
+    const known = new Set(variables.map((v) => v.key));
     const found = body.match(/\{[a-z_]+\}/gi) || [];
-    return Array.from(new Set(found.filter((v) => !KNOWN_VARIABLES.has(v.toLowerCase()))));
+    return Array.from(new Set(found.filter((v) => !known.has(v.toLowerCase()))));
   };
 
   if (loading) {
@@ -130,7 +141,22 @@ export default function WhatsappTemplateEditor() {
           <p className="text-xs font-semibold text-amber-700 leading-relaxed">
             Algunas plantillas aún no están guardadas en la base y se está mostrando el texto
             por defecto. Se guardarán la primera vez que aprietes «Guardar», o al aplicar la
-            migración <span className="font-mono">03_whatsapp_tables.sql</span>.
+            migración{" "}
+            <span className="font-mono">
+              {kind === "PAGO" ? "05_whatsapp_payment_notices.sql" : "03_whatsapp_tables.sql"}
+            </span>
+            .
+          </p>
+        </div>
+      )}
+
+      {kind === "PAGO" && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-start gap-3">
+          <Zap className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs font-semibold text-slate-600 leading-relaxed">
+            Estos tres mensajes salen solos al aprobar un comprobante o registrar un pago: nadie
+            los elige, la plantilla la decide el tipo de pago. Desmarcar «Activa» apaga ese aviso
+            para todos los proyectos.
           </p>
         </div>
       )}
@@ -142,7 +168,7 @@ export default function WhatsappTemplateEditor() {
           Haz clic en una para insertarla donde tengas el cursor
         </p>
         <div className="flex flex-wrap gap-2">
-          {TEMPLATE_VARIABLES.map((v) => (
+          {variables.map((v) => (
             <span
               key={v.key}
               title={v.description}
@@ -157,7 +183,7 @@ export default function WhatsappTemplateEditor() {
       {/* Editores */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {templates.map((t) => {
-          const style = CATEGORY_STYLES[t.category as WhatsappCategory];
+          const style = ALL_CATEGORY_STYLES[t.category];
           const draft = drafts[t.category];
           if (!draft) return null;
 
@@ -177,7 +203,7 @@ export default function WhatsappTemplateEditor() {
                 <div className="flex items-center gap-2.5">
                   <div className={cn("w-2 h-2 rounded-full flex-shrink-0", style.dot)} />
                   <span className={cn("text-xs font-bold uppercase tracking-wide", style.text)}>
-                    {CATEGORY_LABELS[t.category as WhatsappCategory]}
+                    {t.label}
                   </span>
                 </div>
 
@@ -231,7 +257,7 @@ export default function WhatsappTemplateEditor() {
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
-                  {TEMPLATE_VARIABLES.map((v) => (
+                  {variables.map((v) => (
                     <button
                       key={v.key}
                       onClick={() => insertVariable(t.category, v.key)}

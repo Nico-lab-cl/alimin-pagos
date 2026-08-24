@@ -82,3 +82,102 @@ export const TEMPLATE_VARIABLES: { key: string; description: string }[] = [
   { key: "{fecha_vencimiento}", description: "Fecha de vencimiento de la cuota" },
   { key: "{portal}", description: "Link al portal del cliente" },
 ];
+
+// ---------------------------------------------------------------------------
+// Avisos automaticos de pago
+// ---------------------------------------------------------------------------
+// Estas categorias NO son de cobranza y por eso viven aparte de
+// WHATSAPP_CATEGORIES: no tienen audiencia que segmentar ni pantalla de envio.
+// Salen solas cuando postventa aprueba un comprobante o registra un pago, una
+// por objetivo del pago.
+
+export const PAYMENT_CATEGORIES = ["PAGO_PIE", "PAGO_CUOTA", "PAGO_INTERES"] as const;
+export type PaymentCategory = (typeof PAYMENT_CATEGORIES)[number];
+
+export const PAYMENT_CATEGORY_LABELS: Record<PaymentCategory, string> = {
+  PAGO_PIE: "Pago de pie",
+  PAGO_CUOTA: "Pago de cuota",
+  PAGO_INTERES: "Abono a intereses",
+};
+
+export const PAYMENT_CATEGORY_DESCRIPTIONS: Record<PaymentCategory, string> = {
+  PAGO_PIE: "Sale cuando se aprueba o se registra un pago de pie.",
+  PAGO_CUOTA:
+    "Sale cuando se aprueba o se registra el pago de una o varias cuotas. El concepto indica qué cuota y de qué mes.",
+  PAGO_INTERES: "Sale cuando se aprueba o se registra un abono a intereses.",
+};
+
+/**
+ * De donde vino el pago. Es la unica diferencia de redaccion entre un aviso y
+ * otro, y por eso va como variable en vez de duplicar las tres plantillas:
+ * el cliente que subio su comprobante espera un "aprobado", y el que pago por
+ * transferencia sin subir nada espera un "lo registramos".
+ */
+export type PaymentNoticeSource = "RECEIPT" | "MANUAL";
+
+export const CONFIRMATION_PHRASES: Record<PaymentNoticeSource, string> = {
+  RECEIPT: "Confirmamos que su pago fue aprobado y ya quedó registrado en su portal.",
+  MANUAL: "Registramos su pago y ya quedó publicado en su portal.",
+};
+
+export const DEFAULT_PAYMENT_TEMPLATES: Record<PaymentCategory, { name: string; body: string }> = {
+  PAGO_CUOTA: {
+    name: "Pago de cuota confirmado",
+    body:
+      "Hola {nombre}, le saludamos de {proyecto}.\n\n" +
+      "{confirmacion}\n\n" +
+      "Detalle del pago\nLote {lote}\n{concepto}\nMonto: {monto}\nFecha: {fecha}\n\n" +
+      "Puede revisar su estado de cuenta y descargar su comprobante en el portal: {portal}\n\n" +
+      "¡Gracias por su pago!",
+  },
+  PAGO_PIE: {
+    name: "Pago de pie confirmado",
+    body:
+      "Hola {nombre}, le saludamos de {proyecto}.\n\n" +
+      "{confirmacion}\n\n" +
+      "Detalle del pago\nLote {lote}\n{concepto}\nMonto: {monto}\nFecha: {fecha}\n\n" +
+      "Puede revisar su estado de cuenta y descargar su comprobante en el portal: {portal}\n\n" +
+      "¡Gracias por su pago!",
+  },
+  PAGO_INTERES: {
+    name: "Abono a intereses confirmado",
+    body:
+      "Hola {nombre}, le saludamos de {proyecto}.\n\n" +
+      "{confirmacion}\n\n" +
+      "Detalle del abono\nLote {lote}\n{concepto}\nMonto: {monto}\nFecha: {fecha}\n\n" +
+      "Puede revisar su estado de cuenta y descargar su comprobante en el portal: {portal}\n\n" +
+      "Quedamos atentos.",
+  },
+};
+
+/**
+ * Variables de los avisos de pago. Son distintas a las de cobranza a proposito:
+ * un aviso de pago confirma lo que se pago y nada mas. No expone saldo, mora ni
+ * dias de atraso, porque eso lo ve el cliente en su portal y lo conversa con
+ * postventa, no se le anuncia junto con la confirmacion de su pago.
+ */
+export const PAYMENT_TEMPLATE_VARIABLES: { key: string; description: string }[] = [
+  { key: "{nombre}", description: "Nombre completo del cliente" },
+  { key: "{proyecto}", description: "Nombre del proyecto" },
+  { key: "{lote}", description: "Número de lote" },
+  { key: "{etapa}", description: "Etapa del lote" },
+  { key: "{rut}", description: "RUT del cliente" },
+  {
+    key: "{concepto}",
+    description: 'Qué se pagó: "Cuota 3 - Agosto 2026", "Pago de Pie", "Abono a intereses"',
+  },
+  { key: "{monto}", description: "Monto del pago confirmado" },
+  { key: "{fecha}", description: "Fecha del pago" },
+  {
+    key: "{confirmacion}",
+    description: 'Se rellena solo: "fue aprobado" si el cliente subió el comprobante, "lo registramos" si lo cargó postventa',
+  },
+  { key: "{portal}", description: "Link al portal del cliente" },
+];
+
+/** Categoria de plantilla que le toca a cada objetivo de pago. */
+export const PAYMENT_CATEGORY_BY_KIND: Record<"PIE" | "CUOTA" | "INTERES", PaymentCategory> = {
+  PIE: "PAGO_PIE",
+  CUOTA: "PAGO_CUOTA",
+  INTERES: "PAGO_INTERES",
+};

@@ -11,6 +11,7 @@ import {
   Wifi,
   WifiOff,
   AlertTriangle,
+  BadgeCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getWhatsappOverview } from "@/actions/whatsapp";
@@ -19,12 +20,14 @@ import { cn } from "@/lib/utils";
 import WhatsappPanel from "@/components/admin/whatsapp/WhatsappPanel";
 import WhatsappSender from "@/components/admin/whatsapp/WhatsappSender";
 import WhatsappTemplateEditor from "@/components/admin/whatsapp/WhatsappTemplateEditor";
+import WhatsappPaymentHistory from "@/components/admin/whatsapp/WhatsappPaymentHistory";
 
-type Tab = "panel" | "enviar" | "plantillas";
+type Tab = "panel" | "enviar" | "avisos" | "plantillas";
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "panel", label: "Panel", icon: BarChart3 },
   { id: "enviar", label: "Enviar", icon: Send },
+  { id: "avisos", label: "Avisos de pago", icon: BadgeCheck },
   { id: "plantillas", label: "Plantillas", icon: FileText },
 ];
 
@@ -76,11 +79,11 @@ export default function WhatsappPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">WhatsApp</h1>
             <span className="text-[9px] font-extrabold text-brand-600 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded shadow-xs">
-              ENVÍO MANUAL
+              COBRANZA + AVISOS
             </span>
           </div>
           <p className="text-xs font-medium text-slate-500 mt-1.5">
-            Mensajes de cobranza a los clientes vía Evolution API.
+            Cobranza manual y avisos automáticos de pago a los clientes, vía Evolution API.
           </p>
         </div>
 
@@ -216,7 +219,31 @@ export default function WhatsappPage() {
             />
           )}
 
-          {tab === "plantillas" && <WhatsappTemplateEditor />}
+          {tab === "avisos" && <WhatsappPaymentHistory projectSlug={selectedProject} />}
+
+          {tab === "plantillas" && (
+            <div className="space-y-10">
+              <section className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Cobranza</h2>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5">
+                    Se eligen y se envían a mano desde la pestaña «Enviar».
+                  </p>
+                </div>
+                <WhatsappTemplateEditor kind="COBRANZA" />
+              </section>
+
+              <section className="space-y-4 pt-4 border-t border-slate-200">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Avisos de pago</h2>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5">
+                    Salen solos al aprobar un comprobante o registrar un pago.
+                  </p>
+                </div>
+                <WhatsappTemplateEditor kind="PAGO" />
+              </section>
+            </div>
+          )}
         </>
       )}
 
