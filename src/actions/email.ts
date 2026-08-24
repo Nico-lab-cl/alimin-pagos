@@ -739,5 +739,3 @@ export async function getEmailMessageHtml(id: string) {
     return { error: "Error al cargar el correo" };
   }
 }
-
-export { AUDIENCES as EMAIL_AUDIENCES, AUDIENCE_LABELS as EMAIL_AUDIENCE_LABELS };
