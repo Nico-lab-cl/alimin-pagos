@@ -8,8 +8,6 @@
  * que solo hay un lugar donde el diseño se puede desalinear entre proyectos.
  */
 
-import { getReceiptLegalInfo } from "@/lib/receiptLegalInfo";
-
 export const EMAIL_SUBJECT_MAX = 120;
 export const EMAIL_BODY_MAX = 4000;
 
@@ -53,17 +51,32 @@ export function renderEmailVariables(
 }
 
 /**
+ * URL absoluta del logo. Va absoluta a propósito: este HTML lo abre Gmail en
+ * la bandeja del cliente, no el navegador del portal, así que una ruta
+ * relativa ("/logo.png") no resolvería a ningún lado. Mismo criterio de
+ * fallback que ya usa el link de recuperación de clave.
+ */
+function logoUrl(): string {
+  const base = (
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.AUTH_URL ||
+    "https://pagos.aliminspa.cl"
+  ).replace(/\/+$/, "");
+  return `${base}/logo.png`;
+}
+
+/**
  * Arma el HTML completo que se manda a n8n: marco de marca + el cuerpo que
- * escribió postventa (ya con las variables reemplazadas). `projectSlug` decide
- * el nombre legal y el correo de contacto del pie, igual que en el comprobante
- * de pago oficial.
+ * escribió postventa (ya con las variables reemplazadas).
+ *
+ * Sin pie legal: postventa pidió sacarlo (el nombre/RUT/dirección por razón
+ * social que sí lleva el comprobante de pago oficial, aquí no se necesita).
  */
 export function buildEmailHtml(opts: {
   projectSlug: string;
   projectName: string;
   bodyText: string;
 }): string {
-  const legal = getReceiptLegalInfo(opts.projectSlug);
   const paragraphs = bodyToHtmlParagraphs(opts.bodyText);
 
   return `<!doctype html>
@@ -74,21 +87,23 @@ export function buildEmailHtml(opts: {
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
             <tr>
-              <td style="background:#0f172a;padding:24px 32px;">
-                <span style="color:#ffffff;font-size:18px;font-weight:bold;letter-spacing:0.02em;">Alimin</span>
-                <span style="color:#94a3b8;font-size:12px;display:block;margin-top:2px;">${escapeHtml(opts.projectName)}</span>
+              <td style="background:#1b4818;padding:24px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding-right:12px;">
+                      <img src="${logoUrl()}" width="36" height="36" alt="Alimin" style="display:block;border:0;" />
+                    </td>
+                    <td>
+                      <span style="color:#ffffff;font-size:18px;font-weight:bold;letter-spacing:0.02em;">Alimin</span>
+                      <span style="color:#cdeac2;font-size:12px;display:block;margin-top:2px;">${escapeHtml(opts.projectName)}</span>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
             <tr>
               <td style="padding:32px;color:#1e293b;font-size:14px;line-height:1.6;">
                 ${paragraphs}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:20px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;color:#64748b;font-size:11px;line-height:1.6;">
-                <p style="margin:0 0 4px 0;font-weight:bold;color:#334155;">${escapeHtml(legal.legalName)}</p>
-                <p style="margin:0 0 4px 0;">${escapeHtml(legal.address)}</p>
-                <p style="margin:0;">Contacto: <a href="mailto:${legal.contactEmail}" style="color:#2563eb;">${legal.contactEmail}</a></p>
               </td>
             </tr>
           </table>
