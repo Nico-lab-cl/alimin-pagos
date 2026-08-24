@@ -56,21 +56,7 @@ export async function getProjectEmails(projectSlug: string) {
   }
 }
 
-export async function sendBulkEmail(data: { projectSlug: string, subject: string, message: string }) {
-    const session = await auth();
-    const adminUser = session?.user as any;
-    if (!session?.user || adminUser?.role !== "ADMIN") {
-      return { error: "No autorizado" };
-    }
-
-    // In a real scenario, this would trigger an N8N webhook or a Resend API call.
-    // For now, we will return success and log the action.
-    console.log(`SENDING BULK EMAIL to project ${data.projectSlug}`);
-    console.log(`Subject: ${data.subject}`);
-    console.log(`Message: ${data.message}`);
-
-    // Simulate delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    return { success: true };
-}
+// El envío masivo real vive en src/actions/email.ts (webhook a n8n -> Gmail de
+// postventa). Este archivo ya no tiene un sendBulkEmail: el que había antes
+// era un simulacro que devolvía éxito sin mandar nada, y dejarlo al lado del
+// módulo real era la receta para que alguien lo invocara pensando que servía.

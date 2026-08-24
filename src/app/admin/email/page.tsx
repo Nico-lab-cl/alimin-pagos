@@ -1,126 +1,170 @@
-import { Mail, Send, Users, FileText, History, Hammer } from "lucide-react";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { Loader2, Mail, Send, FileText, BarChart3, RefreshCw, AlertTriangle, History } from "lucide-react";
+import { toast } from "sonner";
+import { getEmailOverview } from "@/actions/email";
+import { cn } from "@/lib/utils";
+import EmailPanel from "@/components/admin/email/EmailPanel";
+import EmailComposer from "@/components/admin/email/EmailComposer";
+import EmailTemplateManager from "@/components/admin/email/EmailTemplateManager";
+import EmailHistory from "@/components/admin/email/EmailHistory";
 
 /**
- * Modulo de Email — marcador de posicion.
+ * Modulo de correo masivo. Postventa escribe asunto + cuerpo, elige a quien,
+ * y el envio real lo hace n8n (nodo Gmail de la cuenta que corresponda). El
+ * portal solo arma el correo y lleva el registro.
  *
- * La ruta ya existe y cuelga del menu para que postventa sepa que el canal
- * viene en camino, pero todavia no envia nada. Cuando se implemente, esta
- * pagina se reemplaza por el modulo real (mismo patron que /admin/whatsapp:
- * pestanas Panel / Enviar / Plantillas).
- *
- * Es un Server Component a proposito: no tiene interaccion ni consulta la base,
- * asi que carga siempre, incluso si el resto del portal esta con problemas.
- *
- * OJO: no confundir con /admin/email-marketing, que pese al nombre es la
- * pagina de "Informes" (ingresos y mora). El canal de correo es ESTA.
+ * Mismo patron de pestañas que /admin/whatsapp: Panel / Redactar y enviar /
+ * Plantillas / Historial.
  */
 
-const PLANIFICADO = [
-  {
-    icon: Users,
-    titulo: "Envío masivo",
-    detalle:
-      "Escribir una vez y mandarlo a todos los clientes de un proyecto, o solo a los que estén en mora, en gracia o al día.",
-  },
-  {
-    icon: Send,
-    titulo: "Envío individual",
-    detalle:
-      "Escribirle a un cliente puntual desde su ficha, sin salir del portal ni abrir el correo aparte.",
-  },
-  {
-    icon: FileText,
-    titulo: "Plantillas editables",
-    detalle:
-      "Textos guardados y reutilizables con los datos del cliente ya rellenados, igual que en WhatsApp.",
-  },
-  {
-    icon: History,
-    titulo: "Historial de envíos",
-    detalle:
-      "Quién recibió qué correo y cuándo, para que quede registro de lo que se le comunicó a cada cliente.",
-  },
+type Tab = "panel" | "redactar" | "plantillas" | "historial";
+
+const TABS: { id: Tab; label: string; icon: any }[] = [
+  { id: "panel", label: "Panel", icon: BarChart3 },
+  { id: "redactar", label: "Redactar y enviar", icon: Send },
+  { id: "plantillas", label: "Plantillas", icon: FileText },
+  { id: "historial", label: "Historial", icon: History },
 ];
 
 export default function EmailPage() {
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>("panel");
+  const [selectedProject, setSelectedProject] = useState("ALL");
+  const [overview, setOverview] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadOverview = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getEmailOverview({ projectSlug: selectedProject });
+      if ((res as any).error) {
+        setError((res as any).error);
+        setOverview(null);
+      } else {
+        setOverview(res);
+      }
+    } catch (err) {
+      console.error("Error cargando el panel de correo:", err);
+      setError("No se pudo cargar el panel de correo");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedProject]);
+
+  useEffect(() => {
+    loadOverview();
+  }, [loadOverview]);
+
   return (
     <div className="space-y-8 animate-fade-in text-slate-800 font-sans">
       {/* Encabezado */}
-      <div className="pb-2">
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Email</h1>
-          <span className="text-[9px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded shadow-xs uppercase tracking-wider">
-            Próximamente
-          </span>
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 pb-2">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Email</h1>
+            <span className="text-[9px] font-extrabold text-brand-600 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded shadow-xs">
+              ENVÍO MASIVO
+            </span>
+          </div>
+          <p className="text-xs font-medium text-slate-500 mt-1.5">
+            Correos a los clientes desde el portal, enviados vía Gmail de cada cuenta de postventa.
+          </p>
         </div>
-        <p className="text-xs font-medium text-slate-500 mt-1.5">
-          Correos a los clientes desde el portal: masivos o uno a uno.
-        </p>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={selectedProject}
+            onChange={(e) => setSelectedProject(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 transition-all shadow-sm focus:border-brand-500 uppercase"
+          >
+            <option value="ALL">Todos los proyectos</option>
+            {(overview?.projects || []).map((p: any) => (
+              <option key={p.slug} value={p.slug}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={loadOverview}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5 text-slate-500", loading && "animate-spin")} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
-      {/* Aviso principal */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 sm:p-10">
-        <div className="flex flex-col sm:flex-row sm:items-start gap-5">
-          <div className="w-12 h-12 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0">
-            <Mail className="w-6 h-6 text-brand-600" />
-          </div>
-          <div className="max-w-2xl">
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-              Este módulo todavía no está disponible
-            </h2>
-            <p className="text-sm font-medium text-slate-600 mt-2 leading-relaxed">
-              Estamos construyendo el canal de correo del portal. Por ahora esta
-              pantalla no envía nada: está aquí para que sepas que viene y qué va
-              a poder hacer.
-            </p>
-            <p className="text-xs font-medium text-slate-500 mt-3 leading-relaxed">
-              Mientras tanto, los correos automáticos de cobranza siguen saliendo
-              como siempre — esto no cambia nada de lo que ya está funcionando.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Lo que viene */}
-      <div>
-        <div className="flex items-center gap-2.5 mb-4">
-          <Hammer className="w-4 h-4 text-slate-400" />
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-            Lo que viene
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {PLANIFICADO.map((item) => (
-            <div
-              key={item.titulo}
-              className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 flex items-start gap-4"
+      {/* Pestañas */}
+      <div className="flex bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm overflow-x-auto">
+        {TABS.map((t) => {
+          const isActive = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap",
+                isActive ? "bg-brand-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+              )}
             >
-              <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center flex-shrink-0">
-                <item.icon className="w-4 h-4 text-slate-400" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-slate-800">{item.titulo}</p>
-                <p className="text-xs font-medium text-slate-500 mt-1.5 leading-relaxed">
-                  {item.detalle}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+              <t.icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Nota sobre el correo secundario */}
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
-        <p className="text-xs font-medium text-slate-600 leading-relaxed">
-          <span className="font-bold text-slate-800">Ojo con las fichas:</span>{" "}
-          cada cliente tiene ahora un campo de{" "}
-          <span className="font-bold text-slate-800">correo secundario</span>. Lo
-          que anote postventa ahí va a servir cuando este módulo esté listo, así
-          que mientras más fichas queden completas antes, mejor va a llegar el
-          primer envío.
-        </p>
-      </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-red-700">No se pudo cargar el módulo</p>
+            <p className="text-xs font-medium text-red-700/80 mt-1">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {loading && !overview && !error && (
+        <div className="flex flex-col items-center justify-center py-32 gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 opacity-60">Cargando correo...</p>
+        </div>
+      )}
+
+      {!error && overview && (
+        <>
+          {tab === "panel" && <EmailPanel overview={overview} />}
+
+          {tab === "redactar" && (
+            <EmailComposer
+              projectSlug={selectedProject}
+              projects={overview.projects || []}
+              canSend={overview.canSend}
+              configured={overview.configured}
+              onSent={() => {
+                loadOverview();
+                toast.success("Tanda finalizada. El panel se actualizó.");
+              }}
+            />
+          )}
+
+          {tab === "plantillas" && <EmailTemplateManager />}
+
+          {tab === "historial" && <EmailHistory projectSlug={selectedProject} />}
+        </>
+      )}
+
+      {!error && !loading && !overview && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
+          <Mail className="w-10 h-10 text-slate-300 mx-auto mb-4" />
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Sin datos de correo</p>
+        </div>
+      )}
     </div>
   );
 }
