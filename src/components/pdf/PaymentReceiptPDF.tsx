@@ -181,6 +181,12 @@ interface PaymentReceiptPDFProps {
   nominalInstallmentNumber?: number | null;
   nominalInstallmentRange?: string | null;
   logoPath?: string;
+  /**
+   * Recibos emitidos desde la reserva (cuotas pagadas sin comprobante detrás)
+   * no conocen la HORA del pago, solo el día. En ese caso el timbre muestra
+   * solo la fecha en vez de inventar una hora.
+   */
+  hideStampTime?: boolean;
 }
 
 export const PaymentReceiptPDF = ({
@@ -202,6 +208,7 @@ export const PaymentReceiptPDF = ({
   nominalInstallmentNumber,
   nominalInstallmentRange,
   logoPath,
+  hideStampTime = false,
 }: PaymentReceiptPDFProps) => {
   const isCuotas = paymentScope === 'INSTALLMENT';
 
@@ -332,7 +339,7 @@ export const PaymentReceiptPDF = ({
           <View style={styles.stampOval}>
             <Text style={styles.stampText}>RECIBIDO / PAGADO</Text>
             <Text style={{ textAlign: 'center', fontSize: 8, color: '#ef4444', marginTop: 4 }}>
-              {format(receiptDate, 'dd/MM/yyyy HH:mm', { locale: es })}
+              {format(receiptDate, hideStampTime ? 'dd/MM/yyyy' : 'dd/MM/yyyy HH:mm', { locale: es })}
             </Text>
           </View>
         </View>

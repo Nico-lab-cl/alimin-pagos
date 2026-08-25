@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { getClientPOV } from "@/actions/postventa";
 import { uploadPaymentReceipt } from "@/actions/user";
-import { formatCLP, getDownloadFilename, downloadDocument, cn, formatInstallmentsLabel } from "@/lib/utils";
+import { formatCLP, getDownloadFilename, downloadDocument, cn, formatInstallmentsLabel, comprobanteCubreCuota, urlReciboOficial } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   X,
@@ -187,33 +187,23 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: Ta
   
   // 1. Paid installments
   for (let i = data.paidCuotas; i >= 1; i--) {
-    const matchingReceipt = data.receipts?.find((r: any) => 
-      r.nominal_installment_number === i || 
-      (r.nominal_installment_range && r.nominal_installment_range.split('-').map(Number).includes(i))
-    );
-    
+    const matchingReceipt = data.receipts?.find((r: any) => comprobanteCubreCuota(r, i));
+
     let payDate = new Date(data.nextDueDate || new Date());
     payDate.setMonth(payDate.getMonth() - (data.paidCuotas - i + 1));
-    
+
     if (matchingReceipt) {
       payDate = new Date(matchingReceipt.created_at);
     }
 
-    // Search for a matching digital receipt in data.documents
-    let comprobanteDigital: string | null = null;
-    if (matchingReceipt) {
-      const systemDoc = data.documents?.find((d: any) => 
-        d.name?.toLowerCase().includes(`comprobante_pago_${matchingReceipt.id.substring(0, 6).toLowerCase()}`)
-      );
-      if (systemDoc) {
-        comprobanteDigital = `/api/documents/${systemDoc.id}`;
-      }
-    }
+    // El recibo oficial siempre está disponible para una cuota pagada: se emite
+    // al vuelo, con o sin comprobante del cliente detrás.
+    const comprobanteDigital = urlReciboOficial(data.reservationId, i, matchingReceipt?.id);
 
     paymentHistory.push({
       cuota: `Cuota #${String(i).padStart(2, '0')}`,
       fecha: formatDateMockup(payDate),
-      monto: formatCLP(matchingReceipt?.amount_clp || data.valor_cuota),
+      monto: formatCLP(matchingReceipt?.amount_clp || data.paidInstallmentAmounts?.[i] || data.valor_cuota),
       estado: "Pagado",
       comprobanteDigital,
       comprobanteCliente: matchingReceipt ? `/api/documents/${matchingReceipt.id}` : null,
@@ -352,9 +342,9 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: Ta
                           <div className="flex items-center gap-2 justify-end sm:justify-start">
                             {item.comprobanteDigital && (
                               <button
-                                onClick={() => downloadDocument(item.comprobanteDigital, `comprobante_digital_${item.cuota.replace('#', '')}.pdf`, "application/pdf")}
+                                onClick={() => downloadDocument(item.comprobanteDigital, `recibo_oficial_${item.cuota.replace('#', '')}.pdf`, "application/pdf")}
                                 className="text-brand-600 hover:text-brand-800 transition-colors p-1.5 rounded-lg hover:bg-brand-50 inline-flex items-center justify-center cursor-pointer border border-brand-100 bg-brand-50/30"
-                                title="Descargar Comprobante Digital (PDF)"
+                                title="Descargar Recibo Oficial (PDF)"
                               >
                                 <FileText className="w-3.5 h-3.5 text-brand-600" />
                               </button>

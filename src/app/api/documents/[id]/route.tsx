@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderToStream } from "@react-pdf/renderer";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getInstallmentDueDate } from "@/lib/financials";
+import { getInstallmentDueDate, getNominalInstallmentAmount } from "@/lib/financials";
 import { getReceiptLegalInfo } from "@/lib/receiptLegalInfo";
 import { PaymentReceiptPDF } from "@/components/pdf/PaymentReceiptPDF";
 
 const OFFICIAL_RECEIPT_PREFIX = "official-";
+const OFFICIAL_INSTALLMENT_PREFIX = "official-cuota-";
 
 export async function GET(
   request: NextRequest,
@@ -20,6 +21,91 @@ export async function GET(
   const { id } = await params;
   const url = new URL(request.url);
   const forceDownload = url.searchParams.get("download") === "true";
+
+  // Recibo OFICIAL de una cuota que YA ESTA PAGADA pero que no tiene ningun
+  // PaymentReceipt detras (pago manual registrado sin adjuntar archivo, cuota
+  // sumada a mano, historial migrado). El recibo lo emite Alimin, asi que no
+  // tiene por que depender de que el cliente haya subido su transferencia: se
+  // genera al vuelo desde la reserva, con el monto nominal y el vencimiento de
+  // esa cuota. Id: "official-cuota-{reservationId}-{numeroDeCuota}".
+  if (id.startsWith(OFFICIAL_INSTALLMENT_PREFIX)) {
+    try {
+      const resto = id.slice(OFFICIAL_INSTALLMENT_PREFIX.length);
+      const corte = resto.lastIndexOf("-");
+      const reservationId = corte > 0 ? resto.slice(0, corte) : "";
+      const installmentNumber = corte > 0 ? parseInt(resto.slice(corte + 1), 10) : NaN;
+
+      if (!reservationId || !Number.isFinite(installmentNumber) || installmentNumber < 1) {
+        return new NextResponse("Document not found", { status: 404 });
+      }
+
+      const reservation = await prisma.reservation.findUnique({
+        where: { id: reservationId },
+        include: { lot: true, project: true },
+      });
+      if (!reservation) return new NextResponse("Document not found", { status: 404 });
+
+      const user = session.user as any;
+      if (user.role !== "ADMIN" && user.role !== "LEGAL") {
+        if (reservation.user_id !== user.id) {
+          return new NextResponse("Forbidden", { status: 403 });
+        }
+      }
+
+      // Solo se emite recibo de cuotas efectivamente pagadas: nunca de una
+      // cuota que el cliente todavia debe.
+      if (installmentNumber > (reservation.installments_paid || 0)) {
+        return new NextResponse("Document not found", { status: 404 });
+      }
+
+      const startDate =
+        reservation.installment_start_date || reservation.created_at || new Date();
+      const dueDay = reservation.due_day || undefined;
+      const installmentDueDate = getInstallmentDueDate(startDate, installmentNumber, dueDay);
+      const amount = getNominalInstallmentAmount(
+        reservation.installment_ranges,
+        installmentNumber,
+        reservation.lot.valor_cuota || 0
+      );
+
+      const stream = await renderToStream(
+        <PaymentReceiptPDF
+          // El Nº del recibo se arma con el primer bloque del id, asi que se le
+          // pega el numero de cuota para que no salgan dos recibos con el mismo
+          // numero para la misma reserva.
+          receiptId={`${reservation.id.slice(0, 8)}C${installmentNumber}`}
+          receiptDate={installmentDueDate}
+          hideStampTime
+          clientName={`${reservation.name} ${reservation.last_name || ""}`.trim()}
+          clientRut={reservation.rut || ""}
+          clientEmail={reservation.email}
+          projectName={reservation.project.name}
+          legalInfo={getReceiptLegalInfo(reservation.project.slug)}
+          lotNumber={reservation.lot.number}
+          lotStage={reservation.lot.stage || ""}
+          amountPaid={amount}
+          paymentScope="INSTALLMENT"
+          installmentsCount={1}
+          totalInstallments={reservation.lot.cuotas || 0}
+          nominalInstallmentNumber={installmentNumber}
+          nominalInstallmentRange={null}
+          installmentDueDate={installmentDueDate}
+        />
+      );
+
+      const dispositionMode = forceDownload ? "attachment" : "inline";
+      return new NextResponse(stream as unknown as ReadableStream, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `${dispositionMode}; filename="Recibo_Oficial_Cuota_${installmentNumber}_Lote_${reservation.lot.number}.pdf"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (error) {
+      console.error("Error generating official installment receipt PDF:", error);
+      return new NextResponse("Internal Server Error", { status: 500 });
+    }
+  }
 
   // Recibo OFICIAL emitido por Alimin (distinto del comprobante que sube el
   // cliente): se genera al vuelo desde los datos del PaymentReceipt, no hay

@@ -1,9 +1,8 @@
 /**
- * Aviso automatico al cliente cuando su pago queda aprobado o registrado.
+ * Aviso automático al cliente cuando su comprobante queda aprobado en la bandeja.
  *
- * Se llama desde los cuatro puntos donde postventa da por bueno un pago:
- * las dos aprobaciones de la bandeja de comprobantes y los dos registros
- * manuales. El aviso sale por el mismo numero de WhatsApp con el que el equipo
+ * Se llama desde las aprobaciones de la bandeja de comprobantes (cuotas, pie o
+ * intereses). El aviso sale por el mismo número de WhatsApp con el que el equipo
  * ya le habla al cliente.
  *
  * Tres reglas que sostienen este archivo:

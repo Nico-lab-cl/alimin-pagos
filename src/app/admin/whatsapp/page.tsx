@@ -237,7 +237,7 @@ export default function WhatsappPage() {
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Avisos de pago</h2>
                   <p className="text-xs font-medium text-slate-500 mt-0.5">
-                    Salen solos al aprobar un comprobante o registrar un pago.
+                    Salen automáticamente al aprobar un comprobante en la bandeja de entrada.
                   </p>
                 </div>
                 <WhatsappTemplateEditor kind="PAGO" />

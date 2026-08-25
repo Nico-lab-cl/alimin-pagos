@@ -254,6 +254,45 @@ export async function downloadCsv(csvContent: string, filename: string) {
 }
 
 /**
+ * ¿Este comprobante cubre la cuota N?
+ *
+ * Un comprobante puede venir marcado con un número de cuota suelto
+ * (nominal_installment_number) o con un rango ("4-6") cuando un solo pago
+ * amortizó varias cuotas. El rango cubre TODAS las cuotas del intervalo, no
+ * solo sus extremos: leerlo como lista de extremos dejaba las cuotas del medio
+ * sin comprobante en el historial del cliente.
+ */
+export function comprobanteCubreCuota(
+  receipt: { nominal_installment_number?: number | null; nominal_installment_range?: string | null },
+  cuota: number
+): boolean {
+  if (receipt.nominal_installment_number === cuota) return true;
+  if (receipt.nominal_installment_range) {
+    const [desde, hasta] = String(receipt.nominal_installment_range).split("-").map(Number);
+    if (Number.isFinite(desde) && Number.isFinite(hasta)) {
+      return cuota >= desde && cuota <= hasta;
+    }
+  }
+  return false;
+}
+
+/**
+ * URL del recibo OFICIAL de una cuota pagada. Siempre existe: si hay un
+ * comprobante detrás se emite desde él, y si no (pago manual sin archivo, cuota
+ * migrada) se emite desde los datos de la reserva. El recibo lo emite Alimin,
+ * así que no depende de que el cliente haya subido su transferencia.
+ */
+export function urlReciboOficial(
+  reservationId: string,
+  cuota: number,
+  receiptId?: string | null
+): string {
+  return receiptId
+    ? `/api/documents/official-${receiptId}`
+    : `/api/documents/official-cuota-${reservationId}-${cuota}`;
+}
+
+/**
  * Unified document downloader that handles HTTP URLs and base64 data URIs.
  * It tries to extract the server-provided filename from Content-Disposition headers.
  */

@@ -10,6 +10,7 @@ import {
   calculateGrowingFixedPenalty,
   crearAplicadorDeAbonosMora,
   getChileToday,
+  getNominalInstallmentAmount,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
 
@@ -74,6 +75,11 @@ export async function getUserLots() {
             ? JSON.parse(res.installment_ranges)
             : res.installment_ranges)
         : [];
+      // Monto pactado de cada cuota ya pagada. Se guarda aparte del total (que
+      // se sigue sumando igual que siempre, para no mover ningún saldo) para
+      // que el historial y el recibo oficial de una cuota sin comprobante
+      // muestren exactamente la misma cifra.
+      const paidInstallmentAmounts: Record<number, number> = {};
       for (let i = 1; i <= paidCuotas; i++) {
         const range = (ranges as any[]).find((r: any) => {
           const from = Number(r.from ?? r.start ?? 0);
@@ -83,6 +89,11 @@ export async function getUserLots() {
         calculatedCuotasTotal += range
           ? Number(range.amount ?? range.value ?? 0)
           : (lot.valor_cuota || 0);
+        paidInstallmentAmounts[i] = getNominalInstallmentAmount(
+          res.installment_ranges,
+          i,
+          lot.valor_cuota || 0
+        );
       }
 
       // Total Invertido strictly follows (Cuotas + Pie + Extra)
@@ -265,6 +276,11 @@ export async function getUserLots() {
           let autoPenaltyForThis = 0;
           if (res.mora_status !== "CONGELADO" && !res.mora_frozen) {
             if (project.slug === "lomas-del-mar") {
+              // FIXED/MIXED: la multa fija ya cubre la deuda historica, asi que
+              // no se le pasa debt_start_date aca -- si no, cada cuota pendiente
+              // se ve con "1 dia de atraso" apenas se registra un pago o un
+              // abono (que re-fija debt_start_date a hoy), sin importar cuanto
+              // llevaba vencida de verdad. Mismo criterio que el lado admin.
               autoPenaltyForThis = calculateLomasInterest(
                 currentDue,
                 currentDate,
@@ -276,11 +292,6 @@ export async function getUserLots() {
                 res.debt_end_date
               );
             } else {
-              // FIXED/MIXED: la multa fija ya cubre la deuda historica, asi que
-              // no se le pasa debt_start_date aca -- si no, cada cuota pendiente
-              // se ve con "1 dia de atraso" apenas se registra un pago o un
-              // abono (que re-fija debt_start_date a hoy), sin importar cuanto
-              // llevaba vencida de verdad. Mismo criterio que el lado admin.
               autoPenaltyForThis = calculateTotalInterest(
                 currentDue,
                 currentDate,
@@ -470,6 +481,7 @@ export async function getUserLots() {
         pendingBalance,
         paidCuotas,
         totalCuotas,
+        paidInstallmentAmounts,
         acquisitionProgress,
         nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
         nextInstallmentMonth: nextDueDate ? formatMonth.format(nextDueDate).toUpperCase() : null,

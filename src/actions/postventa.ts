@@ -12,10 +12,11 @@ import {
   getProjectConfig,
   getChileToday,
   buildInstallmentConcept,
+  getNominalInstallmentAmount,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
-import { revalidatePath } from "next/cache";
 import { notifyPaymentApproved } from "@/lib/whatsappPaymentNotice";
+import { revalidatePath } from "next/cache";
 import { hash } from "bcryptjs";
 import crypto from "crypto";
 import { ENTITY_GROUPS, getEntityLabel, getEntityGroupKey, GROUPS_KEYED_BY_RESERVATION } from "@/lib/auditLabels";
@@ -1090,7 +1091,6 @@ export async function approveReceipt(receiptId: string) {
       console.error("Failed to generate and save PDF receipt:", err);
     }
 
-    memoryCache.deleteByPrefix("postventa_");
     // Aviso por WhatsApp. Va después de todo lo demás y nunca lanza: el pago ya
     // está aprobado y esa es la operación que importa. El número de cuota es el
     // MISMO que se acaba de imprimir en el comprobante (valor pre-aprobación),
@@ -1116,6 +1116,7 @@ export async function approveReceipt(receiptId: string) {
       });
     }
 
+    memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");
     memoryCache.deleteByPrefix("receipts_");
     revalidatePath("/admin");
@@ -1247,7 +1248,6 @@ export async function approveReceiptAsInterestPayment(receiptId: string) {
       console.error("Failed to generate PDF for interest payment:", err);
     }
 
-    memoryCache.deleteByPrefix("postventa_");
     // Se informa lo que efectivamente se aplicó a la mora, no lo que traía el
     // comprobante: si el cliente pagó de más, el excedente no se aplicó y aún
     // no le corresponde darlo por abonado. Es el mismo monto que sale en el PDF.
@@ -1261,6 +1261,7 @@ export async function approveReceiptAsInterestPayment(receiptId: string) {
       sentBy: adminUser.email,
     });
 
+    memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");
     memoryCache.deleteByPrefix("receipts_");
     revalidatePath("/admin");
@@ -2676,21 +2677,6 @@ export async function registerManualPayment(
     }
 
     memoryCache.deleteByPrefix("postventa_");
-    // Aviso por WhatsApp. Acá el cliente no subió nada, así que el texto le dice
-    // que su pago quedó registrado y publicado en su portal, no que "fue
-    // aprobado". La fecha que se informa es la del pago, no la de hoy.
-    await notifyPaymentApproved({
-      eventKey: `manual:${receiptId}`,
-      reservationId,
-      kind: data.isPie ? "PIE" : "CUOTA",
-      source: "MANUAL",
-      amount: data.amount,
-      paidAt: paymentDate,
-      firstInstallmentNumber: nextInstNum,
-      installmentsCount: data.installmentsCount || 1,
-      sentBy: adminUser.email,
-    });
-
     memoryCache.deleteByPrefix("user_data_");
     revalidatePath("/admin/clients");
 
@@ -2832,18 +2818,6 @@ export async function registerInterestPayment(
     }
 
     memoryCache.deleteByPrefix("postventa_");
-    // Igual que en la bandeja: se informa lo aplicado a la mora, no el total que
-    // trajo el depósito, porque el excedente todavía no está abonado a nada.
-    await notifyPaymentApproved({
-      eventKey: `manual-interes:${receiptId}`,
-      reservationId,
-      kind: "INTERES",
-      source: "MANUAL",
-      amount: appliedToMora,
-      paidAt: paymentDate,
-      sentBy: adminUser.email,
-    });
-
     memoryCache.deleteByPrefix("user_data_");
     revalidatePath("/admin/clients");
 
@@ -2910,6 +2884,10 @@ export async function getClientPOV(reservationId: string) {
           ? JSON.parse(res.installment_ranges)
           : res.installment_ranges)
       : [];
+    // Monto pactado de cada cuota pagada. Se guarda aparte del total (que se
+    // sigue sumando igual que siempre, para no mover ningún saldo) para que el
+    // historial y el recibo oficial muestren la misma cifra.
+    const paidInstallmentAmounts: Record<number, number> = {};
     for (let i = 1; i <= paidCuotas; i++) {
       const range = (ranges as any[]).find((r: any) => {
         const from = Number(r.from ?? r.start ?? 0);
@@ -2919,6 +2897,11 @@ export async function getClientPOV(reservationId: string) {
       calculatedCuotasTotal += range
         ? Number(range.amount ?? range.value ?? 0)
         : (lot.valor_cuota || 0);
+      paidInstallmentAmounts[i] = getNominalInstallmentAmount(
+        res.installment_ranges,
+        i,
+        lot.valor_cuota || 0
+      );
     }
 
     const extraPaid = res.extra_paid_amount || 0;
@@ -3079,6 +3062,11 @@ export async function getClientPOV(reservationId: string) {
         let autoPenaltyForThis = 0;
         if (res.mora_status !== "CONGELADO" && !res.mora_frozen) {
           if (project.slug === "lomas-del-mar") {
+            // FIXED/MIXED: la multa fija ya cubre la deuda historica, asi que
+            // no se le pasa debt_start_date aca -- si no, cada cuota pendiente
+            // se ve con "1 dia de atraso" apenas se registra un pago o un
+            // abono (que re-fija debt_start_date a hoy), sin importar cuanto
+            // llevaba vencida de verdad. Mismo criterio que la rama de abajo.
             autoPenaltyForThis = calculateLomasInterest(
               currentDue,
               currentDate,
@@ -3089,11 +3077,6 @@ export async function getClientPOV(reservationId: string) {
               project.penalty_start_date,
               res.debt_end_date
             );
-            // FIXED/MIXED: la multa fija ya cubre la deuda historica, asi que
-            // no se le pasa debt_start_date aca -- si no, cada cuota pendiente
-            // se ve con "1 dia de atraso" apenas se registra un pago o un
-            // abono (que re-fija debt_start_date a hoy), sin importar cuanto
-            // llevaba vencida de verdad. Mismo criterio que la rama de abajo.
           } else {
             autoPenaltyForThis = calculateTotalInterest(
               currentDue,
@@ -3285,6 +3268,7 @@ export async function getClientPOV(reservationId: string) {
         pendingBalance,
         paidCuotas,
         totalCuotas,
+        paidInstallmentAmounts,
         acquisitionProgress,
         nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
         nextInstallmentMonth,
@@ -3300,6 +3284,17 @@ export async function getClientPOV(reservationId: string) {
         dailyPenalty: activeDailyPenalty,
         upcomingInstallments,
         documents,
+        // La vista "como cliente" tiene que cruzar comprobante <-> cuota igual
+        // que el portal real; sin esta lista el historial de postventa mostraba
+        // todas las cuotas como "No disponible".
+        receipts: (res.receipts || []).map((r: any) => ({
+          id: r.id,
+          amount_clp: r.amount_clp,
+          scope: r.scope,
+          created_at: r.created_at,
+          nominal_installment_number: r.nominal_installment_number,
+          nominal_installment_range: r.nominal_installment_range,
+        })),
         bank: {
           name: project.bank_name,
           type: project.bank_type,

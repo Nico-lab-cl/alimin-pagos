@@ -154,7 +154,7 @@ export default function WhatsappTemplateEditor({
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-start gap-3">
           <Zap className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
           <p className="text-xs font-semibold text-slate-600 leading-relaxed">
-            Estos tres mensajes salen solos al aprobar un comprobante o registrar un pago: nadie
+            Estos tres mensajes salen automáticamente al aprobar un comprobante en la bandeja de pagos: nadie
             los elige, la plantilla la decide el tipo de pago. Desmarcar «Activa» apaga ese aviso
             para todos los proyectos.
           </p>

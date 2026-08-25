@@ -89,6 +89,37 @@ export function buildInstallmentConcept(opts: {
 }
 
 /**
+ * Monto nominal de UNA cuota según los tramos pactados (installment_ranges).
+ * Si la cuota no cae en ningún tramo, cae al valor_cuota del lote.
+ *
+ * Los tramos vienen con nombres de campo distintos según de dónde se cargaron
+ * (from/to o start/end, amount o value), por eso se leen ambos.
+ */
+export function getNominalInstallmentAmount(
+  installmentRanges: unknown,
+  installmentNumber: number,
+  fallbackAmount: number
+): number {
+  const ranges = installmentRanges
+    ? typeof installmentRanges === "string"
+      ? JSON.parse(installmentRanges)
+      : installmentRanges
+    : [];
+
+  if (!Array.isArray(ranges)) return fallbackAmount;
+
+  const range = ranges.find((r: any) => {
+    const from = Number(r.from ?? r.start ?? 0);
+    const to = Number(r.to ?? r.end ?? 0);
+    return installmentNumber >= from && installmentNumber <= to;
+  });
+
+  if (!range) return fallbackAmount;
+  const amount = Number(range.amount ?? range.value ?? 0);
+  return amount > 0 ? amount : fallbackAmount;
+}
+
+/**
  * Helper to get a UTC Date set at 12:00:00 UTC representing the calendar day in Chile (America/Santiago) timezone.
  */
 export function getSantiagoUTCDate(date: Date): Date {
