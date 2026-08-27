@@ -13,6 +13,12 @@ import {
   getNominalInstallmentAmount,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
+import {
+  buildReceiptDocName,
+  isOfficialReceiptDocFor,
+  receiptFileType,
+  receiptHasFile,
+} from "@/lib/receiptDocs";
 
 const CACHE_TTL = 300;
 
@@ -414,52 +420,57 @@ export async function getUserLots() {
       }
 
       // New Docs
+      //
+      // Los comprobantes oficiales de Alimin se guardan con un nombre opaco
+      // ("Comprobante_Pago_a1b2c3.pdf"): con varios pagos encima el cliente no
+      // podía saber cuál era cuál. Acá se cruzan con su comprobante de origen
+      // para mostrarlos por su concepto real (Reserva, Pie, Cuota 12, Gastos
+      // Operacionales). Es solo el nombre que se muestra; el archivo no cambia.
       if (res.documents && res.documents.length > 0) {
-        const newDocs = res.documents.map((d: any) => ({
-          name: d.name,
-          category: d.category,
-          uploadedAt: d.created_at,
-          fileType: d.file_type,
-          url: `/api/documents/${d.id}`,
-        }));
+        const newDocs = res.documents.map((d: any) => {
+          const origin = (res.receipts || []).find((r: any) =>
+            isOfficialReceiptDocFor(d.name, r.id)
+          );
+          return {
+            name: origin ? buildReceiptDocName(origin, "pdf") : d.name,
+            category: d.category,
+            uploadedAt: d.created_at,
+            fileType: d.file_type,
+            url: `/api/documents/${d.id}`,
+          };
+        });
         documents = [...newDocs, ...documents];
       }
 
-      // Approved Payment Receipts
+      // Comprobantes aprobados.
+      //
+      // Por cada pago existen DOS archivos: el comprobante oficial de Alimin
+      // (el PDF que emite el portal, ya incluido arriba como documento) y el
+      // respaldo bancario que subió el cliente o postventa. Mostrar los dos
+      // duplicaba cada pago en la lista —los dos se llaman "Comprobante_Pago..."—
+      // y era lo que tenía perdidos a los clientes con muchos pagos.
+      //
+      // Ahora el respaldo bancario queda interno (postventa lo sigue viendo en
+      // la ficha) y solo se le muestra al cliente cuando ese pago NO alcanzó a
+      // generar su PDF oficial, para no dejarlo sin ningún respaldo.
       if (res.receipts && res.receipts.length > 0) {
-        const receiptDocs = res.receipts.map((r: any) => {
-          let ext = "pdf";
-          let fileType = "application/pdf";
-          if (r.receipt_url && r.receipt_url.startsWith("data:")) {
-            const parts = r.receipt_url.split(";");
-            if (parts[0]) {
-              fileType = parts[0].substring(5);
-              if (fileType === "image/png") ext = "png";
-              else if (fileType === "image/jpeg") ext = "jpg";
-              else if (fileType === "image/webp") ext = "webp";
-              else if (fileType === "application/pdf") ext = "pdf";
-            }
-          }
-          
-          let docName = "Comprobante de Pago";
-          if (r.scope === "PIE") {
-            docName = `Comprobante_Pago_Pie.${ext}`;
-          } else {
-            docName = r.nominal_installment_range
-              ? `Comprobante_Pago_Cuotas_${r.nominal_installment_range}.${ext}`
-              : r.nominal_installment_number
-                ? `Comprobante_Pago_Cuota_${r.nominal_installment_number}.${ext}`
-                : `Comprobante_Pago_Cuota.${ext}`;
-          }
-
-          return {
-            name: docName,
-            category: "Comprobantes",
-            uploadedAt: r.processed_at || r.created_at,
-            fileType: fileType,
-            url: `/api/documents/${r.id}`,
-          };
-        });
+        const receiptDocs = res.receipts
+          .filter((r: any) => {
+            if (!receiptHasFile(r.receipt_url)) return false;
+            return !(res.documents || []).some((d: any) =>
+              isOfficialReceiptDocFor(d.name, r.id)
+            );
+          })
+          .map((r: any) => {
+            const { ext, fileType } = receiptFileType(r.receipt_url);
+            return {
+              name: buildReceiptDocName(r, ext),
+              category: "Comprobantes",
+              uploadedAt: r.processed_at || r.created_at,
+              fileType: fileType,
+              url: `/api/documents/${r.id}`,
+            };
+          });
         documents = [...documents, ...receiptDocs];
       }
 

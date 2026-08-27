@@ -20,6 +20,16 @@ import { revalidatePath } from "next/cache";
 import { hash } from "bcryptjs";
 import crypto from "crypto";
 import { ENTITY_GROUPS, getEntityLabel, getEntityGroupKey, GROUPS_KEYED_BY_RESERVATION } from "@/lib/auditLabels";
+import {
+  SCOPE_LABELS,
+  SCOPE_CONCEPTS,
+  SCOPE_TO_LEDGER_CATEGORY,
+  LEDGER_CATEGORY_TO_SCOPE,
+  buildReceiptDocName,
+  isOfficialReceiptDocFor,
+  receiptFileType,
+  receiptHasFile,
+} from "@/lib/receiptDocs";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -134,7 +144,16 @@ export async function getFullPostventaData({
         else if (piePaidFromReceipts > 0) actualPieComponent = piePaidFromReceipts;
         else if ((res.pie_status || "").toUpperCase() === "PAID") actualPieComponent = targetGrossPie;
 
-        const reservationAmountPaid = lot.reservation_amount_clp ?? 500000;
+        // La reserva se contaba SIEMPRE con el valor del lote (o 500.000 por
+        // defecto), aunque no existiera ningún comprobante que la respaldara: el
+        // cliente veía la plata sumada en su Total Invertido y ningún documento
+        // detrás. Si ahora hay comprobantes de RESERVA registrados, manda lo que
+        // efectivamente se pagó; si no hay ninguno, se mantiene el supuesto
+        // anterior para no mover saldos ya publicados.
+        const reservaFromReceipts = res.receipts
+          ?.filter((r) => r.scope === "RESERVA")
+          .reduce((acc, r) => acc + (r.amount_clp || 0), 0) || 0;
+        const reservationAmountPaid = reservaFromReceipts || (lot.reservation_amount_clp ?? 500000);
 
         totalPaid = totalCuotas === 0
           ? totalToPay + extraPaid
@@ -1054,8 +1073,8 @@ export async function approveReceipt(receiptId: string) {
       const stage = receipt.reservation.lot?.stage || "";
       // El comprobante debe decir QUÉ cuota se pagó y a qué mes/año corresponde,
       // no solo cuántas cuotas venían en el pago.
-      const concept = receipt.scope === "PIE"
-        ? "Pago de Pie"
+      const concept = receipt.scope !== "INSTALLMENT"
+        ? (SCOPE_CONCEPTS[receipt.scope] || "Pago Registrado")
         : buildInstallmentConcept({
             installmentStartDate: receipt.reservation.installment_start_date,
             dueDay: receipt.reservation.due_day,
@@ -1575,7 +1594,7 @@ export async function updateFinancialLedgerAmount(
       const receipt = await prisma.paymentReceipt.findFirst({
         where: {
           reservation_id: entry.reservation_id,
-          scope: entry.category === "PIE" ? "PIE" : "INSTALLMENT",
+          scope: LEDGER_CATEGORY_TO_SCOPE[entry.category] || "INSTALLMENT",
           created_at: {
             gte: new Date(ledgerCreatedAt.getTime() - 120000),
             lte: new Date(ledgerCreatedAt.getTime() + 120000),
@@ -2455,6 +2474,14 @@ export async function toggleAlContado(reservationId: string, isAlContado: boolea
 
 /**
  * Registers a manual payment (e.g. offline transfer, cash) and adds it to the ledger.
+ *
+ * `kind` distingue los cuatro conceptos de caja:
+ *   CUOTA   → amortiza cuotas y reparte el excedente a mora (comportamiento histórico)
+ *   PIE     → marca el pie como pagado
+ *   RESERVA → el pago de reserva inicial; no toca cuotas, pie ni mora
+ *   GASTOS  → gastos operacionales; cargo aparte del precio del terreno
+ *
+ * `isPie` se mantiene por compatibilidad con las llamadas viejas.
  */
 export async function registerManualPayment(
   reservationId: string,
@@ -2463,6 +2490,7 @@ export async function registerManualPayment(
     installmentsCount: number;
     paidAt: string;
     isPie: boolean;
+    kind?: "CUOTA" | "PIE" | "RESERVA" | "GASTOS";
     receiptUrl?: string;
   }
 ) {
@@ -2471,6 +2499,8 @@ export async function registerManualPayment(
   if (!session?.user || adminUser?.role !== "ADMIN") {
     return { error: "No autorizado" };
   }
+
+  const kind = data.kind ?? (data.isPie ? "PIE" : "CUOTA");
 
   try {
     const res = await prisma.reservation.findUnique({
@@ -2486,7 +2516,56 @@ export async function registerManualPayment(
     // Se calcula acá arriba porque también lo necesita el comprobante PDF.
     const nextInstNum = (res.installments_paid || 0) + 1;
 
-    if (data.isPie) {
+    if (kind === "RESERVA" || kind === "GASTOS") {
+      // Cargos que viven fuera del plan de pago: no incrementan installments_paid,
+      // no marcan el pie y no recalculan mora. Solo dejan el movimiento en caja y
+      // su comprobante, que es justamente lo que faltaba para el pago de reserva.
+      const operations: any[] = [
+        prisma.financialLedger.create({
+          data: {
+            reservation_id: reservationId,
+            amount_clp: data.amount,
+            category: SCOPE_TO_LEDGER_CATEGORY[kind],
+            description: kind === "RESERVA" ? "Pago Manual de Reserva" : "Pago Manual de Gastos Operacionales",
+            paid_at: paymentDate,
+          },
+        }),
+      ];
+
+      // A diferencia de pie/cuota, acá el comprobante se crea SIEMPRE, tenga o
+      // no respaldo bancario del cliente. Es Alimin la que certifica que recibió
+      // la plata, y el caso típico es justamente ese: postventa registra una
+      // reserva vieja de la que ya nadie tiene la transferencia. Si no se
+      // emitiera, el cliente quedaría igual que antes — con la plata contada en
+      // su saldo y ningún documento que la respalde.
+      operations.push(
+        prisma.paymentReceipt.create({
+          data: {
+            id: receiptId,
+            reservation_id: reservationId,
+            lot_id: res.lot_id,
+            amount_clp: data.amount,
+            receipt_url: data.receiptUrl || "SIN_RESPALDO",
+            scope: kind,
+            status: "APPROVED",
+            processed_at: new Date(),
+          },
+        })
+      );
+
+      await prisma.$transaction(operations);
+
+      await prisma.auditLog.create({
+        data: {
+          action: "CREATE",
+          entity: "FinancialLedger",
+          entity_id: reservationId,
+          details: `Registro manual de ${SCOPE_LABELS[kind]}: $${data.amount.toLocaleString("es-CL")} con fecha ${paymentDate.toLocaleDateString("es-CL")}. No modifica cuotas, pie ni mora.`,
+          user_id: adminUser.id,
+          user_email: adminUser.email,
+        },
+      });
+    } else if (kind === "PIE") {
       const operations: any[] = [
         prisma.reservation.update({
           where: { id: reservationId },
@@ -2627,8 +2706,11 @@ export async function registerManualPayment(
       }
     }
 
-    // Auto-generate Digital Payment Receipt PDF for Manual Payment
-    if (data.receiptUrl) {
+    // Auto-generate Digital Payment Receipt PDF for Manual Payment.
+    // Reserva y gastos operacionales siempre lo emiten (ver arriba): son los
+    // casos donde el cliente necesita el documento aunque no exista la
+    // transferencia original.
+    if (data.receiptUrl || kind === "RESERVA" || kind === "GASTOS") {
       try {
         const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
         
@@ -2640,14 +2722,14 @@ export async function registerManualPayment(
         const projectName = res.project?.name || "Alimin SPA";
         const lotNumber = (res.lot as any)?.number || res.lot_id.toString();
         const stage = res.lot?.stage || "";
-        const concept = data.isPie
-          ? "Pago de Pie"
-          : buildInstallmentConcept({
+        const concept = kind === "CUOTA"
+          ? buildInstallmentConcept({
               installmentStartDate: res.installment_start_date,
               dueDay: res.due_day,
               firstInstallmentNumber: nextInstNum,
               installmentsCount: data.installmentsCount || 1,
-            });
+            })
+          : SCOPE_CONCEPTS[kind];
 
         const pdfBase64 = await generateReceiptPDF({
           clientName,
@@ -3197,52 +3279,46 @@ export async function getClientPOV(reservationId: string) {
         }));
       } catch {}
     }
+    // Mismo criterio de nombres que el portal real (ver getUserLots): los
+    // recibos oficiales de Alimin se muestran por su concepto en vez del id
+    // opaco con el que se guardaron.
     if (res.documents && res.documents.length > 0) {
-      const newDocs = res.documents.map((d: any) => ({
-        name: d.name,
-        category: d.category,
-        uploadedAt: d.created_at,
-        fileType: d.file_type,
-        url: `/api/documents/${d.id}`,
-      }));
+      const newDocs = res.documents.map((d: any) => {
+        const origin = (res.receipts || []).find((r: any) =>
+          isOfficialReceiptDocFor(d.name, r.id)
+        );
+        return {
+          name: origin ? buildReceiptDocName(origin, "pdf") : d.name,
+          category: d.category,
+          uploadedAt: d.created_at,
+          fileType: d.file_type,
+          url: `/api/documents/${d.id}`,
+        };
+      });
       documents = [...newDocs, ...documents];
     }
 
-    // Approved Payment Receipts
+    // Respaldos bancarios: internos salvo que el pago no tenga recibo oficial.
+    // Esta vista tiene que enseñar EXACTAMENTE lo que ve el cliente, así que
+    // aplica el mismo filtro que getUserLots.
     if (res.receipts && res.receipts.length > 0) {
-      const receiptDocs = res.receipts.map((r: any) => {
-        let ext = "pdf";
-        let fileType = "application/pdf";
-        if (r.receipt_url && r.receipt_url.startsWith("data:")) {
-          const parts = r.receipt_url.split(";");
-          if (parts[0]) {
-            fileType = parts[0].substring(5);
-            if (fileType === "image/png") ext = "png";
-            else if (fileType === "image/jpeg") ext = "jpg";
-            else if (fileType === "image/webp") ext = "webp";
-            else if (fileType === "application/pdf") ext = "pdf";
-          }
-        }
-        
-        let docName = "Comprobante de Pago";
-        if (r.scope === "PIE") {
-          docName = `Comprobante_Pago_Pie.${ext}`;
-        } else {
-          docName = r.nominal_installment_range
-            ? `Comprobante_Pago_Cuotas_${r.nominal_installment_range}.${ext}`
-            : r.nominal_installment_number
-              ? `Comprobante_Pago_Cuota_${r.nominal_installment_number}.${ext}`
-              : `Comprobante_Pago_Cuota.${ext}`;
-        }
-
-        return {
-          name: docName,
-          category: "Comprobantes",
-          uploadedAt: r.processed_at || r.created_at,
-          fileType: fileType,
-          url: `/api/documents/${r.id}`,
-        };
-      });
+      const receiptDocs = res.receipts
+        .filter((r: any) => {
+          if (!receiptHasFile(r.receipt_url)) return false;
+          return !(res.documents || []).some((d: any) =>
+            isOfficialReceiptDocFor(d.name, r.id)
+          );
+        })
+        .map((r: any) => {
+          const { ext, fileType } = receiptFileType(r.receipt_url);
+          return {
+            name: buildReceiptDocName(r, ext),
+            category: "Comprobantes",
+            uploadedAt: r.processed_at || r.created_at,
+            fileType: fileType,
+            url: `/api/documents/${r.id}`,
+          };
+        });
       documents = [...documents, ...receiptDocs];
     }
 
@@ -3755,9 +3831,9 @@ export async function deletePaymentReceipt(receiptId: string) {
       where: { id: receiptId },
     });
 
-    const label = receipt.scope === "PIE"
-      ? "Comprobante de Pie"
-      : `Comprobante de Cuota ${receipt.nominal_installment_range || receipt.nominal_installment_number || ""}`.trim();
+    const label = receipt.scope === "INSTALLMENT"
+      ? `Comprobante de Cuota ${receipt.nominal_installment_range || receipt.nominal_installment_number || ""}`.trim()
+      : `Comprobante de ${SCOPE_LABELS[receipt.scope] || receipt.scope}`;
     await logSystemNote(
       receipt.reservation_id,
       `${label} eliminado (monto $${receipt.amount_clp.toLocaleString("es-CL")}, estado previo: ${receipt.status}).${wasApproved ? " Se revirtió el conteo de cuotas correspondiente." : ""}`,

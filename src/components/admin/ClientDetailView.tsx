@@ -196,7 +196,9 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     paidAt: new Date().toISOString().split("T")[0],
     isPie: false
   });
-  const [paymentType, setPaymentType] = useState<"CUOTA" | "PIE" | "INTERES">("CUOTA");
+  // RESERVA y GASTOS son cargos aparte del plan de pago: no mueven cuotas, pie
+  // ni mora, solo dejan el movimiento en caja con su comprobante.
+  const [paymentType, setPaymentType] = useState<"CUOTA" | "PIE" | "INTERES" | "RESERVA" | "GASTOS">("CUOTA");
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
 
   // Financial History State
@@ -231,7 +233,8 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           url: `/api/documents/${d.id}`,
           fileType: d.file_type,
           type: d.type || 'table',
-          hasFile: d.hasFile !== false
+          hasFile: d.hasFile !== false,
+          internal: d.internal === true
         }));
 
         const legacyDocs = (selectedClient.manual_documents || []).map((d: any, i: number) => ({
@@ -582,11 +585,20 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           installmentsCount: paymentForm.installmentsCount,
           paidAt: paymentForm.paidAt,
           isPie: paymentType === "PIE",
+          kind: paymentType,
           receiptUrl: base64 || undefined
         });
         success = !!res.success;
         errorMsg = res.error;
-        if (success) toast.success("Pago registrado exitosamente");
+        if (success) {
+          toast.success(
+            paymentType === "RESERVA"
+              ? "Reserva registrada exitosamente"
+              : paymentType === "GASTOS"
+                ? "Gastos operacionales registrados exitosamente"
+                : "Pago registrado exitosamente"
+          );
+        }
       }
 
       if (success) {
@@ -660,7 +672,15 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     financialHistory.forEach(item => {
       feed.push({
         id: item.id,
-        title: item.category === 'PIE' ? "Pago de Pie registrado" : item.category === 'PENALTY' ? "Pago de Multa registrado" : "Pago registrado",
+        title: item.category === 'PIE'
+          ? "Pago de Pie registrado"
+          : item.category === 'PENALTY'
+            ? "Pago de Multa registrado"
+            : item.category === 'RESERVA'
+              ? "Pago de Reserva registrado"
+              : item.category === 'GASTOS'
+                ? "Gastos Operacionales registrados"
+                : "Pago registrado",
         badge: "PAGO",
         description: `${item.description}. Monto: ${formatCLP(item.amount_clp)}.`,
         date: item.paid_at,
@@ -1350,6 +1370,9 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                           </p>
                           <p className="text-[8px] font-semibold text-slate-400 uppercase mt-0.5">
                             {new Date(doc.date).toLocaleDateString("es-CL")}
+                            {/* El respaldo bancario ya no le llega al cliente:
+                                el portal le muestra solo el recibo oficial. */}
+                            {doc.internal && <span className="ml-1.5 text-slate-500">· Interno</span>}
                           </p>
                         </div>
                       </div>
@@ -2318,15 +2341,39 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   >
                     Abono Intereses
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentType("RESERVA")}
+                    className={`py-2.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${paymentType === "RESERVA" ? "bg-slate-700 border-slate-700 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    Reserva
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentType("GASTOS")}
+                    className={`py-2.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${paymentType === "GASTOS" ? "bg-slate-700 border-slate-700 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    Gastos Op.
+                  </button>
                 </div>
                 {paymentType === "INTERES" && (
                   <p className="text-[10px] text-amber-700 font-semibold pt-1">
                     El monto completo se aplica a la mora del cliente. No suma cuotas pagadas. Si sobra dinero, se avisa para registrarlo aparte.
                   </p>
                 )}
+                {paymentType === "RESERVA" && (
+                  <p className="text-[10px] text-slate-600 font-semibold pt-1">
+                    Deja registrado el pago de reserva inicial con su comprobante. No suma cuotas, no marca el pie y no toca la mora.
+                  </p>
+                )}
+                {paymentType === "GASTOS" && (
+                  <p className="text-[10px] text-slate-600 font-semibold pt-1">
+                    Cargo aparte del precio del terreno. Queda en caja con su comprobante, pero no descuenta saldo ni cuotas.
+                  </p>
+                )}
               </div>
 
-              {paymentType !== "INTERES" && (
+              {paymentType !== "INTERES" && paymentType !== "RESERVA" && paymentType !== "GASTOS" && (
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Cantidad de Cuotas que amortiza</label>
                   <input
@@ -2348,6 +2395,11 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   onChange={e => setPaymentFile(e.target.files?.[0] || null)}
                   className="w-full border border-slate-200 bg-slate-50/50 rounded-xl px-3 py-2 text-xs font-medium text-slate-600 cursor-pointer focus:border-brand-500 outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
                 />
+                {(paymentType === "RESERVA" || paymentType === "GASTOS") && (
+                  <p className="text-[10px] text-slate-500 font-semibold pt-1">
+                    Si no tienes la transferencia, igual se emite el recibo oficial de Alimin y el cliente lo ve en su portal.
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-slate-100">
@@ -2364,7 +2416,13 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   className={`flex-1 py-3 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${paymentType === "INTERES" ? "bg-amber-600 hover:bg-amber-700" : "bg-brand-600 hover:bg-brand-700"}`}
                 >
                   {isRegisteringPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  {paymentType === "INTERES" ? "Registrar Abono de Intereses" : "Registrar Pago"}
+                  {paymentType === "INTERES"
+                    ? "Registrar Abono de Intereses"
+                    : paymentType === "RESERVA"
+                      ? "Registrar Reserva"
+                      : paymentType === "GASTOS"
+                        ? "Registrar Gastos Operacionales"
+                        : "Registrar Pago"}
                 </button>
               </div>
             </form>
@@ -2683,6 +2741,8 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   {deletingLedgerEntry.category === "CUOTA" && "Se revertirán las cuotas pagadas que representaba este registro."}
                   {deletingLedgerEntry.category === "PIE" && "El pie del cliente volverá a estado PENDIENTE."}
                   {deletingLedgerEntry.category === "PENALTY" && "El monto se devolverá a la mora pactada del cliente."}
+                  {deletingLedgerEntry.category === "RESERVA" && "No afecta cuotas, pie ni mora: solo se borra el movimiento de caja de la reserva."}
+                  {deletingLedgerEntry.category === "GASTOS" && "No afecta cuotas, pie ni mora: solo se borra el movimiento de caja de los gastos operacionales."}
                   {" "}El comprobante/PDF asociado (si existe) no se elimina, solo este registro de caja. Esta acción queda registrada en la bitácora de auditoría.
                 </span>
               </div>

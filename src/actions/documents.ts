@@ -5,6 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { memoryCache } from "@/lib/cache";
 import { deletePaymentReceipt, logSystemNote } from "@/actions/postventa";
+import {
+  buildReceiptDocName,
+  receiptFileType,
+  receiptHasFile,
+} from "@/lib/receiptDocs";
 
 /**
  * Uploads a document associated with a reservation.
@@ -92,42 +97,23 @@ export async function getReservationDocuments(reservationId: string) {
       orderBy: { created_at: "desc" },
     });
 
+    // Respaldo bancario del pago (la transferencia que subió el cliente o
+    // postventa). Es INTERNO: en el portal del cliente ya no se muestra cuando
+    // existe el recibo oficial de Alimin, para que no vea dos archivos por el
+    // mismo pago. Postventa lo sigue viendo completo acá.
     const receiptDocs = receipts.map((r: any) => {
-      let ext = "pdf";
-      let fileType = "application/pdf";
-      if (r.receipt_url && r.receipt_url.startsWith("data:")) {
-        const parts = r.receipt_url.split(";");
-        if (parts[0]) {
-          fileType = parts[0].substring(5);
-          if (fileType === "image/png") ext = "png";
-          else if (fileType === "image/jpeg") ext = "jpg";
-          else if (fileType === "image/webp") ext = "webp";
-          else if (fileType === "application/pdf") ext = "pdf";
-        }
-      }
-      
-      let docName = "Comprobante de Pago";
-      if (r.scope === "PIE") {
-        docName = `Comprobante_Pago_Pie.${ext}`;
-      } else {
-        docName = r.nominal_installment_range
-          ? `Comprobante_Pago_Cuotas_${r.nominal_installment_range}.${ext}`
-          : r.nominal_installment_number
-            ? `Comprobante_Pago_Cuota_${r.nominal_installment_number}.${ext}`
-            : `Comprobante_Pago_Cuota.${ext}`;
-      }
-
-      // Pagos migrados/registrados sin un archivo digital real (ej. historial
-      // importado, o condonaciones administrativas) no tienen nada que previsualizar.
-      const hasFile = !!r.receipt_url && !["LEGACY_SYNC", "CONDONACION_ADMIN"].includes(r.receipt_url);
+      const { ext, fileType } = receiptFileType(r.receipt_url);
 
       return {
         id: r.id,
-        name: docName,
+        name: buildReceiptDocName(r, ext),
         file_type: fileType,
         created_at: r.processed_at || r.created_at,
         type: "receipt",
-        hasFile,
+        // Pagos migrados/registrados sin un archivo digital real (ej. historial
+        // importado, o condonaciones administrativas) no tienen nada que previsualizar.
+        hasFile: receiptHasFile(r.receipt_url),
+        internal: true,
       };
     });
 
@@ -144,16 +130,10 @@ export async function getReservationDocuments(reservationId: string) {
     // cliente): un documento adicional por cada comprobante aprobado, generado
     // al vuelo (sin archivo guardado) via /api/documents/official-{id}.
     const officialReceiptDocs = receipts.map((r: any) => {
-      let docName = "Recibo_Oficial_Pago";
-      if (r.scope === "PIE") {
-        docName = "Recibo_Oficial_Pago_Pie.pdf";
-      } else {
-        docName = r.nominal_installment_range
-          ? `Recibo_Oficial_Cuotas_${r.nominal_installment_range}.pdf`
-          : r.nominal_installment_number
-            ? `Recibo_Oficial_Cuota_${r.nominal_installment_number}.pdf`
-            : "Recibo_Oficial_Pago.pdf";
-      }
+      const docName = buildReceiptDocName(r, "pdf").replace(
+        /^Comprobante_(Pago_)?/,
+        "Recibo_Oficial_"
+      );
 
       return {
         id: `official-${r.id}`,

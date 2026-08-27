@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { getAdminProjects, approveReceipt, approveReceiptAsInterestPayment, rejectReceipt, getAllReceipts } from "@/actions/postventa";
 import { formatCLP, cn, getReceiptDownloadFilename, downloadDocument, downloadCsv } from "@/lib/utils";
+import { SCOPE_LABELS } from "@/lib/receiptDocs";
 import { toast } from "sonner";
 import { 
   Loader2, 
@@ -52,7 +53,8 @@ function getLotLabel(receipt: any): string {
 }
 
 function getInstallmentMonthStr(receipt: any): string {
-  if (!receipt || receipt.scope === "PIE") return "";
+  // Solo las cuotas tienen mes asociado. Pie, reserva y gastos operacionales no.
+  if (!receipt || receipt.scope !== "INSTALLMENT") return "";
   
   const installmentStartDate = receipt.reservation?.installment_start_date;
   if (!installmentStartDate) return "";
@@ -256,7 +258,9 @@ export default function ReceiptsPage() {
       r.lot?.number || "",
       r.lot?.stage || "",
       r.amount_clp,
-      r.scope === "PIE" ? "Pie" : `Cuota ${String(r.nominal_installment_number || r.reservation?.installments_paid || 1).padStart(2, '0')}`,
+      r.scope === "INSTALLMENT"
+        ? `Cuota ${String(r.nominal_installment_number || r.reservation?.installments_paid || 1).padStart(2, '0')}`
+        : (SCOPE_LABELS[r.scope] || r.scope),
       r.status === "PENDING" ? "Pendiente" : r.status === "APPROVED" ? "Aprobado" : "Rechazado",
       r.rejection_reason || ""
     ]);
@@ -480,12 +484,12 @@ export default function ReceiptsPage() {
               
               // Installment Progress format e.g. "04 / 24" or "Pie"
               let quotaText = "—";
-              if (receipt.scope === "PIE") {
-                quotaText = "Pie";
-              } else {
+              if (receipt.scope === "INSTALLMENT") {
                 const totalCuotas = receipt.lot?.cuotas || 24;
                 const instNum = receipt.nominal_installment_number || receipt.reservation?.installments_paid || 1;
                 quotaText = `${String(instNum).padStart(2, '0')} / ${String(totalCuotas).padStart(2, '0')}`;
+              } else {
+                quotaText = SCOPE_LABELS[receipt.scope] || "—";
               }
 
               // Amount Formatted with Space e.g. "$ 1.450.000"
@@ -514,7 +518,7 @@ export default function ReceiptsPage() {
                   <div className="col-span-1 text-slate-600 text-xs font-bold md:text-center">
                     <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cuota:</span>
                     <div>{quotaText}</div>
-                    {receipt.scope !== "PIE" && (
+                    {receipt.scope === "INSTALLMENT" && (
                       <div className="text-[10px] text-slate-400 font-medium mt-0.5">
                         {getInstallmentMonthStr(receipt)}
                       </div>
@@ -734,12 +738,20 @@ export default function ReceiptsPage() {
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Concepto y Cuota</span>
                   <span className="text-slate-800 block">
-                    {selectedReceipt.scope === "PIE" ? "Pie (Capital)" : "Cuotas de Financiamiento"}
+                    {selectedReceipt.scope === "PIE"
+                      ? "Pie (Capital)"
+                      : selectedReceipt.scope === "INSTALLMENT"
+                        ? "Cuotas de Financiamiento"
+                        : (SCOPE_LABELS[selectedReceipt.scope] || selectedReceipt.scope)}
                   </span>
                   <span className="text-brand-600 block mt-0.5 font-bold">
-                    {selectedReceipt.scope === "PIE" ? "Ingreso Inicial" : `Cuota ${String(selectedReceipt.nominal_installment_number || selectedReceipt.reservation?.installments_paid || 1).padStart(2, '0')} / ${String(selectedReceipt.lot?.cuotas || 24).padStart(2, '0')}`}
+                    {selectedReceipt.scope === "INSTALLMENT"
+                      ? `Cuota ${String(selectedReceipt.nominal_installment_number || selectedReceipt.reservation?.installments_paid || 1).padStart(2, '0')} / ${String(selectedReceipt.lot?.cuotas || 24).padStart(2, '0')}`
+                      : selectedReceipt.scope === "PIE"
+                        ? "Ingreso Inicial"
+                        : "Cargo fuera del plan de pago"}
                   </span>
-                  {selectedReceipt.scope !== "PIE" && (
+                  {selectedReceipt.scope === "INSTALLMENT" && (
                     <span className="text-slate-500 block mt-0.5 text-xs font-semibold">
                       {getInstallmentMonthStr(selectedReceipt)}
                     </span>
@@ -789,7 +801,7 @@ export default function ReceiptsPage() {
                       </button>
                     </>
                   )}
-                  {selectedReceipt.status === "PENDING" && selectedReceipt.scope !== "PIE" && (
+                  {selectedReceipt.status === "PENDING" && selectedReceipt.scope === "INSTALLMENT" && (
                     <button
                       onClick={() => handleApproveAsInterestInModal(selectedReceipt.id)}
                       disabled={processing === selectedReceipt.id}
