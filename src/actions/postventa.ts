@@ -909,6 +909,20 @@ export async function approveReceipt(receiptId: string) {
     // Así es atómico: si el incremento falla (p.ej. por los triggers de protección
     // financiera), el recibo tampoco queda aprobado y no se desincroniza en silencio.
 
+    // Cuota que este pago amortiza DE VERDAD, calculada al aprobar.
+    //
+    // El número que trae el comprobante (`nominal_installment_number`) se estampó
+    // cuando el cliente lo subió, con las cuotas que llevaba pagadas EN ESE
+    // MOMENTO. Si sube dos comprobantes antes de que le aprueben el primero, los
+    // dos quedan marcados como la misma cuota, y después de aprobar ambos el
+    // segundo sigue diciendo "Cuota 1" en la bandeja y en su PDF aunque haya
+    // pagado la 2. Por eso manda el conteo vivo y no el estampado al subir.
+    const installmentsInReceipt = receipt.installments_count || 1;
+    const approvedInstNum = (receipt.reservation?.installments_paid || 0) + 1;
+    const approvedInstRange = installmentsInReceipt > 1
+      ? `${approvedInstNum}-${approvedInstNum + installmentsInReceipt - 1}`
+      : null;
+
     // Update reservation state and Ledger
     if (receipt.scope === "PIE") {
       await prisma.$transaction(async (tx) => {
@@ -971,7 +985,13 @@ export async function approveReceipt(receiptId: string) {
           await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
           await tx.paymentReceipt.update({
             where: { id: receiptId },
-            data: { status: "APPROVED", processed_at: new Date() },
+            data: {
+              status: "APPROVED",
+              processed_at: new Date(),
+              // Se re-estampa con la cuota real que amortiza (ver arriba).
+              nominal_installment_number: approvedInstNum,
+              nominal_installment_range: approvedInstRange,
+            },
           });
           await tx.reservation.update({
             where: { id: receipt.reservation_id },
@@ -1021,7 +1041,12 @@ export async function approveReceipt(receiptId: string) {
           await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
           await tx.paymentReceipt.update({
             where: { id: receiptId },
-            data: { status: "APPROVED", processed_at: new Date() },
+            data: {
+              status: "APPROVED",
+              processed_at: new Date(),
+              nominal_installment_number: approvedInstNum,
+              nominal_installment_range: approvedInstRange,
+            },
           });
           await tx.reservation.update({
             where: { id: receipt.reservation_id },
@@ -1078,10 +1103,9 @@ export async function approveReceipt(receiptId: string) {
         : buildInstallmentConcept({
             installmentStartDate: receipt.reservation.installment_start_date,
             dueDay: receipt.reservation.due_day,
-            // reservation.installments_paid es el valor PRE-aprobación (se leyó
-            // antes de la transacción que lo incrementa).
-            firstInstallmentNumber:
-              receipt.nominal_installment_number || (receipt.reservation.installments_paid || 0) + 1,
+            // Manda la cuota re-estampada al aprobar, no la que traía el
+            // comprobante desde que se subió (ver approvedInstNum).
+            firstInstallmentNumber: approvedInstNum,
             installmentsCount: receipt.installments_count || 1,
           });
 
@@ -1128,8 +1152,7 @@ export async function approveReceipt(receiptId: string) {
         source: "RECEIPT",
         amount: receipt.amount_clp,
         paidAt: new Date(),
-        firstInstallmentNumber:
-          receipt.nominal_installment_number || (receipt.reservation.installments_paid || 0) + 1,
+        firstInstallmentNumber: approvedInstNum,
         installmentsCount: receipt.installments_count || 1,
         sentBy: user.email,
       });
