@@ -138,19 +138,22 @@ export default async function DiagnosticoComprobantesPage() {
   // columna guarda la imagen entera en base64 y traerla para cada comprobante de
   // la cartera reventaria la memoria y el tiempo de la pagina. Aca solo viaja el
   // booleano, calculado en el motor.
-  const idsReservas = reservas.map((r) => r.id);
+  //
+  // Va sin WHERE a proposito: pasar la lista de reservas como parametro obliga a
+  // un array de uuid, y esta pagina no se puede probar contra la base antes de
+  // desplegar. Traer id + booleano de toda la tabla es barato y no depende de
+  // como se serialice el parametro. Los comprobantes de otros proyectos entran
+  // al mapa pero nunca se consultan: las filas se arman solo con las reservas
+  // que la cuenta tiene permitidas.
   const archivoPorComprobante = new Map<string, boolean>();
-  if (idsReservas.length > 0) {
-    const filasArchivo = await prisma.$queryRaw<{ id: string; tiene_archivo: boolean }[]>`
-      SELECT pr.id::text AS id,
-             (pr.receipt_url IS NOT NULL
-              AND length(pr.receipt_url) > 0
-              AND pr.receipt_url NOT IN ('LEGACY_SYNC', 'CONDONACION_ADMIN', 'SIN_RESPALDO')) AS tiene_archivo
-      FROM pagos.payment_receipts pr
-      WHERE pr.reservation_id = ANY(${idsReservas}::uuid[])
-    `;
-    for (const f of filasArchivo) archivoPorComprobante.set(f.id, f.tiene_archivo);
-  }
+  const filasArchivo = await prisma.$queryRaw<{ id: string; tiene_archivo: boolean }[]>`
+    SELECT pr.id::text AS id,
+           (pr.receipt_url IS NOT NULL
+            AND length(pr.receipt_url) > 0
+            AND pr.receipt_url NOT IN ('LEGACY_SYNC', 'CONDONACION_ADMIN', 'SIN_RESPALDO')) AS tiene_archivo
+    FROM pagos.payment_receipts pr
+  `;
+  for (const f of filasArchivo) archivoPorComprobante.set(f.id, f.tiene_archivo);
 
   const nombreProyecto = new Map(proyectos.map((p) => [p.id, p.name]));
   const slugProyecto = new Map(proyectos.map((p) => [p.id, p.slug]));
@@ -385,8 +388,13 @@ export default async function DiagnosticoComprobantesPage() {
     porProyecto.set(f.slug, acc);
   }
 
-  const totalComprobantes = archivoPorComprobante.size;
-  const comprobantesConArchivo = [...archivoPorComprobante.values()].filter(Boolean).length;
+  // Se cuentan SOLO los comprobantes de las reservas que esta cuenta ve, no el
+  // mapa completo: ese trae la tabla entera, incluidos proyectos ajenos.
+  const comprobantesDeLaCartera = filas.flatMap((f) => f.receipts);
+  const totalComprobantes = comprobantesDeLaCartera.length;
+  const comprobantesConArchivo = comprobantesDeLaCartera.filter((r) =>
+    archivoPorComprobante.get(r.id)
+  ).length;
 
   return (
     <div className="space-y-8 pb-16">
