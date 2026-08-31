@@ -74,7 +74,59 @@ type Anomalia = {
   detalle: string;
 };
 
-export default async function DiagnosticoComprobantesPage() {
+/**
+ * Navegacion entre paginas. Va por URL (?page=N) y no por estado de cliente para
+ * que la pagina siga siendo un Server Component: asi cada pagina dibuja solo sus
+ * 15 clientes en vez de mandar los 94 al navegador.
+ */
+function Paginacion({
+  paginaActual,
+  totalPaginas,
+}: {
+  paginaActual: number;
+  totalPaginas: number;
+}) {
+  if (totalPaginas <= 1) return null;
+  const base = "/admin/diagnostico-comprobantes";
+  const btn =
+    "px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-colors bg-white border-slate-200 text-slate-600 hover:bg-slate-50";
+  const btnOff =
+    "px-3 py-1.5 rounded-lg border text-[11px] font-bold bg-slate-50 border-slate-200 text-slate-300 cursor-default";
+
+  return (
+    <div className="flex items-center gap-2 ml-auto">
+      {paginaActual > 1 ? (
+        <a href={`${base}?page=${paginaActual - 1}`} className={btn}>
+          Anterior
+        </a>
+      ) : (
+        <span className={btnOff}>Anterior</span>
+      )}
+      <span className="text-[11px] font-bold text-slate-500">
+        {paginaActual} / {totalPaginas}
+      </span>
+      {paginaActual < totalPaginas ? (
+        <a href={`${base}?page=${paginaActual + 1}`} className={btn}>
+          Siguiente
+        </a>
+      ) : (
+        <span className={btnOff}>Siguiente</span>
+      )}
+    </div>
+  );
+}
+
+/** Clientes por pagina. Cada bloque trae la tabla completa de comprobantes del
+ *  cliente, asi que mas de esto vuelve la pagina pesada de leer y de cargar. */
+const POR_PAGINA = 15;
+
+export default async function DiagnosticoComprobantesPage(
+  props: PageProps<"/admin/diagnostico-comprobantes">
+) {
+  // En esta version de Next, searchParams es un Promise y hay que esperarlo.
+  const { page } = await props.searchParams;
+  const paginaPedida = Number(Array.isArray(page) ? page[0] : page) || 1;
+
   const session = await auth();
   const user = session?.user as any;
   if (!session?.user || user?.role !== "ADMIN") {
@@ -342,6 +394,14 @@ export default async function DiagnosticoComprobantesPage() {
     .filter((f) => f.huecas.length > 0 || f.anomalias.length > 0)
     .sort((a, b) => b.huecas.length + b.anomalias.length - (a.huecas.length + a.anomalias.length));
 
+  // Los totales de arriba se siguen calculando sobre la cartera COMPLETA: la
+  // paginacion parte lo que se dibuja, no lo que se cuenta. Si no, cada pagina
+  // mostraria un resumen distinto y no habria forma de saber cuanto falta.
+  const totalPaginas = Math.max(1, Math.ceil(conProblemas.length / POR_PAGINA));
+  const paginaActual = Math.min(Math.max(1, paginaPedida), totalPaginas);
+  const desde = (paginaActual - 1) * POR_PAGINA;
+  const visibles = conProblemas.slice(desde, desde + POR_PAGINA);
+
   const porCausa = new Map<string, number>();
   for (const f of filas) {
     for (const h of f.huecas) porCausa.set(h.causa, (porCausa.get(h.causa) || 0) + 1);
@@ -514,6 +574,16 @@ export default async function DiagnosticoComprobantesPage() {
         </div>
       </div>
 
+      {conProblemas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Mostrando {desde + 1} a {Math.min(desde + POR_PAGINA, conProblemas.length)} de{" "}
+            {conProblemas.length} cliente(s) con hallazgos
+          </p>
+          <Paginacion paginaActual={paginaActual} totalPaginas={totalPaginas} />
+        </div>
+      )}
+
       <div className="space-y-5">
         {conProblemas.length === 0 && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-sm font-bold text-emerald-800">
@@ -521,7 +591,7 @@ export default async function DiagnosticoComprobantesPage() {
           </div>
         )}
 
-        {conProblemas.map((f) => (
+        {visibles.map((f) => (
           <div key={f.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="text-sm font-extrabold text-slate-800">{f.cliente}</span>
@@ -627,6 +697,15 @@ export default async function DiagnosticoComprobantesPage() {
           </div>
         ))}
       </div>
+
+      {conProblemas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Página {paginaActual} de {totalPaginas}
+          </p>
+          <Paginacion paginaActual={paginaActual} totalPaginas={totalPaginas} />
+        </div>
+      )}
     </div>
   );
 }
