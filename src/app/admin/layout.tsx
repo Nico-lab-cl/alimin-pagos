@@ -25,7 +25,8 @@ import {
   BarChart3,
   History,
   MessageSquare,
-  MessageCircle
+  MessageCircle,
+  FileSearch
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { SearchProvider, useSearch } from "@/context/SearchContext";
@@ -45,7 +46,10 @@ const menuItems = [
     label: "Bandeja de Pagos", 
     icon: CheckSquare,
     subItems: [
-      { href: "/admin/receipts/reservas", label: "Reservas", icon: BookOpen }
+      { href: "/admin/receipts/reservas", label: "Reservas", icon: BookOpen },
+      // Estaba escondida: existia desde antes pero sin entrada en el menu, asi
+      // que solo llegaba quien se supiera la URL de memoria.
+      { href: "/admin/diagnostico-comprobantes", label: "Revisión de Comprobantes", icon: FileSearch }
     ]
   },
   { href: "/admin/lots", label: "Lotes", icon: Map },
