@@ -86,6 +86,12 @@ export async function getUserLots() {
       // que el historial y el recibo oficial de una cuota sin comprobante
       // muestren exactamente la misma cifra.
       const paidInstallmentAmounts: Record<number, number> = {};
+      // Vencimiento pactado de cada cuota pagada. El historial mostraba solo la
+      // fecha en que se aprobó el pago, que no dice a qué mes corresponde la
+      // cuota: un pago atrasado o adelantado quedaba con una fecha que no
+      // calzaba con su período.
+      const paidInstallmentDueDates: Record<number, string> = {};
+      const paidDueDay = res.due_day ?? project.due_day_of_month ?? 5;
       for (let i = 1; i <= paidCuotas; i++) {
         const range = (ranges as any[]).find((r: any) => {
           const from = Number(r.from ?? r.start ?? 0);
@@ -100,6 +106,13 @@ export async function getUserLots() {
           i,
           lot.valor_cuota || 0
         );
+        if (res.installment_start_date) {
+          paidInstallmentDueDates[i] = getInstallmentDueDate(
+            res.installment_start_date,
+            i,
+            paidDueDay
+          ).toISOString();
+        }
       }
 
       // Total Invertido strictly follows (Cuotas + Pie + Extra)
@@ -493,6 +506,7 @@ export async function getUserLots() {
         paidCuotas,
         totalCuotas,
         paidInstallmentAmounts,
+        paidInstallmentDueDates,
         acquisitionProgress,
         nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
         nextInstallmentMonth: nextDueDate ? formatMonth.format(nextDueDate).toUpperCase() : null,
@@ -514,6 +528,10 @@ export async function getUserLots() {
           status: r.status,
           scope: r.scope,
           created_at: r.created_at,
+          // Fecha en que postventa aprobó el pago (la que ve el cliente como
+          // "Fecha de Pago"). Si es un registro antiguo sin procesar, cae a la
+          // de subida.
+          processed_at: r.processed_at,
           receipt_url: r.receipt_url,
           nominal_installment_number: r.nominal_installment_number,
           nominal_installment_range: r.nominal_installment_range,

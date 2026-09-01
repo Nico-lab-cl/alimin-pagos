@@ -95,12 +95,19 @@ export default function UserDashboard() {
   for (let i = lot.paidCuotas; i >= 1; i--) {
     const matchingReceipt = lot.receipts?.find((r: any) => comprobanteCubreCuota(r, i));
 
-    let payDate = new Date(lot.nextDueDate || new Date());
-    payDate.setMonth(payDate.getMonth() - (lot.paidCuotas - i + 1));
-
-    if (matchingReceipt) {
-      payDate = new Date(matchingReceipt.created_at);
+    // Vencimiento pactado de la cuota: a qué mes corresponde. Si la reserva no
+    // tiene fecha de inicio de cuotas, se estima retrocediendo desde la próxima.
+    let dueDate = new Date(lot.nextDueDate || new Date());
+    dueDate.setMonth(dueDate.getMonth() - (lot.paidCuotas - i + 1));
+    if (lot.paidInstallmentDueDates?.[i]) {
+      dueDate = new Date(lot.paidInstallmentDueDates[i]);
     }
+
+    // Fecha en que se aprobó el pago. Solo existe si hay un comprobante detrás:
+    // una cuota migrada o registrada a mano no tiene aprobación que mostrar.
+    const payDate = matchingReceipt
+      ? new Date(matchingReceipt.processed_at || matchingReceipt.created_at)
+      : null;
 
     // El recibo oficial siempre está disponible para una cuota pagada: se emite
     // al vuelo, con o sin comprobante del cliente detrás. Antes se buscaba un
@@ -110,7 +117,8 @@ export default function UserDashboard() {
 
     paymentHistory.push({
       cuota: `Cuota #${String(i).padStart(2, '0')}`,
-      fecha: formatDateMockup(payDate),
+      vencimiento: formatDateMockup(dueDate),
+      fechaPago: payDate ? formatDateMockup(payDate) : "—",
       // Monto PACTADO de esta cuota, no el total del comprobante: una sola
       // transferencia puede cubrir varias cuotas (y traer los intereses de la
       // mora encima), y usar su total repetía la suma completa en cada fila
@@ -128,7 +136,8 @@ export default function UserDashboard() {
     
     paymentHistory.push({
       cuota: `Cuota #${String(lot.paidCuotas + 1).padStart(2, '0')}`,
-      fecha: formatDateMockup(lot.nextDueDate),
+      vencimiento: formatDateMockup(lot.nextDueDate),
+      fechaPago: "—",
       monto: formatCLP(nextInstallment?.amount || lot.valor_cuota),
       estado: "Pendiente",
       comprobante: null,
@@ -281,7 +290,8 @@ export default function UserDashboard() {
             <thead>
               <tr className="bg-slate-50/50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
                 <th className="px-6 py-4 font-semibold">Cuota</th>
-                <th className="px-6 py-4 font-semibold">Fecha</th>
+                <th className="px-6 py-4 font-semibold">Vencimiento</th>
+                <th className="px-6 py-4 font-semibold">Fecha de Pago</th>
                 <th className="px-6 py-4 font-semibold">Monto</th>
                 <th className="px-6 py-4 font-semibold">Estado</th>
                 <th className="px-6 py-4 font-semibold text-right sm:text-left">Comprobante</th>
@@ -293,7 +303,8 @@ export default function UserDashboard() {
                 return (
                   <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-800">{item.cuota}</td>
-                    <td className="px-6 py-4 text-slate-600 font-medium">{item.fecha}</td>
+                    <td className="px-6 py-4 text-slate-600 font-medium">{item.vencimiento}</td>
+                    <td className="px-6 py-4 text-slate-500 font-medium">{item.fechaPago}</td>
                     <td className="px-6 py-4 font-bold text-slate-800">{item.monto}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1 text-xs font-bold ${

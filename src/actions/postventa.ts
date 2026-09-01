@@ -3003,6 +3003,10 @@ export async function getClientPOV(reservationId: string) {
     // sigue sumando igual que siempre, para no mover ningún saldo) para que el
     // historial y el recibo oficial muestren la misma cifra.
     const paidInstallmentAmounts: Record<number, number> = {};
+    // Vencimiento pactado de cada cuota pagada, para que el historial muestre a
+    // qué mes corresponde la cuota y no solo cuándo se aprobó el pago.
+    const paidInstallmentDueDates: Record<number, string> = {};
+    const paidDueDay = res.due_day ?? project.due_day_of_month ?? 5;
     for (let i = 1; i <= paidCuotas; i++) {
       const range = (ranges as any[]).find((r: any) => {
         const from = Number(r.from ?? r.start ?? 0);
@@ -3017,6 +3021,13 @@ export async function getClientPOV(reservationId: string) {
         i,
         lot.valor_cuota || 0
       );
+      if (res.installment_start_date) {
+        paidInstallmentDueDates[i] = getInstallmentDueDate(
+          res.installment_start_date,
+          i,
+          paidDueDay
+        ).toISOString();
+      }
     }
 
     const extraPaid = res.extra_paid_amount || 0;
@@ -3378,6 +3389,7 @@ export async function getClientPOV(reservationId: string) {
         paidCuotas,
         totalCuotas,
         paidInstallmentAmounts,
+        paidInstallmentDueDates,
         acquisitionProgress,
         nextInstallmentNumber: paidCuotas < totalCuotas ? paidCuotas + 1 : null,
         nextInstallmentMonth,
@@ -3401,6 +3413,9 @@ export async function getClientPOV(reservationId: string) {
           amount_clp: r.amount_clp,
           scope: r.scope,
           created_at: r.created_at,
+          // Fecha en que postventa aprobó el pago (la "Fecha de Pago" del
+          // historial). Los registros antiguos sin procesar caen a la de subida.
+          processed_at: r.processed_at,
           nominal_installment_number: r.nominal_installment_number,
           nominal_installment_range: r.nominal_installment_range,
         })),
