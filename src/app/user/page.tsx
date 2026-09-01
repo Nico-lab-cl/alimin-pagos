@@ -111,7 +111,11 @@ export default function UserDashboard() {
     paymentHistory.push({
       cuota: `Cuota #${String(i).padStart(2, '0')}`,
       fecha: formatDateMockup(payDate),
-      monto: formatCLP(matchingReceipt?.amount_clp || lot.paidInstallmentAmounts?.[i] || lot.valor_cuota),
+      // Monto PACTADO de esta cuota, no el total del comprobante: una sola
+      // transferencia puede cubrir varias cuotas (y traer los intereses de la
+      // mora encima), y usar su total repetía la suma completa en cada fila
+      // — dos cuotas de $350.000 aparecían como $700.000 cada una.
+      monto: formatCLP(lot.paidInstallmentAmounts?.[i] || matchingReceipt?.amount_clp || lot.valor_cuota),
       estado: "Pagado",
       comprobanteDigital,
       comprobanteCliente: matchingReceipt ? `/api/documents/${matchingReceipt.id}` : null,

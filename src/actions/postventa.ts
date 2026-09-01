@@ -11,6 +11,7 @@ import {
   crearAplicadorDeAbonosMora,
   getProjectConfig,
   getChileToday,
+  getSantiagoUTCDate,
   buildInstallmentConcept,
   getNominalInstallmentAmount,
 } from "@/lib/financials";
@@ -961,10 +962,18 @@ export async function approveReceipt(receiptId: string) {
         if (range) expectedCuotaBase = Number(range.amount);
 
         const totalExpectedPerCuota = expectedCuotaBase * (receipt.installments_count || 1);
-        // Mora REAL total que debe hoy (automática + fija), no solo manual_penalty.
-        // Si el cliente paga justo la cuota sin cubrir esta mora, el faltante
-        // (shortfall) la va a preservar como mora fija en vez de borrarla.
-        const currentPenalty = calculateCurrentMoraOwed(res, res.project);
+        // Fecha en que el cliente efectivamente pagó: la de subida del
+        // comprobante, no la de aprobación. La bandeja se revisa días después,
+        // y medir contra la mora de HOY le cobraba al cliente los días que su
+        // comprobante estuvo esperando revisión.
+        const paymentDate = getSantiagoUTCDate(
+          receipt.created_at ? new Date(receipt.created_at) : new Date()
+        );
+        // Mora REAL que debía A LA FECHA DEL PAGO (automática + fija, menos los
+        // abonos de mora ya hechos). Lo único que cambia respecto de antes es la
+        // fecha de corte: sigue siendo el mismo cálculo, así que una multa
+        // pactada anterior se preserva igual que siempre en el faltante.
+        const currentPenalty = calculateCurrentMoraOwed(res, res.project, paymentDate);
         // User requested: "primero a la cuota y luego al interes"
         const paid = receipt.amount_clp;
         const cuotaPaidAmount = Math.min(paid, totalExpectedPerCuota);
@@ -1002,8 +1011,9 @@ export async function approveReceipt(receiptId: string) {
               next_payment_date: null,
               manual_penalty: shortfall > 0 ? shortfall : null,
               penalty_mode: nextPenaltyMode,
-              // Re-fija la fecha desde la que la multa empieza a crecer día a día.
-              debt_start_date: shortfall > 0 ? getChileToday() : null,
+              // El faltante se calculó A LA FECHA DEL PAGO, así que crece desde
+              // ese mismo día y no desde hoy (ver registerManualPayment).
+              debt_start_date: shortfall > 0 ? paymentDate : null,
               debt_end_date: null,
             },
           });

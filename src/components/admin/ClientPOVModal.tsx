@@ -203,7 +203,11 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: Ta
     paymentHistory.push({
       cuota: `Cuota #${String(i).padStart(2, '0')}`,
       fecha: formatDateMockup(payDate),
-      monto: formatCLP(matchingReceipt?.amount_clp || data.paidInstallmentAmounts?.[i] || data.valor_cuota),
+      // Monto PACTADO de esta cuota, no el total del comprobante: una sola
+      // transferencia puede cubrir varias cuotas (y traer los intereses de la
+      // mora encima), y usar su total repetía la suma completa en cada fila
+      // — dos cuotas de $350.000 aparecían como $700.000 cada una.
+      monto: formatCLP(data.paidInstallmentAmounts?.[i] || matchingReceipt?.amount_clp || data.valor_cuota),
       estado: "Pagado",
       comprobanteDigital,
       comprobanteCliente: matchingReceipt ? `/api/documents/${matchingReceipt.id}` : null,
