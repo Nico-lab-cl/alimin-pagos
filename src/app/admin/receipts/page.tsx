@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { getAdminProjects, approveReceipt, approveReceiptAsInterestPayment, rejectReceipt, getAllReceipts } from "@/actions/postventa";
+import { getAdminProjects, approveReceipt, approveReceiptAsInterestPayment, rejectReceipt, getAllReceipts, deletePaymentReceipt } from "@/actions/postventa";
 import { formatCLP, cn, getReceiptDownloadFilename, downloadDocument, downloadCsv } from "@/lib/utils";
 import { SCOPE_LABELS } from "@/lib/receiptDocs";
 import { toast } from "sonner";
@@ -20,7 +20,8 @@ import {
   Plus,
   FileSpreadsheet,
   FileText,
-  Percent
+  Percent,
+  Trash2
 } from "lucide-react";
 import Link from "next/link";
 import { getInstallmentDueDate } from "@/lib/financials";
@@ -107,6 +108,11 @@ export default function ReceiptsPage() {
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   const [showRejectionForm, setShowRejectionForm] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  // Confirmación de borrado de un comprobante ya procesado. Va aparte del
+  // rechazo porque no es lo mismo: rechazar le avisa al cliente que su pago no
+  // sirve, y eliminar deshace un pago que se aprobó por error (el caso típico
+  // es el mismo comprobante aceptado dos veces).
+  const [showDeleteForm, setShowDeleteForm] = useState(false);
 
   // Load Projects on mount
   useEffect(() => {
@@ -186,10 +192,36 @@ export default function ReceiptsPage() {
       });
       setSelectedReceipt(null); // Close modal
       setShowRejectionForm(false);
+      setShowDeleteForm(false);
       setRejectionReason("");
       loadReceipts();
     } else {
       toast.error(result.error || "Error al procesar el rechazo");
+    }
+    setProcessing(null);
+  };
+
+  /**
+   * Elimina el comprobante y deshace lo que su aprobación dejó puesto (cuotas,
+   * caja, mora y el PDF que se le emitió al cliente). Es la salida para un
+   * comprobante aceptado dos veces: hasta ahora la bandeja solo dejaba aprobar
+   * o rechazar, así que un duplicado ya aprobado no se podía revertir desde acá.
+   */
+  const handleConfirmDeleteInModal = async () => {
+    if (!selectedReceipt) return;
+    const id = selectedReceipt.id;
+
+    setProcessing(id);
+    const result = await deletePaymentReceipt(id);
+    if (result.success) {
+      toast.success("Comprobante Eliminado", {
+        description: "Se revirtió lo que había dejado su aprobación en la ficha del cliente.",
+      });
+      setSelectedReceipt(null);
+      setShowDeleteForm(false);
+      loadReceipts();
+    } else {
+      toast.error(result.error || "Error al eliminar el comprobante");
     }
     setProcessing(null);
   };
@@ -583,6 +615,7 @@ export default function ReceiptsPage() {
                       onClick={() => {
                         setSelectedReceipt(receipt);
                         setShowRejectionForm(false);
+                        setShowDeleteForm(false);
                         setRejectionReason("");
                       }}
                       className="px-3 py-1.5 border border-brand-600 text-brand-600 hover:bg-brand-50 font-bold text-[11px] rounded-lg transition-all shadow-sm"
@@ -670,6 +703,7 @@ export default function ReceiptsPage() {
             if (!processing) {
               setSelectedReceipt(null);
               setShowRejectionForm(false);
+              setShowDeleteForm(false);
               setRejectionReason("");
             }
           }}
@@ -690,6 +724,7 @@ export default function ReceiptsPage() {
                   onClick={() => {
                     setSelectedReceipt(null);
                     setShowRejectionForm(false);
+                    setShowDeleteForm(false);
                     setRejectionReason("");
                   }}
                   className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
@@ -779,7 +814,7 @@ export default function ReceiptsPage() {
               )}
 
               {/* Action Buttons inside detail view */}
-              {!showRejectionForm ? (
+              {!showRejectionForm && !showDeleteForm ? (
                 <div className="flex gap-2 pt-5 border-t border-slate-100">
                   {selectedReceipt.status === "PENDING" && (
                     <>
@@ -813,19 +848,31 @@ export default function ReceiptsPage() {
                     </button>
                   )}
                   {selectedReceipt.status !== "PENDING" && (
-                    <button
-                      onClick={() => {
-                        setSelectedReceipt(null);
-                        setShowRejectionForm(false);
-                        setRejectionReason("");
-                      }}
-                      className="w-full py-2.5 border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors rounded-xl"
-                    >
-                      Cerrar Ventana
-                    </button>
+                    <>
+                      <button
+                        onClick={() => {
+                          setSelectedReceipt(null);
+                          setShowRejectionForm(false);
+                          setShowDeleteForm(false);
+                          setRejectionReason("");
+                        }}
+                        className="flex-1 py-2.5 border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors rounded-xl"
+                      >
+                        Cerrar Ventana
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteForm(true)}
+                        disabled={processing === selectedReceipt.id}
+                        className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 hover:bg-red-50 text-slate-600 hover:text-red-600 hover:border-red-200 font-bold text-xs rounded-xl transition-all disabled:opacity-30"
+                        title="Elimina el comprobante y deshace lo que dejó su aprobación"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Eliminar
+                      </button>
+                    </>
                   )}
                 </div>
-              ) : (
+              ) : showRejectionForm ? (
                 /* Inline Rejection Reason Panel */
                 <div className="pt-4 border-t border-slate-100 space-y-3 animate-fade-in">
                   <label className="block text-[10px] font-bold text-red-600 uppercase tracking-wider">Especifica el Motivo del Rechazo:</label>
@@ -840,6 +887,7 @@ export default function ReceiptsPage() {
                     <button
                       onClick={() => {
                         setShowRejectionForm(false);
+                        setShowDeleteForm(false);
                         setRejectionReason("");
                       }}
                       className="px-3.5 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
@@ -851,6 +899,56 @@ export default function ReceiptsPage() {
                       className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold rounded-lg transition-all shadow-sm"
                     >
                       Confirmar Rechazo
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Confirmación de eliminación. Se detalla qué se va a deshacer
+                   para que no se confunda con un rechazo. */
+                <div className="pt-4 border-t border-slate-100 space-y-3 animate-fade-in">
+                  <label className="block text-[10px] font-bold text-red-600 uppercase tracking-wider">
+                    Eliminar este comprobante
+                  </label>
+                  <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-[11px] font-semibold text-red-700 leading-relaxed">
+                    {selectedReceipt.status === "APPROVED" ? (
+                      <>
+                        Se va a deshacer todo lo que dejó esta aprobación en la ficha del cliente:
+                        <ul className="list-disc pl-4 mt-1.5 space-y-0.5">
+                          {selectedReceipt.scope === "INSTALLMENT" && (
+                            <li>Se le descuentan las cuotas que sumó este pago.</li>
+                          )}
+                          {selectedReceipt.scope === "PIE" && <li>El pie vuelve a estado PENDIENTE.</li>}
+                          <li>Sale de caja el monto de {formatCLP(selectedReceipt.amount_clp)}, y si abonó mora, esa mora vuelve a deberse.</li>
+                          <li>Se borra el comprobante en PDF que se le emitió al cliente.</li>
+                        </ul>
+                        <p className="mt-2">
+                          Úsalo cuando el mismo pago se aceptó dos veces. Si el pago nunca existió, mejor
+                          recházalo para que el cliente reciba el motivo.
+                        </p>
+                      </>
+                    ) : (
+                      <>Se elimina el comprobante de la bandeja. No estaba aprobado, así que no hay cuotas ni caja que revertir.</>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-400">Esta acción no se puede deshacer y queda registrada en la bitácora.</p>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setShowDeleteForm(false)}
+                      className="px-3.5 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleConfirmDeleteInModal}
+                      disabled={processing === selectedReceipt.id}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold rounded-lg transition-all shadow-sm disabled:opacity-30"
+                    >
+                      {processing === selectedReceipt.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                      Confirmar Eliminación
                     </button>
                   </div>
                 </div>

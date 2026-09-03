@@ -3826,6 +3826,26 @@ export async function logSystemNote(reservationId: string, text: string, entity:
   }
 }
 
+/**
+ * Elimina un comprobante y deshace TODO lo que su aprobación dejó puesto:
+ * el conteo de cuotas, las filas de caja, la mora que ese pago abonó y el PDF
+ * que se le generó al cliente. Antes solo revertía el conteo y borraba una fila
+ * de caja por monto exacto, y eso dejaba tres restos:
+ *
+ *  1. Un pago que no alcanzó a cubrir la mora se guarda partido en dos filas
+ *     (CUOTA + PENALTY), y ninguna de las dos vale lo que dice el comprobante:
+ *     el borrado por monto exacto no las encontraba y la plata quedaba en caja
+ *     para siempre, con el saldo del cliente mostrando un pago sin respaldo.
+ *  2. Un comprobante aprobado como abono de intereses no suma cuotas, pero se
+ *     le descontaba una igual al eliminarlo.
+ *  3. El PDF "Comprobante_Pago_xxxxxx" seguía en los documentos del cliente,
+ *     así que el duplicado que se venía a borrar seguía a la vista en su portal.
+ *
+ * Todo el deshacer va en UNA transacción: antes el descuento de cuotas se
+ * confirmaba aparte, y si el borrado fallaba después (por ejemplo con un
+ * comprobante viejo sin processed_at) el cliente se quedaba con la cuota
+ * descontada y el comprobante aprobado todavía ahí.
+ */
 export async function deletePaymentReceipt(receiptId: string) {
   const session = await auth();
   const user = session?.user as any;
@@ -3843,50 +3863,164 @@ export async function deletePaymentReceipt(receiptId: string) {
 
     const wasApproved = receipt.status === "APPROVED";
 
-    // Revert reservation state if approved
-    if (wasApproved) {
-      if (receipt.scope === "INSTALLMENT") {
-        await prisma.$transaction(async (tx) => {
-          await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+    // Filas de caja que escribió ESTA aprobación: mismo cliente, dentro de los
+    // 5 segundos del processed_at. Sin filtro de monto, justamente porque el
+    // reparto cuota/mora las deja con montos que no son el del comprobante.
+    const ledgerEntries = wasApproved && receipt.processed_at
+      ? await prisma.financialLedger.findMany({
+          where: {
+            reservation_id: receipt.reservation_id,
+            created_at: {
+              gte: new Date(receipt.processed_at.getTime() - 5000),
+              lte: new Date(receipt.processed_at.getTime() + 5000),
+            },
+          },
+        })
+      : [];
+
+    const cuotaEntries = ledgerEntries.filter((l) => l.category === "CUOTA");
+    const penaltyEntries = ledgerEntries.filter((l) => l.category === "PENALTY");
+    const moraDevuelta = penaltyEntries.reduce((acc, l) => acc + l.amount_clp, 0);
+
+    // Si el comprobante quedó aprobado pero ya no hay ninguna fila de caja suya,
+    // es porque alguien deshizo el pago a mano desde el historial financiero, y
+    // ese borrado YA descontó la cuota. Volver a descontarla acá le inventaría al
+    // cliente una cuota impaga. En ese caso solo se borra el comprobante.
+    const yaRevertidoAMano =
+      wasApproved && receipt.processed_at !== null && ledgerEntries.length === 0;
+
+    // El abono de intereses aprueba un comprobante de cuota sin sumar cuotas
+    // (solo deja mora abonada), así que tampoco hay nada que descontar.
+    const fueAbonoDeIntereses =
+      penaltyEntries.length > 0 && cuotaEntries.length === 0;
+
+    const debeDescontarCuotas =
+      wasApproved &&
+      receipt.scope === "INSTALLMENT" &&
+      !yaRevertidoAMano &&
+      !fueAbonoDeIntereses;
+
+    const cuotasDescontadas = debeDescontarCuotas
+      ? Math.min(receipt.installments_count || 1, receipt.reservation.installments_paid || 0)
+      : 0;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+
+      if (wasApproved) {
+        const reservationUpdate: any = {};
+
+        if (cuotasDescontadas > 0) {
+          reservationUpdate.installments_paid = { decrement: cuotasDescontadas };
+        }
+        if (receipt.scope === "PIE" && !yaRevertidoAMano) {
+          reservationUpdate.pie_status = "PENDING";
+        }
+        // La mora que este pago abonó vuelve a deberse, y vuelve a crecer desde
+        // hoy (mismo criterio que el borrado manual de una fila de caja).
+        if (moraDevuelta > 0) {
+          reservationUpdate.manual_penalty =
+            (receipt.reservation.manual_penalty || 0) + moraDevuelta;
+          reservationUpdate.penalty_mode =
+            receipt.reservation.penalty_mode === "AUTO"
+              ? "MIXED"
+              : receipt.reservation.penalty_mode || "MIXED";
+          reservationUpdate.debt_start_date = getChileToday();
+          reservationUpdate.debt_end_date = null;
+        }
+
+        if (Object.keys(reservationUpdate).length > 0) {
           await tx.reservation.update({
             where: { id: receipt.reservation_id },
-            data: {
-              installments_paid: { decrement: receipt.installments_count || 1 },
-            },
+            data: reservationUpdate,
           });
-        });
-      } else if (receipt.scope === "PIE") {
-        await prisma.reservation.update({
-          where: { id: receipt.reservation_id },
-          data: { pie_status: "PENDING" },
+        }
+
+        if (ledgerEntries.length > 0) {
+          await tx.financialLedger.deleteMany({
+            where: { id: { in: ledgerEntries.map((l) => l.id) } },
+          });
+        }
+
+        // El PDF que se le emitió al cliente al aprobar. Se nombra con los
+        // primeros 6 caracteres del id del comprobante, tanto el de pago como
+        // el de abono de intereses. Se buscan los dos nombres EXACTOS y no por
+        // "contiene", para no llevarse por delante un contrato o un certificado
+        // del mismo cliente que casualmente tuviera esos 6 caracteres.
+        const id6 = receipt.id.substring(0, 6);
+        await tx.reservationDocument.deleteMany({
+          where: {
+            reservation_id: receipt.reservation_id,
+            name: {
+              in: [
+                `Comprobante_Pago_${id6}.pdf`,
+                `Comprobante_Abono_Intereses_${id6}.pdf`,
+              ],
+            },
+          },
         });
       }
 
-      // Also remove from financial ledger if it was added
-      await prisma.financialLedger.deleteMany({
-        where: {
-          reservation_id: receipt.reservation_id,
-          amount_clp: receipt.amount_clp,
-          created_at: {
-            gte: new Date(receipt.processed_at!.getTime() - 5000),
-            lte: new Date(receipt.processed_at!.getTime() + 5000),
-          },
-        },
-      });
-    }
-
-    await prisma.paymentReceipt.delete({
-      where: { id: receiptId },
+      await tx.paymentReceipt.delete({ where: { id: receiptId } });
     });
 
     const label = receipt.scope === "INSTALLMENT"
       ? `Comprobante de Cuota ${receipt.nominal_installment_range || receipt.nominal_installment_number || ""}`.trim()
       : `Comprobante de ${SCOPE_LABELS[receipt.scope] || receipt.scope}`;
+
+    const detalleReversa: string[] = [];
+    if (cuotasDescontadas > 0) {
+      detalleReversa.push(`Se revirtieron ${cuotasDescontadas} cuota(s) pagada(s).`);
+    }
+    if (ledgerEntries.length > 0) {
+      detalleReversa.push(
+        `Se eliminaron de caja: ${ledgerEntries
+          .map((l) => `${l.category} $${l.amount_clp.toLocaleString("es-CL")}`)
+          .join(", ")}.`
+      );
+    }
+    if (moraDevuelta > 0) {
+      detalleReversa.push(
+        `La mora abonada ($${moraDevuelta.toLocaleString("es-CL")}) vuelve a deberse.`
+      );
+    }
+    if (yaRevertidoAMano) {
+      detalleReversa.push(
+        "El pago ya había sido revertido a mano desde el historial financiero, así que no se descontó ninguna cuota de nuevo."
+      );
+    }
+    if (wasApproved && !receipt.processed_at) {
+      detalleReversa.push(
+        "Sin fecha de aprobación registrada: revisar a mano el historial financiero por si quedó una fila de caja de este pago."
+      );
+    }
+    if (
+      wasApproved &&
+      receipt.scope === "INSTALLMENT" &&
+      receipt.reservation.manual_penalty &&
+      moraDevuelta === 0
+    ) {
+      detalleReversa.push(
+        "Ojo: el cliente tiene una multa fija vigente que pudo haberse fijado al aprobar este mismo comprobante. Revisar la mora."
+      );
+    }
+
     await logSystemNote(
       receipt.reservation_id,
-      `${label} eliminado (monto $${receipt.amount_clp.toLocaleString("es-CL")}, estado previo: ${receipt.status}).${wasApproved ? " Se revirtió el conteo de cuotas correspondiente." : ""}`,
+      `${label} eliminado (monto $${receipt.amount_clp.toLocaleString("es-CL")}, estado previo: ${receipt.status}).${detalleReversa.length ? " " + detalleReversa.join(" ") : ""}`,
       "PaymentReceipt"
     );
+
+    await prisma.auditLog.create({
+      data: {
+        action: "DELETE",
+        entity: "PaymentReceipt",
+        entity_id: receiptId,
+        details: `${label} eliminado (monto $${receipt.amount_clp.toLocaleString("es-CL")}, estado previo: ${receipt.status}). ${detalleReversa.join(" ")} ID Reserva: ${receipt.reservation_id}`,
+        user_id: user.id,
+        user_email: user.email,
+      },
+    });
 
     memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");
