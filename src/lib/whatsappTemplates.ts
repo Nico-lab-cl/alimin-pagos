@@ -181,3 +181,31 @@ export const PAYMENT_CATEGORY_BY_KIND: Record<"PIE" | "CUOTA" | "INTERES", Payme
   CUOTA: "PAGO_CUOTA",
   INTERES: "PAGO_INTERES",
 };
+
+// ---------------------------------------------------------------------------
+// Difusión y Mensajes Masivos
+// ---------------------------------------------------------------------------
+
+export const WHATSAPP_MASS_AUDIENCES = ["TODOS", "MORA", "GRACIA", "PROXIMO", "VENCIMIENTO"] as const;
+export type WhatsappMassAudience = (typeof WHATSAPP_MASS_AUDIENCES)[number];
+
+export const MASS_AUDIENCE_LABELS: Record<WhatsappMassAudience, string> = {
+  TODOS: "Todos los clientes",
+  MORA: "En mora",
+  GRACIA: "Días de gracia",
+  PROXIMO: "Próximo a pagar",
+  VENCIMIENTO: "Vence hoy",
+};
+
+export const MASS_TEMPLATE_VARIABLES: { key: string; description: string }[] = [
+  { key: "{nombre}", description: "Nombre completo del cliente" },
+  { key: "{proyecto}", description: "Nombre del proyecto inmobiliario" },
+  { key: "{lote}", description: "Número de lote" },
+  { key: "{etapa}", description: "Etapa del lote" },
+  { key: "{rut}", description: "RUT del cliente" },
+  { key: "{portal}", description: "Link directo al portal de pagos" },
+  { key: "{saldo}", description: "Saldo pendiente total" },
+  { key: "{monto}", description: "Valor de la próxima cuota" },
+  { key: "{fecha_vencimiento}", description: "Fecha de vencimiento" },
+];
+

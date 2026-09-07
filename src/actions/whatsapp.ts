@@ -8,9 +8,12 @@ import {
   resolveInstance,
   getConnectionState,
   sendText,
+  sendMedia,
   fetchInstances,
   instanceKeyForProject,
   knownProjectSlugs,
+  type MediaType,
+  type SendMediaOptions,
 } from "@/lib/evolution";
 import {
   WHATSAPP_CATEGORIES,
@@ -21,8 +24,12 @@ import {
   PAYMENT_CATEGORY_LABELS,
   DEFAULT_PAYMENT_TEMPLATES,
   PAYMENT_TEMPLATE_VARIABLES,
+  WHATSAPP_MASS_AUDIENCES,
+  MASS_AUDIENCE_LABELS,
+  MASS_TEMPLATE_VARIABLES,
   type WhatsappCategory,
   type PaymentCategory,
+  type WhatsappMassAudience,
 } from "@/lib/whatsappTemplates";
 
 /**
@@ -890,6 +897,412 @@ export async function sendWhatsappTest(data: {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Difusión Masiva con Adjuntos (Imágenes, Videos, Documentos)
+// ---------------------------------------------------------------------------
+
+function matchesMassAudience(client: any, audience: WhatsappMassAudience, todayKey: string): boolean {
+  if (client.status === "COMPLETED" || client.status === "FROZEN") return false;
+  switch (audience) {
+    case "TODOS":
+      return true;
+    case "MORA":
+      return client.status === "LATE";
+    case "GRACIA":
+      return client.status === "GRACE";
+    case "PROXIMO":
+      return client.status === "UPCOMING";
+    case "VENCIMIENTO":
+      return client.status !== "LATE" && santiagoDayKey(client.nextDueDate) === todayKey;
+    default:
+      return false;
+  }
+}
+
+export type WhatsappMassAttachment = {
+  media: string; // Base64 o URL
+  mediatype: MediaType;
+  fileName?: string;
+  mimetype?: string;
+};
+
+export async function getWhatsappMassRecipients(params: {
+  projectSlug: string;
+  audience: WhatsappMassAudience;
+}) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado", recipients: [] };
+
+  try {
+    const projects = await scopedProjects(params.projectSlug);
+    if (!projects.length) {
+      return { error: "No hay proyectos disponibles con tu perfil", recipients: [] };
+    }
+
+    const todayKey = santiagoDayKey(new Date())!;
+    const allData = await Promise.all(
+      projects.map((p: any) => getFullPostventaData({ projectSlug: p.slug }))
+    );
+
+    const matched: any[] = [];
+    projects.forEach((p: any, i: number) => {
+      const list = allData[i]?.data || [];
+      for (const client of list) {
+        if (matchesMassAudience(client, params.audience, todayKey)) {
+          matched.push({
+            ...client,
+            projectSlug: p.slug,
+            projectName: p.name,
+          });
+        }
+      }
+    });
+
+    const since = new Date(Date.now() - REPEAT_WINDOW_HOURS * 3_600_000);
+    const recentSends = await prisma.whatsappMessage.findMany({
+      where: {
+        category: "DIFUSION",
+        status: "SENT",
+        created_at: { gte: since },
+        reservation_id: { in: matched.map((c: any) => c.id) },
+      },
+      select: { reservation_id: true, created_at: true },
+      orderBy: { created_at: "desc" },
+    });
+
+    const lastSentAt = new Map<string, Date>();
+    for (const row of recentSends) {
+      if (row.reservation_id && !lastSentAt.has(row.reservation_id)) {
+        lastSentAt.set(row.reservation_id, row.created_at!);
+      }
+    }
+
+    const recipients = matched.map((c: any) => {
+      const phone = normalizePhone(c.clientPhone);
+      const instance = resolveInstance(c.projectSlug);
+      return {
+        id: c.id,
+        clientName: c.clientName,
+        rut: c.rut,
+        projectSlug: c.projectSlug,
+        projectName: c.projectName,
+        lotNumber: c.lotNumber,
+        lotStage: c.lotStage,
+        rawPhone: c.clientPhone,
+        phone: phone.ok ? phone.e164 : null,
+        phoneDisplay: phone.ok ? phone.display : null,
+        phoneKind: phone.ok ? phone.kind : null,
+        phoneError: phone.ok ? null : phone.reason,
+        sendable: phone.ok,
+        instanceKey: instanceKeyForProject(c.projectSlug),
+        instanceReady: Boolean(instance),
+        lateDays: c.lateDays || 0,
+        pendingBalance: c.pendingBalance || 0,
+        nextInstallmentNumber: c.nextInstallmentNumber,
+        nextDueDate: c.nextDueDate,
+        status: c.status,
+        alreadySentAt: lastSentAt.get(c.id) ?? null,
+      };
+    });
+
+    return {
+      success: true,
+      audience: params.audience,
+      recipients,
+      summary: {
+        total: recipients.length,
+        sendable: recipients.filter((r: any) => r.sendable && r.instanceReady).length,
+        badPhone: recipients.filter((r: any) => !r.sendable).length,
+        notConfigured: recipients.filter((r: any) => r.sendable && !r.instanceReady).length,
+        alreadySent: recipients.filter((r: any) => r.alreadySentAt).length,
+      },
+    };
+  } catch (error) {
+    console.error("Error cargando destinatarios masivos de WhatsApp:", error);
+    return { error: "Error al cargar los destinatarios masivos", recipients: [] };
+  }
+}
+
+export async function startWhatsappMassBatch(data: {
+  projectSlug: string;
+  audience: string;
+  total: number;
+  hasAttachment?: boolean;
+}) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado" };
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        action: "OTHER",
+        entity: "WhatsappMassBatch",
+        entity_id: data.audience,
+        details: `Inicio de Difusión Masiva por WhatsApp: ${data.total} destinatarios (Audiencia: ${data.audience}, Proyecto: ${data.projectSlug}, Adjunto: ${data.hasAttachment ? "SÍ" : "NO"}).`,
+        user_id: user.id,
+        user_email: user.email,
+      },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Error registrando auditoría de difusión masiva:", error);
+    return { success: true };
+  }
+}
+
+export async function sendWhatsappMassChunk(data: {
+  reservationIds: string[];
+  message: string;
+  attachment?: WhatsappMassAttachment | null;
+  force?: boolean;
+}): Promise<{ error?: string; results?: ChunkResult[] }> {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado" };
+
+  if (!data.reservationIds?.length) {
+    return { error: "No hay destinatarios en este tramo" };
+  }
+  if (data.reservationIds.length > MAX_CHUNK) {
+    return { error: `Un tramo no puede superar los ${MAX_CHUNK} mensajes` };
+  }
+  if (!data.message?.trim() && !data.attachment?.media) {
+    return { error: "Debe ingresar un mensaje o adjuntar un archivo" };
+  }
+
+  try {
+    const reservations = await prisma.reservation.findMany({
+      where: { id: { in: data.reservationIds } },
+      select: { id: true, project: { select: { slug: true, name: true } } },
+    });
+
+    const slugs = Array.from(new Set(reservations.map((r) => r.project.slug)));
+    const dataBySlug = new Map<string, any[]>();
+    for (const slug of slugs) {
+      if (!canAccessProject(user, slug)) {
+        return { error: `Sin acceso al proyecto ${slug}` };
+      }
+      const res = await getFullPostventaData({ projectSlug: slug });
+      dataBySlug.set(slug, res.data || []);
+    }
+
+    const results: ChunkResult[] = [];
+    let first = true;
+
+    for (const reservationId of data.reservationIds) {
+      const reservation = reservations.find((r) => r.id === reservationId);
+      if (!reservation) {
+        results.push({
+          reservationId,
+          clientName: "?",
+          ok: false,
+          error: "La reserva ya no existe",
+        });
+        continue;
+      }
+
+      const slug = reservation.project.slug;
+      const projectName = reservation.project.name;
+      const client = (dataBySlug.get(slug) || []).find((c: any) => c.id === reservationId);
+
+      if (!client) {
+        results.push({
+          reservationId,
+          clientName: "?",
+          ok: false,
+          error: "No se pudieron leer los datos del cliente",
+        });
+        continue;
+      }
+
+      const label = client.clientName || "?";
+
+      const phone = normalizePhone(client.clientPhone);
+      if (!phone.ok) {
+        results.push({ reservationId, clientName: label, ok: false, error: phone.reason });
+        continue;
+      }
+
+      const instance = resolveInstance(slug);
+      if (!instance) {
+        results.push({
+          reservationId,
+          clientName: label,
+          ok: false,
+          error: `Falta configurar la instancia de WhatsApp para ${slug}`,
+        });
+        continue;
+      }
+
+      // Antirrepetición en difusión (24h)
+      if (!data.force) {
+        const repeated = await prisma.whatsappMessage.findFirst({
+          where: {
+            reservation_id: reservationId,
+            category: "DIFUSION",
+            status: "SENT",
+            created_at: { gte: new Date(Date.now() - REPEAT_WINDOW_HOURS * 3_600_000) },
+          },
+          select: { id: true },
+        });
+        if (repeated) {
+          results.push({
+            reservationId,
+            clientName: label,
+            ok: false,
+            error: `Ya se le envió un mensaje de difusión en las últimas ${REPEAT_WINDOW_HOURS}h`,
+          });
+          continue;
+        }
+      }
+
+      // Techo horario por instancia
+      const lastHour = await prisma.whatsappMessage.count({
+        where: {
+          instance: instance.name,
+          status: "SENT",
+          created_at: { gte: new Date(Date.now() - 3_600_000) },
+        },
+      });
+      if (lastHour >= HOURLY_LIMIT) {
+        results.push({
+          reservationId,
+          clientName: label,
+          ok: false,
+          error: `Se alcanzó el tope de ${HOURLY_LIMIT} mensajes por hora en ${instance.name}. Continúa en un rato.`,
+        });
+        continue;
+      }
+
+      if (!first) {
+        await sleep(DELAY_MIN_MS + Math.random() * (DELAY_MAX_MS - DELAY_MIN_MS));
+      }
+      first = false;
+
+      const renderedMessage = renderTemplate(data.message || "", client, projectName);
+
+      let sent: any;
+      if (data.attachment && data.attachment.media) {
+        sent = await sendMedia(instance, phone.e164, {
+          media: data.attachment.media,
+          mediatype: data.attachment.mediatype,
+          caption: renderedMessage,
+          fileName: data.attachment.fileName,
+          mimetype: data.attachment.mimetype,
+        });
+      } else {
+        sent = await sendText(instance, phone.e164, renderedMessage);
+      }
+
+      await prisma.whatsappMessage.create({
+        data: {
+          reservation_id: reservationId,
+          project_slug: slug,
+          instance: instance.name,
+          category: "DIFUSION",
+          client_name: label,
+          phone: phone.e164,
+          message: renderedMessage,
+          status: sent.ok ? "SENT" : "FAILED",
+          error: sent.ok ? null : sent.error.slice(0, 500),
+          evolution_id: sent.ok ? sent.evolutionId : null,
+          sent_by: user.email,
+          media_type: data.attachment?.mediatype ?? null,
+          media_name: data.attachment?.fileName ?? null,
+        },
+      });
+
+      results.push({
+        reservationId,
+        clientName: label,
+        ok: sent.ok,
+        error: sent.ok ? undefined : sent.error,
+      });
+    }
+
+    return { results };
+  } catch (error) {
+    console.error("Error enviando tramo masivo de WhatsApp:", error);
+    return { error: "Error al enviar los mensajes del tramo" };
+  }
+}
+
+export async function sendWhatsappMassTest(data: {
+  projectSlug: string;
+  phone: string;
+  message: string;
+  attachment?: WhatsappMassAttachment | null;
+}) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado" };
+
+  const phone = normalizePhone(data.phone);
+  if (!phone.ok) return { error: `Número de prueba inválido: ${phone.reason}` };
+
+  try {
+    const projects = await scopedProjects(data.projectSlug);
+    const project = projects[0];
+    if (!project) return { error: "Proyecto no disponible" };
+
+    const instance = resolveInstance(project.slug);
+    if (!instance) {
+      return { error: `Falta configurar la instancia de WhatsApp para ${project.slug}` };
+    }
+
+    const postventaRes = await getFullPostventaData({ projectSlug: project.slug });
+    const sampleClient = (postventaRes.data || [])[0] || {
+      clientName: "Cliente de Prueba",
+      lotNumber: 1,
+      lotStage: "1",
+      rut: "11.111.111-1",
+      pendingBalance: 500000,
+      valor_cuota: 120000,
+      nextInstallmentNumber: 1,
+      nextInstallmentMonth: "Septiembre 2026",
+      nextDueDate: new Date(),
+    };
+
+    const renderedMessage = renderTemplate(data.message || "", sampleClient, project.name);
+
+    let sent: any;
+    if (data.attachment && data.attachment.media) {
+      sent = await sendMedia(instance, phone.e164, {
+        media: data.attachment.media,
+        mediatype: data.attachment.mediatype,
+        caption: renderedMessage,
+        fileName: data.attachment.fileName,
+        mimetype: data.attachment.mimetype,
+      });
+    } else {
+      sent = await sendText(instance, phone.e164, renderedMessage);
+    }
+
+    await prisma.whatsappMessage.create({
+      data: {
+        reservation_id: null,
+        project_slug: project.slug,
+        instance: instance.name,
+        category: "DIFUSION",
+        client_name: `PRUEBA (${user.email})`,
+        phone: phone.e164,
+        message: renderedMessage,
+        status: sent.ok ? "SENT" : "FAILED",
+        error: sent.ok ? null : sent.error.slice(0, 500),
+        evolution_id: sent.ok ? sent.evolutionId : null,
+        sent_by: user.email,
+        media_type: data.attachment?.mediatype ?? null,
+        media_name: data.attachment?.fileName ?? null,
+      },
+    });
+
+    if (!sent.ok) return { error: sent.error };
+
+    return { success: true, sentTo: phone.display, preview: renderedMessage };
+  } catch (error) {
+    console.error("Error enviando prueba masiva de WhatsApp:", error);
+    return { error: "Error al enviar el mensaje de prueba" };
+  }
+}
+
 /**
  * Diagnostico de la conexion. Lista lo que el servidor de Evolution dice tener,
  * para poder comparar el nombre real de la instancia con el que quedo en las
@@ -1008,6 +1421,8 @@ export async function getPaymentNoticeHistory({
       category: true,
       notice_concept: true,
       notice_amount: true,
+      media_type: true,
+      media_name: true,
       status: true,
       error: true,
       instance: true,

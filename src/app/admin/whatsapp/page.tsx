@@ -12,6 +12,7 @@ import {
   WifiOff,
   AlertTriangle,
   BadgeCheck,
+  Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getWhatsappOverview } from "@/actions/whatsapp";
@@ -19,14 +20,16 @@ import type { WhatsappCategory } from "@/lib/whatsappTemplates";
 import { cn } from "@/lib/utils";
 import WhatsappPanel from "@/components/admin/whatsapp/WhatsappPanel";
 import WhatsappSender from "@/components/admin/whatsapp/WhatsappSender";
+import WhatsappMassComposer from "@/components/admin/whatsapp/WhatsappMassComposer";
 import WhatsappTemplateEditor from "@/components/admin/whatsapp/WhatsappTemplateEditor";
 import WhatsappPaymentHistory from "@/components/admin/whatsapp/WhatsappPaymentHistory";
 
-type Tab = "panel" | "enviar" | "avisos" | "plantillas";
+type Tab = "panel" | "enviar" | "masivo" | "avisos" | "plantillas";
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "panel", label: "Panel", icon: BarChart3 },
-  { id: "enviar", label: "Enviar", icon: Send },
+  { id: "enviar", label: "Cobranza", icon: Send },
+  { id: "masivo", label: "Difusión / Masivo", icon: Megaphone },
   { id: "avisos", label: "Avisos de pago", icon: BadgeCheck },
   { id: "plantillas", label: "Plantillas", icon: FileText },
 ];
@@ -215,6 +218,17 @@ export default function WhatsappPage() {
               onSent={() => {
                 loadOverview();
                 toast.success("Tanda finalizada. El panel se actualizó.");
+              }}
+            />
+          )}
+
+          {tab === "masivo" && (
+            <WhatsappMassComposer
+              projectSlug={selectedProject}
+              projects={overview.projects || []}
+              onSent={() => {
+                loadOverview();
+                toast.success("Difusión masiva finalizada. El panel se actualizó.");
               }}
             />
           )}

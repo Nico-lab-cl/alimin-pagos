@@ -154,6 +154,69 @@ export async function sendText(
   return { ok: true, evolutionId: res.data?.key?.id ?? null };
 }
 
+export type MediaType = "image" | "video" | "document" | "audio";
+
+export type SendMediaOptions = {
+  /** Cadena base64 (data:... o pura) o URL pública del archivo. */
+  media: string;
+  mediatype: MediaType;
+  caption?: string;
+  fileName?: string;
+  mimetype?: string;
+};
+
+/**
+ * Envía un archivo adjunto (imagen, video, documento, audio) vía Evolution API.
+ *
+ * El cuerpo se envía en el formato de Evolution v2; si responde 400 se reintenta
+ * con el formato anidado de Evolution v1 (mediaMessage).
+ */
+export async function sendMedia(
+  instance: ResolvedInstance,
+  number: string,
+  options: SendMediaOptions
+): Promise<SendResult> {
+  const path = `/message/sendMedia/${encodeURIComponent(instance.name)}`;
+
+  const v2Body: any = {
+    number,
+    mediatype: options.mediatype,
+    media: options.media,
+    caption: options.caption || "",
+  };
+  if (options.fileName) v2Body.fileName = options.fileName;
+  if (options.mimetype) v2Body.mimetype = options.mimetype;
+
+  let res = await evolutionFetch(path, instance.apikey, {
+    method: "POST",
+    body: JSON.stringify(v2Body),
+  });
+
+  // Formato v1: los parámetros de medio van anidados en mediaMessage.
+  if (!res.ok && res.status === 400) {
+    const v1Body: any = {
+      number,
+      mediaMessage: {
+        mediatype: options.mediatype,
+        media: options.media,
+        caption: options.caption || "",
+        ...(options.fileName ? { fileName: options.fileName } : {}),
+        ...(options.mimetype ? { mimetype: options.mimetype } : {}),
+      },
+    };
+    res = await evolutionFetch(path, instance.apikey, {
+      method: "POST",
+      body: JSON.stringify(v1Body),
+    });
+  }
+
+  if (!res.ok) {
+    return { ok: false, error: readError(res.status, res.data) };
+  }
+
+  return { ok: true, evolutionId: res.data?.key?.id ?? null };
+}
+
 export type ConnectionState = {
   configured: boolean;
   connected: boolean;
