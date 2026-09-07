@@ -187,54 +187,75 @@ export async function sendMedia(
       ? "video/mp4"
       : "application/pdf");
 
-  // Formato v2 con ambos campos (mediaType y mediatype) para máxima compatibilidad
-  const v2Body: any = {
+  const rawBase64 = options.media.includes(",")
+    ? options.media.split(",")[1]
+    : options.media;
+
+  // Intento 1: Formato estándar Evolution API (mediatype en minúsculas en la raíz)
+  const body1: any = {
     number,
-    media: options.media,
-    mediaType: mediatype,
-    mediatype: mediatype,
+    mediatype,
     mimetype,
     caption: options.caption || "",
+    media: options.media,
   };
-  if (options.fileName) v2Body.fileName = options.fileName;
+  if (options.fileName) body1.fileName = options.fileName;
 
   let res = await evolutionFetch(path, instance.apikey, {
     method: "POST",
-    body: JSON.stringify(v2Body),
+    body: JSON.stringify(body1),
   });
 
-  // Si responde 400, intentar con formato anidado en mediaMessage (Evolution v1)
+  // Intento 2: Formato Evolution v2 (mediaType en camelCase)
   if (!res.ok && res.status === 400) {
-    const v1Body: any = {
+    const body2: any = {
       number,
-      mediaMessage: {
-        media: options.media,
-        mediaType: mediatype,
-        mediatype: mediatype,
-        mimetype,
-        caption: options.caption || "",
-        ...(options.fileName ? { fileName: options.fileName } : {}),
-      },
-    };
-    res = await evolutionFetch(path, instance.apikey, {
-      method: "POST",
-      body: JSON.stringify(v1Body),
-    });
-  }
-
-  // Si todavía responde 400, intentar formato estricto v2 sólo con mediaType
-  if (!res.ok && res.status === 400) {
-    const v2Clean: any = {
-      number,
-      media: options.media,
       mediaType: mediatype,
       mimetype,
       caption: options.caption || "",
-      ...(options.fileName ? { fileName: options.fileName } : {}),
+      media: options.media,
     };
+    if (options.fileName) body2.fileName = options.fileName;
+
     res = await evolutionFetch(path, instance.apikey, {
       method: "POST",
-      body: JSON.stringify(v2Clean),
+      body: JSON.stringify(body2),
+    });
+  }
+
+  // Intento 3: Formato Evolution con base64 puro (sin prefijo data URI)
+  if (!res.ok && res.status === 400 && rawBase64 !== options.media) {
+    const body3: any = {
+      number,
+      mediatype,
+      mimetype,
+      caption: options.caption || "",
+      media: rawBase64,
+    };
+    if (options.fileName) body3.fileName = options.fileName;
+
+    res = await evolutionFetch(path, instance.apikey, {
+      method: "POST",
+      body: JSON.stringify(body3),
+    });
+  }
+
+  // Intento 4: Formato anidado en mediaMessage (Evolution v1)
+  if (!res.ok && res.status === 400) {
+    const body4: any = {
+      number,
+      mediaMessage: {
+        mediatype,
+        mimetype,
+        caption: options.caption || "",
+        media: options.media,
+        ...(options.fileName ? { fileName: options.fileName } : {}),
+      },
+    };
+
+    res = await evolutionFetch(path, instance.apikey, {
+      method: "POST",
+      body: JSON.stringify(body4),
     });
   }
 
