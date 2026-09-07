@@ -178,35 +178,63 @@ export async function sendMedia(
 ): Promise<SendResult> {
   const path = `/message/sendMedia/${encodeURIComponent(instance.name)}`;
 
+  const mediatype = options.mediatype || "document";
+  const mimetype =
+    options.mimetype ||
+    (mediatype === "image"
+      ? "image/jpeg"
+      : mediatype === "video"
+      ? "video/mp4"
+      : "application/pdf");
+
+  // Formato v2 con ambos campos (mediaType y mediatype) para máxima compatibilidad
   const v2Body: any = {
     number,
-    mediatype: options.mediatype,
     media: options.media,
+    mediaType: mediatype,
+    mediatype: mediatype,
+    mimetype,
     caption: options.caption || "",
   };
   if (options.fileName) v2Body.fileName = options.fileName;
-  if (options.mimetype) v2Body.mimetype = options.mimetype;
 
   let res = await evolutionFetch(path, instance.apikey, {
     method: "POST",
     body: JSON.stringify(v2Body),
   });
 
-  // Formato v1: los parámetros de medio van anidados en mediaMessage.
+  // Si responde 400, intentar con formato anidado en mediaMessage (Evolution v1)
   if (!res.ok && res.status === 400) {
     const v1Body: any = {
       number,
       mediaMessage: {
-        mediatype: options.mediatype,
         media: options.media,
+        mediaType: mediatype,
+        mediatype: mediatype,
+        mimetype,
         caption: options.caption || "",
         ...(options.fileName ? { fileName: options.fileName } : {}),
-        ...(options.mimetype ? { mimetype: options.mimetype } : {}),
       },
     };
     res = await evolutionFetch(path, instance.apikey, {
       method: "POST",
       body: JSON.stringify(v1Body),
+    });
+  }
+
+  // Si todavía responde 400, intentar formato estricto v2 sólo con mediaType
+  if (!res.ok && res.status === 400) {
+    const v2Clean: any = {
+      number,
+      media: options.media,
+      mediaType: mediatype,
+      mimetype,
+      caption: options.caption || "",
+      ...(options.fileName ? { fileName: options.fileName } : {}),
+    };
+    res = await evolutionFetch(path, instance.apikey, {
+      method: "POST",
+      body: JSON.stringify(v2Clean),
     });
   }
 
