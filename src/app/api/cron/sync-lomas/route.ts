@@ -104,12 +104,45 @@ async function handle(req: NextRequest) {
     }
 
     // --- 2. Lo que ya existe en el portal (no se toca) ---
-    const existentesRows = await prisma.reservation.findMany({ where: { project_id: project.id }, select: { rut: true, lot: { select: { number: true, stage: true } } } });
-    const existentes = new Set(existentesRows.map((r) => `${normRut(r.rut)}_${r.lot.number}_${r.lot.stage}`));
+    // La llave es el LOTE (numero + etapa), no el rut: un lote tiene un solo
+    // dueno. Cuando la llave incluia el rut y la ficha de Lomas venia SIN rut
+    // mientras la del portal si lo tenia (o al reves), no calzaba y el puente
+    // insertaba una reserva duplicada del mismo cliente, congelada en el estado
+    // de cuotas de Lomas -- que es justo el que va atrasado. Paso el 04-09-2026
+    // con Joselin Castillo (L-18 e1) y Rodrigo Marquez (L-42 e3): ambos vieron
+    // en su portal una cuota vencida con mora que en el portal ya estaba pagada.
+    const existentesRows = await prisma.reservation.findMany({
+      where: { project_id: project.id },
+      select: { rut: true, email: true, name: true, last_name: true, lot: { select: { number: true, stage: true } } },
+    });
+    const existentes = new Map<string, { rut: string; email: string; nombre: string }>();
+    for (const e of existentesRows) {
+      existentes.set(`${e.lot.number}_${e.lot.stage}`, {
+        rut: normRut(e.rut),
+        email: (e.email || "").toLowerCase(),
+        nombre: `${e.name || ""} ${e.last_name || ""}`.trim(),
+      });
+    }
 
     for (const r of finalistas) {
-      const key = `${normRut(r.rut)}_${r.lot_number}_${r.lot_stage}`;
-      if (existentes.has(key)) { omitidos++; continue; }
+      const yaEnPortal = existentes.get(`${r.lot_number}_${r.lot_stage}`);
+      if (yaEnPortal) {
+        const rutLomas = normRut(r.rut);
+        const emailLomas = (r.email || "").toLowerCase();
+        const mismaPersona =
+          (!!rutLomas && rutLomas === yaEnPortal.rut) ||
+          (!!emailLomas && emailLomas === yaEnPortal.email);
+        // Mismo lote pero otra persona: no se inserta nada (seria duplicar un
+        // lote ya vendido) y queda reportado en el resumen para revisarlo a mano.
+        if (!mismaPersona) {
+          conflictos.push([
+            `${r.name} ${r.last_name || ""}`.trim() + ` (${r.rut || "sin rut"}) L${r.lot_number}(e${r.lot_stage}) en Lomas`,
+            `${yaEnPortal.nombre || "sin nombre"} ya tiene ese lote en el portal`,
+          ]);
+          continue;
+        }
+        omitidos++; continue;
+      }
       nuevos++;
       detalle.push(`${r.name} ${r.last_name || ""} - Lote #${r.lot_number}(e${r.lot_stage})`.trim());
       if (dryRun) continue;

@@ -23,6 +23,24 @@ import {
 const CACHE_TTL = 300;
 
 /**
+ * De dos fichas del MISMO lote, cual es la que el cliente tiene que ver.
+ * Manda la mas avanzada en cuotas (la que mantiene postventa; la copia del
+ * puente Lomas siempre viene igual o mas atrasada). Si empatan, la que tiene
+ * rut y, en ultima instancia, la que trae mas comprobantes.
+ */
+function esFichaVigente(candidata: any, actual: any): boolean {
+  const cuotasCandidata = candidata.installments_paid || 0;
+  const cuotasActual = actual.installments_paid || 0;
+  if (cuotasCandidata !== cuotasActual) return cuotasCandidata > cuotasActual;
+
+  const rutCandidata = candidata.rut ? 1 : 0;
+  const rutActual = actual.rut ? 1 : 0;
+  if (rutCandidata !== rutActual) return rutCandidata > rutActual;
+
+  return (candidata.receipts?.length || 0) > (actual.receipts?.length || 0);
+}
+
+/**
  * Gets all data for the logged-in user's lots across all their projects.
  */
 export async function getUserLots() {
@@ -61,7 +79,22 @@ export async function getUserLots() {
 
     const currentDate = getChileToday();
 
-    const lots = (reservations as any[]).map((res) => {
+    // Un lote no puede tener dos fichas para el mismo cliente. El puente
+    // Lomas->Portal alcanzo a crear una segunda reserva del mismo lote cuando el
+    // rut venia vacio de un lado (ver app/api/cron/sync-lomas/route.ts), y como
+    // esa copia se queda con el avance de cuotas de Lomas -- que va atrasado
+    // porque los pagos se aprueban en el portal -- el cliente entraba y veia una
+    // cuota ya pagada como vencida y con mora. Nos quedamos con la ficha mas
+    // avanzada, que es la que mantiene postventa. En el admin se siguen viendo
+    // las dos, para poder limpiar la duplicada.
+    const porLote = new Map<number, any>();
+    for (const res of reservations as any[]) {
+      const actual = porLote.get(res.lot_id);
+      if (!actual || esFichaVigente(res, actual)) porLote.set(res.lot_id, res);
+    }
+    const reservasVigentes = [...porLote.values()];
+
+    const lots = reservasVigentes.map((res) => {
       const lot = res.lot;
       const project = res.project;
       const paidCuotas = res.installments_paid || 0;
