@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, Save, Plus, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { getEmailTemplates, saveEmailTemplate, deleteEmailTemplate } from "@/actions/email";
 import { EMAIL_SUBJECT_MAX, EMAIL_BODY_MAX } from "@/lib/emailTemplate";
+import EmailVariableSelector from "./EmailVariableSelector";
+import { cn } from "@/lib/utils";
 
 /**
  * Borradores reutilizables de correo: postventa los crea, edita y borra
@@ -17,6 +19,9 @@ export default function EmailTemplateManager() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [draft, setDraft] = useState({ name: "", subject: "", body: "" });
+  const subjectRef = useRef<HTMLInputElement | null>(null);
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const [activeField, setActiveField] = useState<"subject" | "body">("body");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -41,16 +46,50 @@ export default function EmailTemplateManager() {
   const startNew = () => {
     setDraft({ name: "", subject: "", body: "" });
     setEditingId("new");
+    setActiveField("body");
   };
 
   const startEdit = (t: any) => {
     setDraft({ name: t.name, subject: t.subject, body: t.body });
     setEditingId(t.id);
+    setActiveField("body");
   };
 
   const cancel = () => {
     setEditingId(null);
     setDraft({ name: "", subject: "", body: "" });
+  };
+
+  const insertVariable = (variable: string) => {
+    if (activeField === "subject") {
+      const el = subjectRef.current;
+      if (!el) {
+        setDraft((d) => ({ ...d, subject: d.subject + variable }));
+        return;
+      }
+      const start = el.selectionStart ?? draft.subject.length;
+      const end = el.selectionEnd ?? draft.subject.length;
+      const next = draft.subject.slice(0, start) + variable + draft.subject.slice(end);
+      setDraft((d) => ({ ...d, subject: next }));
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(start + variable.length, start + variable.length);
+      });
+    } else {
+      const el = bodyRef.current;
+      if (!el) {
+        setDraft((d) => ({ ...d, body: d.body + variable }));
+        return;
+      }
+      const start = el.selectionStart ?? draft.body.length;
+      const end = el.selectionEnd ?? draft.body.length;
+      const next = draft.body.slice(0, start) + variable + draft.body.slice(end);
+      setDraft((d) => ({ ...d, body: next }));
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(start + variable.length, start + variable.length);
+      });
+    }
   };
 
   const save = async () => {
@@ -125,30 +164,65 @@ export default function EmailTemplateManager() {
 
       {editingId !== null && (
         <div className="bg-white border border-brand-200 rounded-2xl shadow-sm p-6 space-y-4">
-          <input
-            type="text"
-            value={draft.name}
-            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-            placeholder="Nombre interno (ej. «Aviso corte de agua»)"
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-brand-500 outline-none transition-all font-bold"
-          />
-          <input
-            type="text"
-            value={draft.subject}
-            onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
-            placeholder="Asunto"
-            maxLength={EMAIL_SUBJECT_MAX}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-brand-500 outline-none transition-all"
-          />
-          <textarea
-            value={draft.body}
-            onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
-            rows={8}
-            maxLength={EMAIL_BODY_MAX}
-            placeholder="Cuerpo del correo"
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[13px] text-slate-800 focus:border-brand-500 outline-none transition-all font-sans leading-relaxed resize-y"
-          />
-          <div className="flex justify-end gap-2">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              Nombre de la plantilla
+            </label>
+            <input
+              type="text"
+              value={draft.name}
+              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+              placeholder="Nombre interno (ej. «Aviso corte de agua»)"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-brand-500 outline-none transition-all font-bold"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Asunto
+              </label>
+              <span className={cn("text-[10px] font-bold tabular-nums", draft.subject.length > EMAIL_SUBJECT_MAX ? "text-red-700" : "text-slate-400")}>
+                {draft.subject.length} / {EMAIL_SUBJECT_MAX}
+              </span>
+            </div>
+            <input
+              ref={subjectRef}
+              type="text"
+              value={draft.subject}
+              onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
+              onFocus={() => setActiveField("subject")}
+              placeholder="Asunto del correo"
+              maxLength={EMAIL_SUBJECT_MAX}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 focus:border-brand-500 outline-none transition-all font-medium"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Cuerpo del correo
+              </label>
+              <span className={cn("text-[10px] font-bold tabular-nums", draft.body.length > EMAIL_BODY_MAX ? "text-red-700" : "text-slate-400")}>
+                {draft.body.length} / {EMAIL_BODY_MAX}
+              </span>
+            </div>
+            <textarea
+              ref={bodyRef}
+              value={draft.body}
+              onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
+              onFocus={() => setActiveField("body")}
+              rows={8}
+              maxLength={EMAIL_BODY_MAX}
+              placeholder="Cuerpo del correo"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[13px] text-slate-800 focus:border-brand-500 outline-none transition-all font-sans leading-relaxed resize-y"
+            />
+          </div>
+
+          {/* Metacampos interactivos */}
+          <EmailVariableSelector onInsert={insertVariable} disabled={saving} />
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <button
               onClick={cancel}
               className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer"

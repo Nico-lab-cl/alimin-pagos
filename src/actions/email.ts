@@ -90,6 +90,69 @@ function matchesAudience(client: any, audience: EmailAudience, todayKey: string)
   }
 }
 
+function formatCLP(amount: number | null | undefined): string {
+  return `$${Math.round(Number(amount) || 0).toLocaleString("es-CL")}`;
+}
+
+function formatDateCL(date: Date | string | null | undefined): string {
+  if (!date) return "";
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("es-CL", {
+    timeZone: "America/Santiago",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(d);
+}
+
+function installmentAmount(client: any): number {
+  const n = client?.nextInstallmentNumber;
+  if (!n) return Number(client?.valor_cuota) || 0;
+
+  let ranges: any[] = [];
+  try {
+    const raw = client?.installment_ranges;
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed)) ranges = parsed;
+  } catch {
+    ranges = [];
+  }
+
+  const range = ranges.find(
+    (r: any) => n >= Number(r.from ?? r.start ?? 0) && n <= Number(r.to ?? r.end ?? 0)
+  );
+
+  if (range) return Number(range.amount ?? range.value ?? 0) || 0;
+  return Number(client?.valor_cuota) || 0;
+}
+
+function buildEmailClientValues(client: any, projectName: string): Record<string, string> {
+  const monto = installmentAmount(client);
+  const multa = Number(client?.penaltyAmount) || 0;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://pagos.aliminspa.cl";
+
+  return {
+    nombre: client?.clientName || "",
+    rut: client?.rut || "",
+    email: client?.clientEmail || (validEmails(client)[0] ?? ""),
+    telefono: client?.clientPhone || "",
+    proyecto: projectName || "",
+    lote: String(client?.lotNumber ?? ""),
+    etapa: String(client?.lotStage ?? ""),
+    portal: `${baseUrl.replace(/\/+$/, "")}/user`,
+    monto: formatCLP(monto),
+    cuota: client?.nextInstallmentNumber ? String(client.nextInstallmentNumber) : "",
+    mes_cuota: client?.nextInstallmentMonth || "",
+    fecha_vencimiento: formatDateCL(client?.nextDueDate),
+    saldo: formatCLP(client?.pendingBalance),
+    multa: formatCLP(multa),
+    total: formatCLP(monto + multa),
+    dias_mora: String(client?.lateDays ?? 0),
+    dias_gracia: String(client?.grace_days ?? 0),
+  };
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -232,14 +295,25 @@ export async function getEmailRecipients({
     const recipients = matched
       .map((c: any) => {
         const emails = validEmails(c);
+        const monto = installmentAmount(c);
+        const multa = Number(c?.penaltyAmount) || 0;
         return {
           id: c.id,
           clientName: c.clientName,
           rut: c.rut,
+          clientPhone: c.clientPhone,
           projectSlug: c.projectSlug,
           projectName: c.projectName,
           lotNumber: c.lotNumber,
           lotStage: c.lotStage,
+          nextInstallmentNumber: c.nextInstallmentNumber,
+          nextInstallmentMonth: c.nextInstallmentMonth,
+          nextDueDate: c.nextDueDate,
+          pendingBalance: c.pendingBalance,
+          penaltyAmount: multa,
+          monto,
+          lateDays: c.lateDays,
+          grace_days: c.grace_days,
           emails,
           to: emails.join(", "),
           sendable: emails.length > 0,
@@ -479,13 +553,7 @@ export async function sendEmailChunk(data: {
       }
       first = false;
 
-      const values = {
-        nombre: label,
-        proyecto: projectName,
-        lote: String(client.lotNumber ?? ""),
-        etapa: String(client.lotStage ?? ""),
-        rut: client.rut || "",
-      };
+      const values = buildEmailClientValues(client, projectName);
       const subject = renderEmailVariables(data.subject, values);
       const bodyText = renderEmailVariables(data.body, values);
       const html = buildEmailHtml({ projectSlug: slug, projectName, bodyText });
@@ -577,13 +645,7 @@ export async function sendEmailTest(data: {
       ? (res.data || []).find((c: any) => c.id === data.reservationId) || (res.data || [])[0]
       : (res.data || [])[0];
 
-    const values = {
-      nombre: sample?.clientName || "Cliente de ejemplo",
-      proyecto: project.name,
-      lote: String(sample?.lotNumber ?? "1"),
-      etapa: String(sample?.lotStage ?? ""),
-      rut: sample?.rut || "",
-    };
+    const values = buildEmailClientValues(sample, project.name);
     const subject = `[PRUEBA] ${renderEmailVariables(data.subject, values)}`;
     const bodyText = renderEmailVariables(data.body, values);
     const html = buildEmailHtml({ projectSlug: project.slug, projectName: project.name, bodyText });

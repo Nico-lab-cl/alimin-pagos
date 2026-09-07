@@ -28,7 +28,9 @@ import {
   EMAIL_TEMPLATE_VARIABLES,
   buildEmailHtml,
   renderEmailVariables,
+  getEmailVariableSampleValues,
 } from "@/lib/emailTemplate";
+import EmailVariableSelector from "./EmailVariableSelector";
 import { cn } from "@/lib/utils";
 
 const CHUNK_SIZE = 5;
@@ -75,7 +77,9 @@ export default function EmailComposer({
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const subjectRef = useRef<HTMLInputElement | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const [activeField, setActiveField] = useState<"subject" | "body">("body");
 
   const [templates, setTemplates] = useState<any[]>([]);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -145,33 +149,24 @@ export default function EmailComposer({
   // nada, sin tener que usar "Enviar prueba" para eso.
   const previewSource = selectedList[0] || recipients[0] || null;
 
+  const previewValues = useMemo(() => {
+    return getEmailVariableSampleValues(previewSource);
+  }, [previewSource]);
+
   const previewHtml = useMemo(() => {
-    const values = {
-      nombre: previewSource?.clientName || "Nombre del cliente",
-      proyecto: previewSource?.projectName || "Proyecto",
-      lote: previewSource ? String(previewSource.lotNumber ?? "") : "N°",
-      etapa: previewSource ? String(previewSource.lotStage ?? "") : "",
-      rut: previewSource?.rut || "",
-    };
     const rendered = renderEmailVariables(
       body.trim() ? body : "Escribe el cuerpo del correo para ver la vista previa acá.",
-      values
+      previewValues
     );
     return buildEmailHtml({
       projectSlug: previewSource?.projectSlug || "",
-      projectName: values.proyecto,
+      projectName: previewValues.proyecto || "Proyecto",
       bodyText: rendered,
     });
-  }, [body, previewSource]);
+  }, [body, previewSource, previewValues]);
 
   const previewSubject = subject.trim()
-    ? renderEmailVariables(subject, {
-        nombre: previewSource?.clientName || "Nombre del cliente",
-        proyecto: previewSource?.projectName || "Proyecto",
-        lote: previewSource ? String(previewSource.lotNumber ?? "") : "N°",
-        etapa: previewSource ? String(previewSource.lotStage ?? "") : "",
-        rut: previewSource?.rut || "",
-      })
+    ? renderEmailVariables(subject, previewValues)
     : "(sin asunto)";
 
   const toggle = (id: string) => {
@@ -200,19 +195,35 @@ export default function EmailComposer({
   };
 
   const insertVariable = (variable: string) => {
-    const el = bodyRef.current;
-    if (!el) {
-      setBody((prev) => prev + variable);
-      return;
+    if (activeField === "subject") {
+      const el = subjectRef.current;
+      if (!el) {
+        setSubject((prev) => prev + variable);
+        return;
+      }
+      const start = el.selectionStart ?? subject.length;
+      const end = el.selectionEnd ?? subject.length;
+      const next = subject.slice(0, start) + variable + subject.slice(end);
+      setSubject(next);
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(start + variable.length, start + variable.length);
+      });
+    } else {
+      const el = bodyRef.current;
+      if (!el) {
+        setBody((prev) => prev + variable);
+        return;
+      }
+      const start = el.selectionStart ?? body.length;
+      const end = el.selectionEnd ?? body.length;
+      const next = body.slice(0, start) + variable + body.slice(end);
+      setBody(next);
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(start + variable.length, start + variable.length);
+      });
     }
-    const start = el.selectionStart ?? body.length;
-    const end = el.selectionEnd ?? body.length;
-    const next = body.slice(0, start) + variable + body.slice(end);
-    setBody(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(start + variable.length, start + variable.length);
-    });
   };
 
   /** Carga un borrador guardado en el editor. Nombrada sin prefijo "use" a
@@ -436,9 +447,11 @@ export default function EmailComposer({
             </span>
           </div>
           <input
+            ref={subjectRef}
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
+            onFocus={() => setActiveField("subject")}
             placeholder="Claro y directo — sin URGENTE ni mayúsculas sostenidas"
             disabled={sending}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:border-brand-500 outline-none transition-all font-medium disabled:opacity-60"
@@ -458,6 +471,7 @@ export default function EmailComposer({
             ref={bodyRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onFocus={() => setActiveField("body")}
             rows={8}
             disabled={sending}
             placeholder="Escribe el mensaje tal como lo leería el cliente. El logo y la cabecera se agregan solos."
@@ -465,19 +479,8 @@ export default function EmailComposer({
           />
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {EMAIL_TEMPLATE_VARIABLES.map((v) => (
-            <button
-              key={v.key}
-              onClick={() => insertVariable(v.key)}
-              title={v.description}
-              disabled={sending}
-              className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-mono font-semibold text-slate-500 hover:border-brand-500 hover:text-brand-600 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {v.key}
-            </button>
-          ))}
-        </div>
+        {/* Selector interactivo de metacampos con categorías y ayuda (?) */}
+        <EmailVariableSelector onInsert={insertVariable} disabled={sending} />
 
         {/* Vista previa en vivo: se actualiza sola al marcar a alguien abajo
             o al escribir, sin tener que mandar nada. */}
