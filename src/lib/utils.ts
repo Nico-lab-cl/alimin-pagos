@@ -3,6 +3,7 @@ import { twMerge } from "tailwind-merge";
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
+import { receiptFormat } from "@/lib/receiptDocs";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -134,29 +135,21 @@ export function getDownloadFilename(doc: any): string {
   return `${name}.pdf`;
 }
 
+/** Extensiones que ya vienen puestas en el nombre y no hay que volver a agregar. */
+const KNOWN_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "webp", "gif", "avif", "heic", "heif", "docx", "xlsx"];
+
 /**
- * Resolves the appropriate filename for a receipt download, appending the correct extension.
+ * Nombre con el que se baja el respaldo de un pago.
+ *
+ * La extensión sale de los bytes reales del archivo (ver receiptFormat), no del
+ * mime declarado: antes cualquier formato que no fuera pdf/png/jpg/webp se
+ * bajaba igual como ".pdf", y una foto de iPhone guardada así no la abría
+ * ningún visor —el Mac avisaba que el PDF estaba dañado.
  */
 export function getReceiptDownloadFilename(url: string | null | undefined, receiptId: string): string {
   const prefix = `comprobante_${receiptId}`;
   if (!url) return `${prefix}.pdf`;
-  if (url.startsWith("data:")) {
-    const parts = url.split(";");
-    if (parts.length > 0) {
-      const mime = parts[0].split(":")[1] || "";
-      if (mime.includes("pdf")) return `${prefix}.pdf`;
-      if (mime.includes("png")) return `${prefix}.png`;
-      if (mime.includes("jpeg") || mime.includes("jpg")) return `${prefix}.jpg`;
-      if (mime.includes("webp")) return `${prefix}.webp`;
-    }
-  } else {
-    const cleanUrl = url.split("?")[0].toLowerCase();
-    if (cleanUrl.endsWith(".pdf")) return `${prefix}.pdf`;
-    if (cleanUrl.endsWith(".png")) return `${prefix}.png`;
-    if (cleanUrl.endsWith(".jpg") || cleanUrl.endsWith(".jpeg")) return `${prefix}.jpg`;
-    if (cleanUrl.endsWith(".webp")) return `${prefix}.webp`;
-  }
-  return `${prefix}.pdf`; // default fallback
+  return `${prefix}.${receiptFormat(url).ext}`;
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -302,25 +295,39 @@ export async function downloadDocument(url: string, fallbackName: string, fallba
   try {
     if (url.startsWith("data:")) {
       const prefix = fallbackName || "documento";
-      let extension = "pdf"; // fallback
+      const declaredMime = url.split(";")[0].split(":")[1] || "";
 
-      const parts = url.split(";");
-      if (parts.length > 0) {
-        const mime = parts[0].split(":")[1] || "";
-        if (mime.includes("pdf")) extension = "pdf";
-        else if (mime.includes("png")) extension = "png";
-        else if (mime.includes("jpeg") || mime.includes("jpg")) extension = "jpg";
-        else if (mime.includes("webp")) extension = "webp";
-        else if (mime.includes("word") || mime.includes("officedocument.word")) extension = "docx";
-        else if (mime.includes("sheet") || mime.includes("officedocument.spreadsheet")) extension = "xlsx";
+      // Word y Excel son los dos un ZIP por dentro, asi que los bytes no
+      // alcanzan para distinguirlos: ahi manda el mime declarado. Para todo lo
+      // demas manda el archivo, porque el mime que trae el navegador del
+      // cliente miente seguido (una foto de iPhone llegaba como PDF).
+      const esOffice =
+        declaredMime.includes("word") ||
+        declaredMime.includes("officedocument.word") ||
+        declaredMime.includes("sheet") ||
+        declaredMime.includes("officedocument.spreadsheet");
+
+      let extension: string;
+      let fetchUrl = url;
+      if (esOffice) {
+        extension = declaredMime.includes("sheet") || declaredMime.includes("officedocument.spreadsheet")
+          ? "xlsx"
+          : "docx";
+      } else {
+        // Se baja por la data-URL ya corregida, para que el blob salga con el
+        // mime que de verdad corresponde a los bytes.
+        const formato = receiptFormat(url);
+        extension = formato.ext;
+        fetchUrl = formato.url || url;
       }
 
-      let finalName = prefix;
-      if (!finalName.toLowerCase().endsWith(`.${extension}`)) {
-        finalName = `${finalName}.${extension}`;
-      }
+      // Si el nombre ya venia con extension propia (los documentos de la ficha
+      // la traen), se respeta tal cual y no se le pega una segunda.
+      const finalName = KNOWN_EXTENSIONS.some((e) => prefix.toLowerCase().endsWith(`.${e}`))
+        ? prefix
+        : `${prefix}.${extension}`;
 
-      const dataBlob = await (await fetch(url)).blob();
+      const dataBlob = await (await fetch(fetchUrl)).blob();
       await deliverFile(dataBlob, finalName);
       return;
     }

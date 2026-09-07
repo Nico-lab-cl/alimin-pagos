@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { getAdminProjects, approveReceipt, approveReceiptAsInterestPayment, rejectReceipt, getAllReceipts, deletePaymentReceipt } from "@/actions/postventa";
 import { formatCLP, cn, getReceiptDownloadFilename, downloadDocument, downloadCsv } from "@/lib/utils";
-import { SCOPE_LABELS } from "@/lib/receiptDocs";
+import { SCOPE_LABELS, receiptFormat } from "@/lib/receiptDocs";
 import { toast } from "sonner";
 import { 
   Loader2, 
@@ -96,6 +96,9 @@ export default function ReceiptsPage() {
   
   const [currentPage, setCurrentPage] = useState(1);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Id del comprobante que se está previsualizando, para poder ofrecer la
+  // descarga con su nombre correcto cuando el formato no se puede mostrar.
+  const [previewDownloadId, setPreviewDownloadId] = useState<string | null>(null);
   const itemsPerPage = 7; // Mockup shows 7 items per page
 
   // Active tab state: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -593,14 +596,22 @@ export default function ReceiptsPage() {
                   <div className="col-span-1 flex items-center md:justify-center gap-1.5">
                     <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mr-auto">Comprobante:</span>
                     <button
-                      onClick={() => setPreviewUrl(receipt.receipt_url)}
+                      onClick={() => {
+                        setPreviewUrl(receipt.receipt_url);
+                        setPreviewDownloadId(receipt.id);
+                      }}
                       className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                       title="Previsualizar Comprobante"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => downloadDocument(receipt.receipt_url, `comprobante_${receipt.id}`)}
+                      onClick={() =>
+                        downloadDocument(
+                          receipt.receipt_url,
+                          getReceiptDownloadFilename(receipt.receipt_url, receipt.id)
+                        )
+                      }
                       className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                       title="Descargar Comprobante"
                     >
@@ -678,19 +689,72 @@ export default function ReceiptsPage() {
             className="relative w-full max-w-4xl h-[85vh] flex items-center justify-center animate-scale-up"
             onClick={(e) => e.stopPropagation()}
           >
-            {previewUrl.startsWith("data:application/pdf") ? (
-              <iframe 
-                src={previewUrl} 
-                className="w-full h-full rounded-2xl border border-white/10 shadow-2xl bg-white"
-                title="Full Preview"
-              />
-            ) : (
-              <img 
-                src={previewUrl} 
-                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl bg-white p-2 border border-white/10"
-                alt="Full Preview"
-              />
-            )}
+            {/*
+              El formato se decide por los bytes del archivo, no por el mime que
+              venga escrito: si no, una foto sacada con iPhone (HEIC) caia en el
+              <img> y postventa veia el icono de imagen rota, sin ninguna pista
+              de que el comprobante en realidad estaba bien.
+            */}
+            {(() => {
+              const preview = receiptFormat(previewUrl);
+              if (!preview.url) {
+                // Pago migrado de la planilla o condonación administrativa: no
+                // hay archivo que mostrar y tampoco nada que descargar.
+                return (
+                  <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center gap-3">
+                    <FileText className="w-12 h-12 text-slate-300" />
+                    <p className="text-sm font-black text-slate-800 uppercase tracking-wide">
+                      Sin comprobante digital
+                    </p>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Este pago se registró sin adjuntar la transferencia. El respaldo del
+                      cliente es el recibo oficial que emite Alimin.
+                    </p>
+                  </div>
+                );
+              }
+              if (preview.kind === "pdf") {
+                return (
+                  <iframe
+                    src={preview.url}
+                    className="w-full h-full rounded-2xl border border-white/10 shadow-2xl bg-white"
+                    title="Comprobante"
+                  />
+                );
+              }
+              if (preview.kind === "image" && preview.previewable) {
+                return (
+                  <img
+                    src={preview.url}
+                    className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl bg-white p-2 border border-white/10"
+                    alt="Comprobante"
+                  />
+                );
+              }
+              return (
+                <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center gap-3">
+                  <FileText className="w-12 h-12 text-slate-300" />
+                  <p className="text-sm font-black text-slate-800 uppercase tracking-wide">
+                    Formato {preview.ext.toUpperCase()}
+                  </p>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {preview.ext === "heic"
+                      ? "Es una foto de iPhone. El navegador no la puede mostrar acá, pero el archivo está bien: descárgalo y ábrelo con el visor de fotos del computador."
+                      : "El navegador no puede mostrar este tipo de archivo. Descárgalo para abrirlo en el computador."}
+                  </p>
+                  <button
+                    onClick={() =>
+                      previewDownloadId &&
+                      downloadDocument(previewUrl, getReceiptDownloadFilename(previewUrl, previewDownloadId))
+                    }
+                    className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Descargar comprobante
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -960,36 +1024,63 @@ export default function ReceiptsPage() {
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider self-start mb-2">Comprobante de Respaldo</span>
               
               <div className="flex-1 w-full bg-white border border-slate-200 rounded-xl overflow-hidden shadow-inner flex items-center justify-center relative">
-                {selectedReceipt.receipt_url && selectedReceipt.receipt_url.startsWith("data:image") ? (
-                  <img
-                    src={selectedReceipt.receipt_url}
-                    alt="Payment Document"
-                    className="max-w-full max-h-[320px] object-contain p-2"
-                  />
-                ) : selectedReceipt.receipt_url && selectedReceipt.receipt_url.startsWith("data:application/pdf") ? (
-                  <iframe
-                    src={`${selectedReceipt.receipt_url}#toolbar=0&navpanes=0&scrollbar=0`}
-                    className="w-full h-full border-none"
-                    title="PDF Respaldo"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-2 opacity-30 text-slate-500">
-                    <FileText className="w-12 h-12" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">Documento Digital</p>
-                  </div>
-                )}
+                {(() => {
+                  const respaldo = receiptFormat(selectedReceipt.receipt_url);
+                  if (respaldo.kind === "image" && respaldo.previewable) {
+                    return (
+                      <img
+                        src={respaldo.url}
+                        alt="Payment Document"
+                        className="max-w-full max-h-[320px] object-contain p-2"
+                      />
+                    );
+                  }
+                  if (respaldo.kind === "pdf" && respaldo.url) {
+                    return (
+                      <iframe
+                        src={`${respaldo.url}#toolbar=0&navpanes=0&scrollbar=0`}
+                        className="w-full h-full border-none"
+                        title="PDF Respaldo"
+                      />
+                    );
+                  }
+                  // Sin archivo (pago migrado o condonación) o formato que el
+                  // navegador no dibuja: se dice cuál es, en vez de dejar el
+                  // recuadro vacío como si el comprobante no existiera.
+                  return (
+                    <div className="flex flex-col items-center gap-2 px-4 text-center text-slate-500">
+                      <FileText className={cn("w-12 h-12", respaldo.url ? "text-slate-300" : "opacity-30")} />
+                      <p className="text-[10px] font-black uppercase tracking-widest">
+                        {respaldo.url ? `Archivo ${respaldo.ext.toUpperCase()}` : "Documento Digital"}
+                      </p>
+                      {respaldo.url && (
+                        <p className="text-[10px] text-slate-400 leading-snug">
+                          No se puede mostrar acá. Descárgalo para abrirlo.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="w-full flex gap-2 mt-4">
                 <button
-                  onClick={() => setPreviewUrl(selectedReceipt.receipt_url)}
+                  onClick={() => {
+                    setPreviewUrl(selectedReceipt.receipt_url);
+                    setPreviewDownloadId(selectedReceipt.id);
+                  }}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-slate-200 bg-white rounded-xl text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm font-bold"
                 >
                   <Eye className="w-4 h-4" />
                   Previsualizar
                 </button>
                 <button
-                  onClick={() => downloadDocument(selectedReceipt.receipt_url, `comprobante_${selectedReceipt.id}`)}
+                  onClick={() =>
+                    downloadDocument(
+                      selectedReceipt.receipt_url,
+                      getReceiptDownloadFilename(selectedReceipt.receipt_url, selectedReceipt.id)
+                    )
+                  }
                   className="p-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 rounded-xl transition-colors shadow-sm cursor-pointer"
                   title="Descargar archivo original"
                 >

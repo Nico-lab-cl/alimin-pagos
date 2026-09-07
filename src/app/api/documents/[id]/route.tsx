@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getInstallmentDueDate, getNominalInstallmentAmount } from "@/lib/financials";
 import { getReceiptLegalInfo } from "@/lib/receiptLegalInfo";
+import { receiptFileType } from "@/lib/receiptDocs";
 import { PaymentReceiptPDF } from "@/components/pdf/PaymentReceiptPDF";
 
 const OFFICIAL_RECEIPT_PREFIX = "official-";
@@ -213,18 +214,11 @@ export async function GET(
         where: { id },
       });
       if (receipt) {
-        let ext = "pdf";
-        let fileType = "application/pdf";
-        if (receipt.receipt_url && receipt.receipt_url.startsWith("data:")) {
-          const parts = receipt.receipt_url.split(";");
-          if (parts[0]) {
-            fileType = parts[0].substring(5);
-            if (fileType === "image/png") ext = "png";
-            else if (fileType === "image/jpeg") ext = "jpg";
-            else if (fileType === "image/webp") ext = "webp";
-            else if (fileType === "application/pdf") ext = "pdf";
-          }
-        }
+        // La extension sale de los bytes del archivo, no del mime declarado:
+        // el respaldo que sube el cliente desde el celular llega seguido con el
+        // mime equivocado y antes se bautizaba .pdf igual, asi que despues no
+        // lo abria ningun visor.
+        const { ext, fileType } = receiptFileType(receipt.receipt_url);
 
         let docName = "Comprobante de Pago";
         if (receipt.scope === "PIE") {
@@ -304,6 +298,12 @@ export async function GET(
     } else if (nameLower.endsWith(".webp")) {
         contentType = "image/webp";
         detectedExtension = "webp";
+    } else if (nameLower.endsWith(".heic") || nameLower.endsWith(".heif")) {
+        contentType = "image/heic";
+        detectedExtension = "heic";
+    } else if (nameLower.endsWith(".avif")) {
+        contentType = "image/avif";
+        detectedExtension = "avif";
     } else if (nameLower.endsWith(".docx")) {
         contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
         detectedExtension = "docx";
@@ -325,6 +325,12 @@ export async function GET(
         } else if (header.startsWith("52494646")) {
             contentType = "image/webp";
             detectedExtension = "webp";
+        } else if (buffer.subarray(4, 8).toString("latin1") === "ftyp") {
+            // Familia ISO-BMFF: las fotos que salen de un iPhone.
+            const brand = buffer.subarray(8, 12).toString("latin1").toLowerCase();
+            const isAvif = brand.startsWith("avif") || brand.startsWith("avis");
+            contentType = isAvif ? "image/avif" : "image/heic";
+            detectedExtension = isAvif ? "avif" : "heic";
         } else if (header.startsWith("504b0304")) {
             contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
             detectedExtension = "docx";
