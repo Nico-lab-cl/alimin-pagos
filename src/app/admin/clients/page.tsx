@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile, deletePaymentReceipt, updateMoraDates, getFinancialHistory, generateTemporaryPassword } from "@/actions/postventa";
+import { getAdminProjects, getFullPostventaData, updateClientProfile, updateClientFinancials, toggleMultiLot, toggleAlContado, registerManualPayment, activateClientProfile, deletePaymentReceipt, updateMoraDates, getFinancialHistory, generateTemporaryPassword, archivarFichaDuplicada } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import { formatCLP, formatDate, downloadCsv, esAlContado, formatFechaCsv } from "@/lib/utils";
@@ -257,6 +257,25 @@ export default function ClientsPage() {
     }
   };
 
+  // Archiva la copia atrasada que dejo el puente Lomas->Portal. El servidor
+  // vuelve a verificar que sea la copia y no la ficha buena antes de tocar nada.
+  const handleArchivarDuplicado = async (ficha: any) => {
+    const confirmar = confirm(
+      `Archivar la ficha duplicada de ${ficha.clientName} (Lote ${ficha.lotNumber}, ${ficha.paidCuotas}/${ficha.totalCuotas} cuotas)?
+
+` +
+      "Es la copia atrasada que dejo el puente de Lomas. La ficha buena del cliente NO se toca, y esta queda guardada en la base por si hay que revisarla."
+    );
+    if (!confirmar) return;
+
+    const res = await archivarFichaDuplicada(ficha.id);
+    if (res.error) toast.error(res.error);
+    else {
+      toast.success("Ficha duplicada archivada");
+      await refreshMainData();
+    }
+  };
+
   const handleDeleteReceipt = async (receiptId: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar este comprobante? Si está aprobado, se revertirá el conteo de cuotas.")) return;
     
@@ -278,6 +297,12 @@ export default function ClientsPage() {
   const rawClients = data?.data || [];
   const isTest = (c: any) => c.clientName?.toLowerCase().includes("nicolas cabrera") || c.clientEmail?.toLowerCase().includes("nicolas");
   const nonTestClients = rawClients.filter((c: any) => !isTest(c));
+  // Las fichas fantasma del puente Lomas (lib/fichasDuplicadas.ts) son la copia
+  // atrasada de un cliente que ya esta en el portal: se siguen viendo en "Todos
+  // los Clientes" para poder archivarlas, pero no son un cliente mas ni una mora
+  // mas, asi que no entran en ningun contador.
+  const fichasVigentes = nonTestClients.filter((c: any) => !c.isGhostDuplicate);
+  const fichasFantasma = nonTestClients.filter((c: any) => c.isGhostDuplicate);
   const testClients = rawClients.filter((c: any) => isTest(c));
 
   const uniqueStages: string[] = Array.from(new Set(nonTestClients.map((c: any) => c.lotStage).filter(Boolean)));
@@ -296,13 +321,13 @@ export default function ClientsPage() {
       ? ["OK", "COMPLETED", "FROZEN"]
       : ["OK", "COMPLETED"];
     return {
-      total: nonTestClients.length,
-      late: nonTestClients.filter((c: any) => c.status === "LATE").length,
-      grace: nonTestClients.filter((c: any) => c.status === "GRACE").length,
-      upcoming: nonTestClients.filter((c: any) => c.status === "UPCOMING").length,
-      ok: nonTestClients.filter((c: any) => okStatuses.includes(c.status)).length,
+      total: fichasVigentes.length,
+      late: fichasVigentes.filter((c: any) => c.status === "LATE").length,
+      grace: fichasVigentes.filter((c: any) => c.status === "GRACE").length,
+      upcoming: fichasVigentes.filter((c: any) => c.status === "UPCOMING").length,
+      ok: fichasVigentes.filter((c: any) => okStatuses.includes(c.status)).length,
     };
-  }, [nonTestClients, selectedProject]);
+  }, [fichasVigentes, selectedProject]);
 
   // Orden "natural" por numero de lote: extrae la parte numerica (ej. "L04A" -> 4)
   // para que el orden sea 1,2,3...10 en vez de alfabetico (1,10,2,3...). Ante empate
@@ -340,6 +365,8 @@ export default function ClientsPage() {
     const okStatusesForTab = selectedProject === "lomas-del-mar"
       ? ["OK", "COMPLETED", "FROZEN"]
       : ["OK", "COMPLETED"];
+
+    if (activeTab !== "ALL" && c.isGhostDuplicate) return false;
 
     if (activeTab === "LATE" && c.status !== "LATE") return false;
     if (activeTab === "GRACE" && c.status !== "GRACE") return false;
@@ -490,6 +517,43 @@ export default function ClientsPage() {
           </button>
         </div>
       </div>
+
+      {/* Fichas fantasma del puente Lomas: se avisan aparte porque no son un
+          cliente en mora, son una fila que hay que limpiar. */}
+      {!loading && fichasFantasma.length > 0 && (
+        <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-violet-600 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-violet-900">
+                {fichasFantasma.length === 1
+                  ? "Hay 1 ficha duplicada en este proyecto"
+                  : `Hay ${fichasFantasma.length} fichas duplicadas en este proyecto`}
+              </p>
+              <p className="text-xs text-violet-700 mt-0.5">
+                Son copias que dejo el puente de Lomas del mismo cliente en el mismo lote, congeladas en un
+                avance de cuotas atrasado. Ya no cuentan como mora ni reciben cobranza. Archivalas para sacarlas del listado.
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                {fichasFantasma.map((ficha: any) => (
+                  <div key={ficha.id} className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-violet-900">{ficha.clientName}</span>
+                    <span className="text-violet-700">
+                      Lote {ficha.lotNumber} · copia con {ficha.paidCuotas}/{ficha.totalCuotas} cuotas
+                    </span>
+                    <button
+                      onClick={() => handleArchivarDuplicado(ficha)}
+                      className="px-2.5 py-1 rounded-md bg-violet-600 text-white font-semibold hover:bg-violet-700 transition-colors cursor-pointer"
+                    >
+                      Archivar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs and Counts */}
       {!loading && rawClients.length > 0 && (
@@ -665,6 +729,15 @@ export default function ClientsPage() {
                     badgeStyle = "bg-slate-100 text-slate-500 border-slate-200";
                     dotColor = "bg-slate-400";
                     badgeText = "Congelado";
+                  }
+
+                  // La ficha fantasma manda sobre cualquier otro estado: lo que
+                  // hay que hacer con ella no es cobrarla, es archivarla.
+                  if (c.isGhostDuplicate) {
+                    badgeStyle = "bg-violet-50 text-violet-700 border-violet-200";
+                    dotColor = "bg-violet-400";
+                    badgeText = "Duplicado";
+                    balanceColor = "text-slate-400";
                   }
 
                   const initials = c.clientName 

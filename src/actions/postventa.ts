@@ -31,6 +31,7 @@ import {
   receiptFileType,
   receiptHasFile,
 } from "@/lib/receiptDocs";
+import { detectarFichasFantasma } from "@/lib/fichasDuplicadas";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -558,12 +559,24 @@ export async function getFullPostventaData({
       };
     });
 
+    // Fichas fantasma del puente Lomas: la misma persona repetida en el mismo
+    // lote. La copia viene congelada en el avance de cuotas de Lomas, que va
+    // atrasado, asi que aparece "en mora" por una cuota que postventa ya cobro.
+    // Se marcan (no se esconden: postventa tiene que poder verlas y archivarlas)
+    // y quedan fuera de los contadores y de las audiencias de cobranza.
+    const fantasmas = detectarFichasFantasma(processedData);
+    for (const ficha of processedData) {
+      (ficha as any).isGhostDuplicate = fantasmas.has(ficha.id);
+    }
+    const fichasReales = processedData.filter((d) => !fantasmas.has(d.id));
+
     const stats = {
-      total: processedData.length,
-      late: processedData.filter((d) => d.status === "LATE").length,
-      grace: processedData.filter((d) => d.status === "GRACE").length,
-      upcoming: processedData.filter((d) => d.status === "UPCOMING").length,
-      ok: processedData.filter((d) => d.status === "OK").length,
+      total: fichasReales.length,
+      late: fichasReales.filter((d) => d.status === "LATE").length,
+      grace: fichasReales.filter((d) => d.status === "GRACE").length,
+      upcoming: fichasReales.filter((d) => d.status === "UPCOMING").length,
+      ok: fichasReales.filter((d) => d.status === "OK").length,
+      fantasmas: fantasmas.size,
     };
 
     const result = { success: true, data: processedData, stats, project };
@@ -639,6 +652,91 @@ export async function updateReservation(
   } catch (error) {
     console.error("Error updating reservation:", error);
     return { error: "Error al actualizar" };
+  }
+}
+
+/**
+ * Archiva una ficha fantasma: la copia atrasada que el puente Lomas->Portal
+ * dejo de un cliente que ya estaba en el portal (ver lib/fichasDuplicadas.ts).
+ *
+ * No borra nada. Deja `status` en "ARCHIVED", que queda fuera de los
+ * ["active","COMPLETED"] que leen getFullPostventaData y getUserLots, asi que
+ * la ficha desaparece del directorio, de los contadores de mora, de las
+ * audiencias de cobranza y del portal del cliente -- pero la fila, sus
+ * comprobantes y su historial siguen en la base por si hay que revisarlos.
+ *
+ * Antes de archivar vuelve a comprobar EN EL SERVIDOR que la ficha sea
+ * efectivamente la copia. Si no lo es, no hace nada: archivar por error la
+ * ficha buena le borraria el lote del portal al cliente.
+ */
+export async function archivarFichaDuplicada(reservationId: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const ficha = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { lot: true, project: true },
+    });
+    if (!ficha) return { error: "Ficha no encontrada" };
+    if (user.allowedProjects && !user.allowedProjects.includes(ficha.project.slug)) {
+      return { error: "No tienes acceso a este proyecto" };
+    }
+
+    // Se vuelve a mirar el lote completo: cual ficha es la copia solo se puede
+    // decidir comparandola con las otras del mismo lote, no por si sola.
+    const enElLote = await prisma.reservation.findMany({
+      where: { lot_id: ficha.lot_id, status: { in: ["active", "COMPLETED"] } },
+      include: { user: { select: { id: true, email: true } } },
+    });
+
+    const comparables = enElLote.map((r) => ({
+      id: r.id,
+      lotId: r.lot_id,
+      rut: r.rut,
+      clientEmail: r.user?.email || r.email,
+      buyer: r.user,
+      paidCuotas: r.installments_paid,
+      internalStatus: r.status,
+    }));
+
+    if (!detectarFichasFantasma(comparables).has(reservationId)) {
+      return {
+        error:
+          "Esta ficha no es un duplicado: o es la unica del lote, o es la mas avanzada en cuotas. No se archivo nada.",
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+      await tx.reservation.update({
+        where: { id: reservationId },
+        data: { status: "ARCHIVED" },
+      });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "Reservation",
+        entity_id: reservationId,
+        details: `Ficha duplicada archivada (status ARCHIVED): ${ficha.name} ${ficha.last_name || ""} - Lote #${ficha.lot.number}(e${ficha.lot.stage}), ${ficha.installments_paid || 0} cuotas pagadas. Era la copia atrasada que dejo el puente Lomas->Portal; la ficha vigente del lote no se toco.`,
+        user_id: user.id,
+        user_email: user.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error archivando ficha duplicada:", error);
+    return { error: "Error al archivar la ficha" };
   }
 }
 

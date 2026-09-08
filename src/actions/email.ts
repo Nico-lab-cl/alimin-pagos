@@ -74,6 +74,10 @@ function santiagoDayKey(date: Date | string | null | undefined): string | null {
  */
 function matchesAudience(client: any, audience: EmailAudience, todayKey: string): boolean {
   if (client.status === "COMPLETED" || client.status === "FROZEN") return false;
+  // Ficha fantasma del puente Lomas (ver lib/fichasDuplicadas.ts): es la copia
+  // atrasada de un cliente que ya esta en el portal, asi que su "mora" es de una
+  // cuota que en realidad esta pagada. Cobrarle por ahi seria cobrarle dos veces.
+  if (client.isGhostDuplicate) return false;
   switch (audience) {
     case "TODOS":
       return true;
