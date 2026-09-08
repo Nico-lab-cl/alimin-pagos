@@ -90,7 +90,13 @@ export default function AdminDashboard() {
     );
   }
 
-  const clientsList = data?.data || [];
+  // Fuera las fichas fantasma del puente Lomas (lib/fichasDuplicadas.ts): son la
+  // copia atrasada de un cliente que ya esta en el portal, con lo cual el MISMO
+  // lote se estaba contando dos veces en el saldo pendiente, en el conteo de
+  // clientes activos, en los en mora y en el CSV. Ningun cliente real cambia de
+  // cifra: lo que se va es el duplicado. Para verlas y limpiarlas esta el aviso
+  // de /admin/clients.
+  const clientsList = (data?.data || []).filter((c: any) => !c.isGhostDuplicate);
   const totalPend = clientsList.reduce((acc: number, curr: any) => acc + curr.pendingBalance, 0);
 
   const filteredClients = clientsList.filter((c: any) => {

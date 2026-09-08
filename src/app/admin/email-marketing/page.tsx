@@ -116,12 +116,18 @@ export default function ReportsPage() {
         const clientResults = await Promise.all(
           activeProjects.map((p: any) => getFullPostventaData({ projectSlug: p.slug }))
         );
+        // Fuera las fichas fantasma del puente Lomas (lib/fichasDuplicadas.ts): son
+        // la copia atrasada de un cliente que ya esta en el portal, asi que su mora
+        // es de una cuota que en realidad esta pagada. Contarlas aca inflaba la mora
+        // del proyecto y podia meter a un cliente al dia en este listado.
         const allClients = clientResults.flatMap((res, i) =>
-          (res.data || []).map((c: any) => ({
-            ...c,
-            projectName: activeProjects[i].name,
-            projectSlug: activeProjects[i].slug,
-          }))
+          (res.data || [])
+            .filter((c: any) => !c.isGhostDuplicate)
+            .map((c: any) => ({
+              ...c,
+              projectName: activeProjects[i].name,
+              projectSlug: activeProjects[i].slug,
+            }))
         );
 
         // Filter combined clients based on selectedProject
