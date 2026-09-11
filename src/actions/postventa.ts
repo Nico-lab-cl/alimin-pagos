@@ -4132,6 +4132,144 @@ export async function deletePaymentReceipt(receiptId: string) {
   }
 }
 
+/**
+ * Un comprobante ya existente, ¿cubre esta cuota? Mismo cruce que hace el portal
+ * del cliente (lib/utils.ts comprobanteCubreCuota). Se repite acá en vez de
+ * importarlo porque ese módulo arrastra Capacitor, que no tiene nada que hacer
+ * en el servidor.
+ */
+function comprobanteYaCubreCuota(
+  r: { nominal_installment_number?: number | null; nominal_installment_range?: string | null },
+  cuota: number
+): boolean {
+  if (r.nominal_installment_number === cuota) return true;
+  if (r.nominal_installment_range) {
+    const [desde, hasta] = String(r.nominal_installment_range).split("-").map(Number);
+    if (Number.isFinite(desde) && Number.isFinite(hasta)) return cuota >= desde && cuota <= hasta;
+  }
+  return false;
+}
+
+/**
+ * Cuelga el comprobante bancario de una cuota que YA está pagada en el sistema.
+ *
+ * El caso: la cuota se sumó sin archivo detrás (pago manual sin adjuntar la
+ * transferencia, cuota migrada de la planilla, o "Cuotas Pagadas" editado a
+ * mano). El saldo del cliente está bien, pero en su portal esa fila queda con
+ * "—" en Fecha de Pago y sin nada que descargar, y el cliente lo lee como "mi
+ * pago no está en el sistema" (caso Romina, Lomas L-29 cuota 4). Hasta ahora la
+ * única forma de darle el archivo era registrar el pago de nuevo, y eso le
+ * sumaba una cuota que no pagó.
+ *
+ * Esto NO es un pago: no toca installments_paid, no escribe en caja, no toca
+ * mora ni pie. Solo adjunta el respaldo de una cuota ya contada — la plata ya
+ * está registrada, y volver a anotarla la contaría dos veces en caja y en los
+ * KPIs. Con el comprobante colgado, la cuota pasa a mostrar su fecha de pago
+ * real y el cliente puede descargar tanto su transferencia como el recibo
+ * oficial de Alimin.
+ */
+export async function adjuntarComprobanteACuotaPagada(
+  reservationId: string,
+  cuota: number,
+  data: { receiptBase64: string; amount: number; paidAt: string }
+) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const res = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { lot: true, project: true, receipts: true },
+    });
+    if (!res) return { error: "Reserva no encontrada" };
+    if (user.allowedProjects && !user.allowedProjects.includes(res.project.slug)) {
+      return { error: "No tienes acceso a este proyecto" };
+    }
+
+    const pagadas = res.installments_paid || 0;
+    if (!Number.isInteger(cuota) || cuota < 1) {
+      return { error: "Número de cuota inválido" };
+    }
+    // Solo cuotas ya contadas. Si la cuota todavía no está pagada, lo que
+    // corresponde es Registrar Pago Manual, que sí la suma y la deja en caja.
+    if (cuota > pagadas) {
+      return {
+        error: `La cuota ${cuota} todavía no figura pagada (van ${pagadas}). Para sumarla usa Registrar Pago Manual.`,
+      };
+    }
+
+    const yaTiene = res.receipts.find(
+      (r) => r.status === "APPROVED" && comprobanteYaCubreCuota(r, cuota)
+    );
+    if (yaTiene) {
+      return {
+        error: `La cuota ${cuota} ya tiene un comprobante adjunto. Si lo vas a reemplazar, elimina primero el anterior.`,
+      };
+    }
+
+    if (!receiptHasFile(data.receiptBase64)) {
+      return { error: "Falta el archivo del comprobante" };
+    }
+    if (!data.amount || data.amount <= 0) {
+      return { error: "El monto del comprobante debe ser mayor a cero" };
+    }
+
+    const paymentDate = new Date(data.paidAt + "T12:00:00");
+    if (Number.isNaN(paymentDate.getTime())) {
+      return { error: "Fecha de pago inválida" };
+    }
+
+    const receiptId = crypto.randomUUID();
+    await prisma.paymentReceipt.create({
+      data: {
+        id: receiptId,
+        reservation_id: reservationId,
+        lot_id: res.lot_id,
+        amount_clp: data.amount,
+        receipt_url: data.receiptBase64,
+        scope: "INSTALLMENT",
+        installments_count: 1,
+        status: "APPROVED",
+        // Las dos fechas son las del pago real, no las de hoy: el portal del
+        // cliente muestra processed_at en la columna "Fecha de Pago" de esa
+        // cuota, así que ponerle hoy le mentiría la fecha al cliente.
+        created_at: paymentDate,
+        processed_at: paymentDate,
+        nominal_installment_number: cuota,
+      },
+    });
+
+    const lote = `#${res.lot.number}${res.lot.stage ? `(e${res.lot.stage})` : ""}`;
+    const detalle = `Comprobante adjuntado a la cuota ${cuota}, que ya figuraba pagada. Cliente: ${res.name} ${res.last_name || ""} - Lote ${lote}. Monto del comprobante: $${data.amount.toLocaleString("es-CL")}, pagado el ${paymentDate.toLocaleDateString("es-CL")}. Solo respaldo documental: no suma cuotas, no mueve caja ni mora.`;
+
+    await logSystemNote(reservationId, detalle, "PaymentReceipt");
+
+    await prisma.auditLog.create({
+      data: {
+        action: "CREATE",
+        entity: "PaymentReceipt",
+        entity_id: receiptId,
+        details: `${detalle} ID Reserva: ${reservationId}`,
+        user_id: user.id,
+        user_email: user.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    memoryCache.deleteByPrefix("receipts_");
+    revalidatePath("/admin");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error adjuntando comprobante a cuota pagada:", error);
+    return { error: "Error al adjuntar el comprobante" };
+  }
+}
+
 export async function updateMoraDates(
   reservationId: string,
   startDate: string | null,

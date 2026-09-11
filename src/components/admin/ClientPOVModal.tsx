@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { getClientPOV } from "@/actions/postventa";
+import { useCallback, useEffect, useState } from "react";
+import { getClientPOV, adjuntarComprobanteACuotaPagada } from "@/actions/postventa";
 import { uploadPaymentReceipt } from "@/actions/user";
 import { formatCLP, getDownloadFilename, downloadDocument, cn, formatInstallmentsLabel, comprobanteCubreCuota, urlReciboOficial } from "@/lib/utils";
 import { toast } from "sonner";
@@ -49,10 +49,12 @@ export default function ClientPOVModal({ reservationId, clientName, onClose }: C
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
 
-  useEffect(() => {
+  // Se deja como función aparte para poder volver a leer la ficha después de
+  // adjuntarle un comprobante a una cuota, sin cerrar y reabrir la vista.
+  const cargarDatos = useCallback(() => {
     setLoading(true);
     setError("");
-    getClientPOV(reservationId)
+    return getClientPOV(reservationId)
       .then((result) => {
         if (result.error) {
           setError(result.error);
@@ -63,6 +65,10 @@ export default function ClientPOVModal({ reservationId, clientName, onClose }: C
       .catch(() => setError("Error de conexión"))
       .finally(() => setLoading(false));
   }, [reservationId]);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   return (
     <div
@@ -147,7 +153,7 @@ export default function ClientPOVModal({ reservationId, clientName, onClose }: C
             </div>
           ) : data ? (
             <>
-              {activeTab === "dashboard" && <DashboardView data={data} onTabChange={setActiveTab} />}
+              {activeTab === "dashboard" && <DashboardView data={data} onTabChange={setActiveTab} onRefresh={cargarDatos} />}
               {activeTab === "payment" && <PaymentView data={data} reservationId={reservationId} />}
               {activeTab === "documents" && <DocumentsView data={data} />}
             </>
@@ -159,7 +165,78 @@ export default function ClientPOVModal({ reservationId, clientName, onClose }: C
 }
 
 /* ──────────────────── DASHBOARD VIEW ──────────────────── */
-function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: TabType) => void }) {
+function DashboardView({
+  data,
+  onTabChange,
+  onRefresh,
+}: {
+  data: any;
+  onTabChange: (tab: TabType) => void;
+  onRefresh?: () => void;
+}) {
+  // Adjuntar el respaldo bancario de una cuota que YA figura pagada pero quedó
+  // sin comprobante detrás. El cliente la ve con "—" en Fecha de Pago y sin nada
+  // que descargar, y lo lee como "mi pago no está en el sistema". No es un pago
+  // nuevo: no suma cuotas, no mueve caja ni mora (ver adjuntarComprobanteACuotaPagada).
+  const [cuotaAAdjuntar, setCuotaAAdjuntar] = useState<any>(null);
+  const [archivoAdjunto, setArchivoAdjunto] = useState<File | null>(null);
+  const [montoAdjunto, setMontoAdjunto] = useState(0);
+  const [fechaAdjunto, setFechaAdjunto] = useState("");
+  const [adjuntando, setAdjuntando] = useState(false);
+
+  const abrirAdjuntar = (item: any) => {
+    setArchivoAdjunto(null);
+    setMontoAdjunto(data.paidInstallmentAmounts?.[item.numero] || data.valor_cuota || 0);
+    // Se propone el vencimiento pactado de esa cuota; postventa lo corrige con
+    // la fecha real que diga la transferencia, que es la que verá el cliente.
+    setFechaAdjunto(
+      data.paidInstallmentDueDates?.[item.numero]
+        ? new Date(data.paidInstallmentDueDates[item.numero]).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0]
+    );
+    setCuotaAAdjuntar(item);
+  };
+
+  const guardarAdjunto = async () => {
+    if (!cuotaAAdjuntar) return;
+    if (!archivoAdjunto) {
+      toast.error("Selecciona el comprobante del cliente");
+      return;
+    }
+    setAdjuntando(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Error al leer archivo"));
+        reader.readAsDataURL(archivoAdjunto);
+      });
+
+      const res = await adjuntarComprobanteACuotaPagada(
+        data.reservationId,
+        cuotaAAdjuntar.numero,
+        { receiptBase64: base64, amount: montoAdjunto, paidAt: fechaAdjunto }
+      );
+
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+
+      toast.success(`Comprobante adjuntado a la cuota ${cuotaAAdjuntar.numero}`, {
+        description:
+          "El cliente ya lo ve en su portal, con su fecha de pago. No se sumaron cuotas ni se movió caja.",
+        duration: 8000,
+      });
+      setCuotaAAdjuntar(null);
+      onRefresh?.();
+    } catch {
+      toast.error("No se pudo adjuntar el comprobante");
+    } finally {
+      setAdjuntando(false);
+    }
+  };
+
   const [historyPage, setHistoryPage] = useState(1);
   const formatDateMockup = (dateInput: any) => {
     if (!dateInput) return "—";
@@ -208,6 +285,7 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: Ta
     const comprobanteDigital = urlReciboOficial(data.reservationId, i, matchingReceipt?.id);
 
     paymentHistory.push({
+      numero: i,
       cuota: `Cuota #${String(i).padStart(2, '0')}`,
       vencimiento: formatDateMockup(dueDate),
       fechaPago: payDate ? formatDateMockup(payDate) : "—",
@@ -373,6 +451,18 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: Ta
                                 <Download className="w-3.5 h-3.5 text-emerald-700" />
                               </button>
                             )}
+                            {/* Cuota pagada SIN la transferencia del cliente detrás: es la
+                                fila que el cliente ve con "—" en Fecha de Pago. Este botón
+                                lo ve solo postventa; el cliente no lo tiene. */}
+                            {!item.comprobanteCliente && (
+                              <button
+                                onClick={() => abrirAdjuntar(item)}
+                                className="text-amber-700 hover:text-amber-800 transition-colors p-1.5 rounded-lg hover:bg-amber-100 inline-flex items-center justify-center cursor-pointer border border-amber-200 bg-amber-50/60"
+                                title="Esta cuota no tiene la transferencia del cliente: adjuntarla"
+                              >
+                                <Upload className="w-3.5 h-3.5 text-amber-700" />
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400 italic">No disponible</span>
@@ -485,6 +575,91 @@ function DashboardView({ data, onTabChange }: { data: any; onTabChange: (tab: Ta
         </div>
       </div>
 
+      {/* Adjuntar comprobante a una cuota ya pagada. Es una acción de postventa
+          sobre la vista del cliente, no algo que el cliente pueda hacer. */}
+      {cuotaAAdjuntar && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => !adjuntando && setCuotaAAdjuntar(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-2">
+              <h3 className="text-base font-bold text-slate-800">
+                Adjuntar comprobante — {cuotaAAdjuntar.cuota}
+              </h3>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Esta cuota ya figura pagada, pero se registró sin la transferencia: por eso el
+                cliente la ve sin fecha de pago y cree que su pago no está en el sistema.
+                Adjuntar el archivo <span className="font-bold text-slate-700">no suma cuotas,
+                no mueve caja ni mora</span> — solo le devuelve el respaldo.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                Monto de la transferencia
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={montoAdjunto}
+                onChange={(e) => setMontoAdjunto(Number(e.target.value))}
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 focus:border-brand-500 outline-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                Fecha del pago (la que dice el comprobante)
+              </label>
+              <input
+                type="date"
+                value={fechaAdjunto}
+                onChange={(e) => setFechaAdjunto(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 focus:border-brand-500 outline-none"
+              />
+              <p className="text-[10px] text-slate-400 font-medium">
+                Es la fecha que va a ver el cliente en la columna Fecha de Pago.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                Comprobante del cliente (imagen o PDF)
+              </label>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => setArchivoAdjunto(e.target.files?.[0] || null)}
+                className="w-full border border-slate-200 bg-slate-50/50 rounded-xl px-3 py-2 text-xs font-medium text-slate-600 cursor-pointer focus:border-brand-500 outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={adjuntando}
+                onClick={() => setCuotaAAdjuntar(null)}
+                className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-xl font-bold text-xs transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={adjuntando}
+                onClick={guardarAdjunto}
+                className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-60"
+              >
+                {adjuntando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Adjuntar comprobante
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
