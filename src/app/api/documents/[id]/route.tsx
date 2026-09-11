@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getInstallmentDueDate, getNominalInstallmentAmount } from "@/lib/financials";
 import { getReceiptLegalInfo } from "@/lib/receiptLegalInfo";
-import { receiptFileType } from "@/lib/receiptDocs";
+import { receiptFileType, fechaDePagoComprobante } from "@/lib/receiptDocs";
 import { PaymentReceiptPDF } from "@/components/pdf/PaymentReceiptPDF";
 
 const OFFICIAL_RECEIPT_PREFIX = "official-";
@@ -128,7 +128,9 @@ export async function GET(
         }
       }
 
-      const receiptDate = receipt.processed_at || receipt.created_at || new Date();
+      // El recibo oficial lleva la fecha en que el cliente pagó, no la del día
+      // en que postventa revisó la bandeja.
+      const receiptDate = fechaDePagoComprobante(receipt) || new Date();
       const startDate = receipt.reservation.installment_start_date || receipt.reservation.created_at || new Date();
       const dueDay = receipt.reservation.due_day || undefined;
 

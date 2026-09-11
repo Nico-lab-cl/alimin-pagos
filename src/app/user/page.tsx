@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { getUserLots, getUserNotifications, markNotificationAsRead } from "@/actions/user";
 import { formatCLP, getDownloadFilename, downloadDocument, comprobanteCubreCuota, urlReciboOficial } from "@/lib/utils";
+import { fechaDePagoComprobante } from "@/lib/receiptDocs";
 import {
   Home,
   CheckCircle2,
@@ -103,11 +104,9 @@ export default function UserDashboard() {
       dueDate = new Date(lot.paidInstallmentDueDates[i]);
     }
 
-    // Fecha en que se aprobó el pago. Solo existe si hay un comprobante detrás:
-    // una cuota migrada o registrada a mano no tiene aprobación que mostrar.
-    const payDate = matchingReceipt
-      ? new Date(matchingReceipt.processed_at || matchingReceipt.created_at)
-      : null;
+    // Fecha en que el cliente pagó. Solo existe si hay un comprobante detrás:
+    // una cuota migrada o registrada a mano no tiene nada que mostrar.
+    const payDate = fechaDePagoComprobante(matchingReceipt);
 
     // El recibo oficial siempre está disponible para una cuota pagada: se emite
     // al vuelo, con o sin comprobante del cliente detrás. Antes se buscaba un

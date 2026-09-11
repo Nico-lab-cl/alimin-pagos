@@ -979,7 +979,21 @@ function getMoraBreakdownText(
   return `Desglose del interés automático vigente:\n${lines.join("\n")}`;
 }
 
-export async function approveReceipt(receiptId: string) {
+export async function approveReceipt(
+  receiptId: string,
+  // Lo que dice la transferencia, leído del comprobante por quien aprueba.
+  //
+  // El portal estampa el comprobante con SU cálculo del momento en que el
+  // cliente lo sube: la cuota más la mora de ese día. Pero el cliente puede
+  // haber transferido antes (típico: paga el último día de plazo y sube el
+  // respaldo a la mañana siguiente) y por un monto distinto del sugerido. Al
+  // aprobar sin estos datos se le cobraba un día de interés que no debía y en
+  // caja entraba una cifra que el banco nunca recibió.
+  //
+  // Si no se declaran, el comportamiento es el de siempre: fecha de subida del
+  // comprobante y monto estampado por el portal.
+  datosReales?: { paidAt?: string; amount?: number }
+) {
   const session = await auth();
   const user = session?.user as any;
   if (!session?.user || user?.role !== "ADMIN") {
@@ -1002,6 +1016,34 @@ export async function approveReceipt(receiptId: string) {
     });
 
     if (!receipt) return { error: "Comprobante no encontrado" };
+
+    // Fecha en que el cliente efectivamente pagó. La declarada manda; si no
+    // viene, se cae a la de subida del comprobante — que ya era mejor que la de
+    // aprobación, porque la bandeja se revisa días después y medir contra la
+    // mora de HOY le cobraba al cliente los días que su comprobante estuvo
+    // esperando revisión.
+    let paymentDate = getSantiagoUTCDate(
+      receipt.created_at ? new Date(receipt.created_at) : new Date()
+    );
+    if (datosReales?.paidAt) {
+      const declarada = new Date(datosReales.paidAt + "T12:00:00");
+      if (Number.isNaN(declarada.getTime())) {
+        return { error: "Fecha de pago inválida" };
+      }
+      paymentDate = getSantiagoUTCDate(declarada);
+      if (paymentDate.getTime() > getChileToday().getTime()) {
+        return { error: "La fecha del pago no puede ser futura" };
+      }
+    }
+
+    // Monto que realmente entró a la cuenta. Reemplaza al estampado por el
+    // portal, así la caja, el recibo oficial y el aviso al cliente dicen los
+    // tres lo mismo que la cartola del banco.
+    if (datosReales?.amount != null && !(datosReales.amount > 0)) {
+      return { error: "El monto del pago debe ser mayor a cero" };
+    }
+    const montoReal = datosReales?.amount ?? receipt.amount_clp;
+    const montoCorregido = montoReal !== receipt.amount_clp;
 
     // IMPORTANTE: el marcado del recibo como APROBADO se hace DENTRO de la misma
     // transacción que actualiza la reserva (incremento de cuotas / pie) + ledger.
@@ -1028,7 +1070,12 @@ export async function approveReceipt(receiptId: string) {
         await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
         await tx.paymentReceipt.update({
           where: { id: receiptId },
-          data: { status: "APPROVED", processed_at: new Date() },
+          data: {
+            status: "APPROVED",
+            processed_at: new Date(),
+            paid_at: paymentDate,
+            amount_clp: montoReal,
+          },
         });
         await tx.reservation.update({
           where: { id: receipt.reservation_id },
@@ -1037,9 +1084,10 @@ export async function approveReceipt(receiptId: string) {
         await tx.financialLedger.create({
           data: {
             reservation_id: receipt.reservation_id,
-            amount_clp: receipt.amount_clp,
+            amount_clp: montoReal,
             category: "PIE",
-            description: "Pago de Pie Aprobado"
+            description: "Pago de Pie Aprobado",
+            paid_at: paymentDate,
           }
         });
       });
@@ -1060,20 +1108,13 @@ export async function approveReceipt(receiptId: string) {
         if (range) expectedCuotaBase = Number(range.amount);
 
         const totalExpectedPerCuota = expectedCuotaBase * (receipt.installments_count || 1);
-        // Fecha en que el cliente efectivamente pagó: la de subida del
-        // comprobante, no la de aprobación. La bandeja se revisa días después,
-        // y medir contra la mora de HOY le cobraba al cliente los días que su
-        // comprobante estuvo esperando revisión.
-        const paymentDate = getSantiagoUTCDate(
-          receipt.created_at ? new Date(receipt.created_at) : new Date()
-        );
         // Mora REAL que debía A LA FECHA DEL PAGO (automática + fija, menos los
         // abonos de mora ya hechos). Lo único que cambia respecto de antes es la
         // fecha de corte: sigue siendo el mismo cálculo, así que una multa
         // pactada anterior se preserva igual que siempre en el faltante.
         const currentPenalty = calculateCurrentMoraOwed(res, res.project, paymentDate);
         // User requested: "primero a la cuota y luego al interes"
-        const paid = receipt.amount_clp;
+        const paid = montoReal;
         const cuotaPaidAmount = Math.min(paid, totalExpectedPerCuota);
         const penaltyPaidAmount = Math.max(0, paid - totalExpectedPerCuota);
 
@@ -1095,6 +1136,10 @@ export async function approveReceipt(receiptId: string) {
             data: {
               status: "APPROVED",
               processed_at: new Date(),
+              // La fecha de la transferencia y lo que realmente llegó: es lo que
+              // el cliente ve como Fecha de Pago y lo que imprime su recibo.
+              paid_at: paymentDate,
+              amount_clp: montoReal,
               // Se re-estampa con la cuota real que amortiza (ver arriba).
               nominal_installment_number: approvedInstNum,
               nominal_installment_range: approvedInstRange,
@@ -1122,7 +1167,8 @@ export async function approveReceipt(receiptId: string) {
                 reservation_id: receipt.reservation_id,
                 amount_clp: cuotaPaidAmount,
                 category: "CUOTA",
-                description: `Pago Cuota x${receipt.installments_count || 1} Aprobado`
+                description: `Pago Cuota x${receipt.installments_count || 1} Aprobado`,
+                paid_at: paymentDate,
               }
             });
           }
@@ -1133,11 +1179,20 @@ export async function approveReceipt(receiptId: string) {
                 reservation_id: receipt.reservation_id,
                 amount_clp: penaltyPaidAmount,
                 category: "PENALTY",
-                description: `Pago Mora Aprobada`
+                description: `Pago Mora Aprobada`,
+                paid_at: paymentDate,
               }
             });
           }
         });
+
+        if (montoCorregido) {
+          await logSystemNote(
+            receipt.reservation_id,
+            `Monto corregido al aprobar: el portal había estampado ${receipt.amount_clp.toLocaleString("es-CL")} y la transferencia dice ${montoReal.toLocaleString("es-CL")}. Se registró el monto de la transferencia.`,
+            "PaymentReceipt"
+          );
+        }
 
         if (shortfall > 0) {
           const noteText = `Multa fija actualizada a $${shortfall.toLocaleString("es-CL")} (el pago cubrió la cuota pero no el interés acumulado).${moraBreakdownText ? "\n\n" + moraBreakdownText : ""}`;
@@ -1258,8 +1313,8 @@ export async function approveReceipt(receiptId: string) {
         reservationId: receipt.reservation_id,
         kind: receipt.scope === "PIE" ? "PIE" : "CUOTA",
         source: "RECEIPT",
-        amount: receipt.amount_clp,
-        paidAt: new Date(),
+        amount: montoReal,
+        paidAt: paymentDate,
         firstInstallmentNumber: approvedInstNum,
         installmentsCount: receipt.installments_count || 1,
         sentBy: user.email,
@@ -1286,7 +1341,13 @@ export async function approveReceipt(receiptId: string) {
  * excedente para que postventa lo registre aparte como pago de cuota.
  * No modifica ningún otro dato de la reserva.
  */
-export async function approveReceiptAsInterestPayment(receiptId: string) {
+export async function approveReceiptAsInterestPayment(
+  receiptId: string,
+  // Lo que dice la transferencia (ver approveReceipt): mismo criterio, para que
+  // abonar a intereses no quede midiendo contra la mora de hoy cuando el cliente
+  // pagó antes.
+  datosReales?: { paidAt?: string; amount?: number }
+) {
   const session = await auth();
   const adminUser = session?.user as any;
   if (!session?.user || adminUser?.role !== "ADMIN") {
@@ -1303,14 +1364,34 @@ export async function approveReceiptAsInterestPayment(receiptId: string) {
     if (receipt.status !== "PENDING") return { error: "Este comprobante ya fue procesado" };
     if (receipt.scope !== "INSTALLMENT") return { error: "Solo se puede abonar a intereses un comprobante de cuota" };
 
+    let paymentDate = getSantiagoUTCDate(
+      receipt.created_at ? new Date(receipt.created_at) : new Date()
+    );
+    if (datosReales?.paidAt) {
+      const declarada = new Date(datosReales.paidAt + "T12:00:00");
+      if (Number.isNaN(declarada.getTime())) {
+        return { error: "Fecha de pago inválida" };
+      }
+      paymentDate = getSantiagoUTCDate(declarada);
+      if (paymentDate.getTime() > getChileToday().getTime()) {
+        return { error: "La fecha del pago no puede ser futura" };
+      }
+    }
+    if (datosReales?.amount != null && !(datosReales.amount > 0)) {
+      return { error: "El monto del pago debe ser mayor a cero" };
+    }
+    const montoReal = datosReales?.amount ?? receipt.amount_clp;
+
     const res = receipt.reservation;
-    const currentMora = calculateCurrentMoraOwed(res, res.project);
+    // La mora que el cliente debía EL DÍA QUE PAGÓ. Abonar contra la de hoy le
+    // descontaba menos de lo que su plata alcanzaba a cubrir ese día.
+    const currentMora = calculateCurrentMoraOwed(res, res.project, paymentDate);
 
     if (currentMora <= 0) {
       return { error: "Este cliente no tiene mora pendiente por abonar" };
     }
 
-    const paid = receipt.amount_clp;
+    const paid = montoReal;
     const appliedToMora = Math.min(paid, currentMora);
     const excess = Math.max(0, paid - currentMora);
     const remainingMora = currentMora - appliedToMora;
@@ -1319,15 +1400,21 @@ export async function approveReceiptAsInterestPayment(receiptId: string) {
       await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
       await tx.paymentReceipt.update({
         where: { id: receiptId },
-        data: { status: "APPROVED", processed_at: new Date() },
+        data: {
+          status: "APPROVED",
+          processed_at: new Date(),
+          paid_at: paymentDate,
+          amount_clp: montoReal,
+        },
       });
       await tx.reservation.update({
         where: { id: receipt.reservation_id },
         data: {
           manual_penalty: remainingMora > 0 ? remainingMora : null,
           penalty_mode: remainingMora > 0 ? "MIXED" : "AUTO",
-          // Re-fija la fecha desde la que la mora restante sigue creciendo día a día.
-          debt_start_date: remainingMora > 0 ? getChileToday() : null,
+          // Re-fija la fecha desde la que la mora restante sigue creciendo día a
+          // día: desde que pagó, no desde hoy.
+          debt_start_date: remainingMora > 0 ? paymentDate : null,
           debt_end_date: null,
         },
       });
@@ -1337,6 +1424,7 @@ export async function approveReceiptAsInterestPayment(receiptId: string) {
           amount_clp: appliedToMora,
           category: "PENALTY",
           description: "Abono de Intereses Aprobado (Bandeja de Pagos)",
+          paid_at: paymentDate,
         },
       });
     });
@@ -1407,7 +1495,7 @@ export async function approveReceiptAsInterestPayment(receiptId: string) {
       kind: "INTERES",
       source: "RECEIPT",
       amount: appliedToMora,
-      paidAt: new Date(),
+      paidAt: paymentDate,
       sentBy: adminUser.email,
     });
 
@@ -2680,6 +2768,7 @@ export async function registerManualPayment(
             scope: kind,
             status: "APPROVED",
             processed_at: new Date(),
+            paid_at: paymentDate,
           },
         })
       );
@@ -2725,6 +2814,7 @@ export async function registerManualPayment(
               scope: "PIE",
               status: "APPROVED",
               processed_at: new Date(),
+              paid_at: paymentDate,
             },
           })
         );
@@ -2821,6 +2911,7 @@ export async function registerManualPayment(
               installments_count: data.installmentsCount,
               status: "APPROVED",
               processed_at: new Date(),
+              paid_at: paymentDate,
               nominal_installment_number: nextInstNum,
               nominal_installment_range:
                 data.installmentsCount > 1
@@ -3511,8 +3602,9 @@ export async function getClientPOV(reservationId: string) {
           amount_clp: r.amount_clp,
           scope: r.scope,
           created_at: r.created_at,
-          // Fecha en que postventa aprobó el pago (la "Fecha de Pago" del
-          // historial). Los registros antiguos sin procesar caen a la de subida.
+          // Fecha de la transferencia (la "Fecha de Pago" del historial) y, como
+          // respaldo para los comprobantes anteriores a paid_at, la de aprobación.
+          paid_at: r.paid_at,
           processed_at: r.processed_at,
           nominal_installment_number: r.nominal_installment_number,
           nominal_installment_range: r.nominal_installment_range,
@@ -4233,11 +4325,11 @@ export async function adjuntarComprobanteACuotaPagada(
         scope: "INSTALLMENT",
         installments_count: 1,
         status: "APPROVED",
-        // Las dos fechas son las del pago real, no las de hoy: el portal del
-        // cliente muestra processed_at en la columna "Fecha de Pago" de esa
-        // cuota, así que ponerle hoy le mentiría la fecha al cliente.
+        // paid_at es la fecha de la transferencia — la que el cliente ve como
+        // Fecha de Pago; processed_at, el momento en que postventa la adjuntó.
         created_at: paymentDate,
-        processed_at: paymentDate,
+        paid_at: paymentDate,
+        processed_at: new Date(),
         nominal_installment_number: cuota,
       },
     });

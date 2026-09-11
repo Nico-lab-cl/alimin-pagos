@@ -9,6 +9,7 @@ import {
   buildReceiptDocName,
   receiptFileType,
   receiptHasFile,
+  fechaDePagoComprobante,
 } from "@/lib/receiptDocs";
 
 /**
@@ -93,6 +94,7 @@ export async function getReservationDocuments(reservationId: string) {
         nominal_installment_range: true,
         created_at: true,
         processed_at: true,
+        paid_at: true,
       },
       orderBy: { created_at: "desc" },
     });
@@ -108,7 +110,7 @@ export async function getReservationDocuments(reservationId: string) {
         id: r.id,
         name: buildReceiptDocName(r, ext),
         file_type: fileType,
-        created_at: r.processed_at || r.created_at,
+        created_at: fechaDePagoComprobante(r),
         type: "receipt",
         // Pagos migrados/registrados sin un archivo digital real (ej. historial
         // importado, o condonaciones administrativas) no tienen nada que previsualizar.
@@ -139,7 +141,7 @@ export async function getReservationDocuments(reservationId: string) {
         id: `official-${r.id}`,
         name: docName,
         file_type: "application/pdf",
-        created_at: r.processed_at || r.created_at,
+        created_at: fechaDePagoComprobante(r),
         type: "official_receipt",
         hasFile: true,
       };

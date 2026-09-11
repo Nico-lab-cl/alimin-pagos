@@ -116,6 +116,16 @@ export default function ReceiptsPage() {
   // sirve, y eliminar deshace un pago que se aprobó por error (el caso típico
   // es el mismo comprobante aceptado dos veces).
   const [showDeleteForm, setShowDeleteForm] = useState(false);
+  // Lo que dice la transferencia. Se confirma antes de aprobar, porque el
+  // comprobante llega estampado con el cálculo del portal (cuota + la mora del
+  // día en que el cliente lo subió), y eso no siempre es lo que pasó por el banco.
+  const [showApproveForm, setShowApproveForm] = useState(false);
+  // El formulario es el mismo para las dos formas de aceptar un pago: como cuota
+  // o aplicándolo entero a la mora. Cambia a dónde va la plata, no los datos de
+  // la transferencia que hay que confirmar.
+  const [approveMode, setApproveMode] = useState<"PAGO" | "INTERES">("PAGO");
+  const [approveDate, setApproveDate] = useState("");
+  const [approveAmount, setApproveAmount] = useState(0);
 
   // Load Projects on mount
   useEffect(() => {
@@ -145,14 +155,36 @@ export default function ReceiptsPage() {
     setCurrentPage(1);
   }, [activeTab]);
 
+  // Abre la confirmación con lo que trae el comprobante: la fecha en que el
+  // cliente lo subió y el monto que el portal le estampó. Quien aprueba corrige
+  // ambos contra la transferencia que está viendo al lado.
+  const abrirAprobacion = (receipt: any, modo: "PAGO" | "INTERES" = "PAGO") => {
+    setApproveMode(modo);
+    const subida = receipt.created_at ? new Date(receipt.created_at) : new Date();
+    setApproveDate(
+      `${subida.getFullYear()}-${String(subida.getMonth() + 1).padStart(2, "0")}-${String(subida.getDate()).padStart(2, "0")}`
+    );
+    setApproveAmount(receipt.amount_clp || 0);
+    setShowApproveForm(true);
+  };
+
   const handleApproveInModal = async (id: string) => {
+    if (!approveDate) {
+      toast.error("Indica la fecha de la transferencia");
+      return;
+    }
+    if (!approveAmount || approveAmount <= 0) {
+      toast.error("Indica el monto de la transferencia");
+      return;
+    }
     setProcessing(id);
-    const result = await approveReceipt(id);
+    const result = await approveReceipt(id, { paidAt: approveDate, amount: approveAmount });
     if (result.success) {
       toast.success("Pago Aprobado", {
         description: "El saldo del cliente ha sido actualizado.",
       });
       setSelectedReceipt(null); // Close modal
+      setShowApproveForm(false);
       loadReceipts();
     } else {
       toast.error(result.error || "Ocurrió un fallo en la validación");
@@ -161,9 +193,19 @@ export default function ReceiptsPage() {
   };
 
   const handleApproveAsInterestInModal = async (id: string) => {
-    if (!confirm("Este monto se aplicará completo a la mora del cliente, sin sumar cuotas pagadas. ¿Confirmas?")) return;
+    if (!approveDate) {
+      toast.error("Indica la fecha de la transferencia");
+      return;
+    }
+    if (!approveAmount || approveAmount <= 0) {
+      toast.error("Indica el monto de la transferencia");
+      return;
+    }
     setProcessing(id);
-    const result = await approveReceiptAsInterestPayment(id);
+    const result = await approveReceiptAsInterestPayment(id, {
+      paidAt: approveDate,
+      amount: approveAmount,
+    });
     if (result.success) {
       let description = `Se aplicaron ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(result.appliedToMora || 0)} a la mora.`;
       if (result.excess && result.excess > 0) {
@@ -171,6 +213,7 @@ export default function ReceiptsPage() {
       }
       toast.success("Abono de Intereses Aprobado", { description, duration: 8000 });
       setSelectedReceipt(null);
+      setShowApproveForm(false);
       loadReceipts();
     } else {
       toast.error(result.error || "Ocurrió un fallo en la validación");
@@ -197,6 +240,7 @@ export default function ReceiptsPage() {
       setShowRejectionForm(false);
       setShowDeleteForm(false);
       setRejectionReason("");
+      setShowApproveForm(false);
       loadReceipts();
     } else {
       toast.error(result.error || "Error al procesar el rechazo");
@@ -569,7 +613,7 @@ export default function ReceiptsPage() {
                   {/* Column 5: Fecha de Pago */}
                   <div className="col-span-1.5 text-slate-500 text-xs font-semibold">
                     <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha de Pago:</span>
-                    {formatReceiptDateSimple(receipt.created_at)}
+                    {formatReceiptDateSimple(receipt.paid_at || receipt.created_at)}
                   </div>
 
                   {/* Column 6: Estado */}
@@ -628,6 +672,7 @@ export default function ReceiptsPage() {
                         setShowRejectionForm(false);
                         setShowDeleteForm(false);
                         setRejectionReason("");
+                        setShowApproveForm(false);
                       }}
                       className="px-3 py-1.5 border border-brand-600 text-brand-600 hover:bg-brand-50 font-bold text-[11px] rounded-lg transition-all shadow-sm"
                     >
@@ -769,6 +814,7 @@ export default function ReceiptsPage() {
               setShowRejectionForm(false);
               setShowDeleteForm(false);
               setRejectionReason("");
+              setShowApproveForm(false);
             }
           }}
         >
@@ -790,6 +836,7 @@ export default function ReceiptsPage() {
                     setShowRejectionForm(false);
                     setShowDeleteForm(false);
                     setRejectionReason("");
+                    setShowApproveForm(false);
                   }}
                   className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                 >
@@ -878,12 +925,12 @@ export default function ReceiptsPage() {
               )}
 
               {/* Action Buttons inside detail view */}
-              {!showRejectionForm && !showDeleteForm ? (
+              {!showRejectionForm && !showDeleteForm && !showApproveForm ? (
                 <div className="flex gap-2 pt-5 border-t border-slate-100">
                   {selectedReceipt.status === "PENDING" && (
                     <>
                       <button
-                        onClick={() => handleApproveInModal(selectedReceipt.id)}
+                        onClick={() => abrirAprobacion(selectedReceipt)}
                         disabled={processing === selectedReceipt.id}
                         className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all disabled:opacity-30"
                       >
@@ -902,7 +949,7 @@ export default function ReceiptsPage() {
                   )}
                   {selectedReceipt.status === "PENDING" && selectedReceipt.scope === "INSTALLMENT" && (
                     <button
-                      onClick={() => handleApproveAsInterestInModal(selectedReceipt.id)}
+                      onClick={() => abrirAprobacion(selectedReceipt, "INTERES")}
                       disabled={processing === selectedReceipt.id}
                       className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-700 font-bold text-xs rounded-xl transition-all disabled:opacity-30"
                       title="Aplica el monto completo a la mora del cliente, sin sumar cuotas pagadas"
@@ -919,6 +966,7 @@ export default function ReceiptsPage() {
                           setShowRejectionForm(false);
                           setShowDeleteForm(false);
                           setRejectionReason("");
+                          setShowApproveForm(false);
                         }}
                         className="flex-1 py-2.5 border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors rounded-xl"
                       >
@@ -935,6 +983,92 @@ export default function ReceiptsPage() {
                       </button>
                     </>
                   )}
+                </div>
+              ) : showApproveForm ? (
+                /* Confirmación de lo que dice la transferencia. Estos dos datos
+                   son los que mandan en todo lo que viene después: la mora se
+                   calcula a esa fecha, la caja registra ese monto, y son los que
+                   el cliente ve en su historial, en su recibo y en su WhatsApp. */
+                <div className="pt-4 border-t border-slate-100 space-y-3 animate-fade-in">
+                  <label className="block text-[10px] font-bold text-brand-600 uppercase tracking-wider">
+                    {approveMode === "INTERES"
+                      ? "Abono a intereses — confirma la transferencia"
+                      : "Confirma lo que dice la transferencia"}
+                  </label>
+                  {approveMode === "INTERES" && (
+                    <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2.5 leading-relaxed">
+                      El monto completo se aplica a la mora que el cliente debía a esa fecha. No suma
+                      cuotas pagadas. Si sobra, se avisa para registrarlo aparte.
+                    </p>
+                  )}
+                  <p className="text-[11px] font-semibold text-slate-500 leading-relaxed">
+                    Vienen del comprobante: la fecha en que el cliente lo subió y el monto que le
+                    calculó el portal. Corrígelos con lo que ves en la transferencia — si el cliente
+                    pagó antes de subirla, no se le cobran los días de diferencia.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                        Fecha de la transferencia
+                      </label>
+                      <input
+                        type="date"
+                        value={approveDate}
+                        onChange={(e) => setApproveDate(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:border-brand-500 focus:bg-white outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                        Monto transferido
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={approveAmount}
+                        onChange={(e) => setApproveAmount(Number(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:border-brand-500 focus:bg-white outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {approveAmount !== selectedReceipt.amount_clp && (
+                    <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2.5 leading-relaxed">
+                      Se va a registrar {formatCLP(approveAmount)} en vez de los{" "}
+                      {formatCLP(selectedReceipt.amount_clp)} que declaró el portal. Queda anotado en
+                      la bitácora del cliente.
+                    </p>
+                  )}
+
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setShowApproveForm(false)}
+                      className="px-3.5 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() =>
+                        approveMode === "INTERES"
+                          ? handleApproveAsInterestInModal(selectedReceipt.id)
+                          : handleApproveInModal(selectedReceipt.id)
+                      }
+                      disabled={processing === selectedReceipt.id}
+                      className={`flex items-center gap-1.5 px-3.5 py-2 text-white text-[11px] font-bold rounded-lg transition-all shadow-sm disabled:opacity-30 ${
+                        approveMode === "INTERES"
+                          ? "bg-amber-600 hover:bg-amber-700"
+                          : "bg-brand-600 hover:bg-brand-700"
+                      }`}
+                    >
+                      {processing === selectedReceipt.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      {approveMode === "INTERES" ? "Confirmar Abono a Intereses" : "Confirmar y Aprobar"}
+                    </button>
+                  </div>
                 </div>
               ) : showRejectionForm ? (
                 /* Inline Rejection Reason Panel */
@@ -953,6 +1087,7 @@ export default function ReceiptsPage() {
                         setShowRejectionForm(false);
                         setShowDeleteForm(false);
                         setRejectionReason("");
+                        setShowApproveForm(false);
                       }}
                       className="px-3.5 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                     >

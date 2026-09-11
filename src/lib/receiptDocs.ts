@@ -101,6 +101,30 @@ export function isOfficialReceiptDocFor(docName: string, receiptId: string): boo
 }
 
 /**
+ * Fecha en que el cliente PAGÓ: la que ve en su historial, la que lleva impresa
+ * su recibo oficial y la que le llega por WhatsApp.
+ *
+ * `paid_at` la declara postventa al aprobar, leyéndola de la transferencia.
+ * Antes de que existiera, la única fecha disponible era `processed_at` — la de
+ * aprobación —, que puede caer días después de que el cliente pagó: quien
+ * transfería el último día de plazo y subía el comprobante a la mañana
+ * siguiente aparecía pagando tarde. Los comprobantes viejos siguen cayendo ahí,
+ * y los importados sin procesar, a la fecha de subida.
+ */
+export function fechaDePagoComprobante(
+  r?: {
+    paid_at?: Date | string | null;
+    processed_at?: Date | string | null;
+    created_at?: Date | string | null;
+  } | null
+): Date | null {
+  const cruda = r?.paid_at || r?.processed_at || r?.created_at;
+  if (!cruda) return null;
+  const fecha = new Date(cruda);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
+/**
  * Comprobantes sin archivo digital real: pagos migrados desde la planilla,
  * condonaciones administrativas, o cargos que postventa registró sin tener a
  * mano la transferencia original ("SIN_RESPALDO"). No hay nada que

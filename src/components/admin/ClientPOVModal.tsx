@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getClientPOV, adjuntarComprobanteACuotaPagada } from "@/actions/postventa";
 import { uploadPaymentReceipt } from "@/actions/user";
 import { formatCLP, getDownloadFilename, downloadDocument, cn, formatInstallmentsLabel, comprobanteCubreCuota, urlReciboOficial } from "@/lib/utils";
+import { fechaDePagoComprobante } from "@/lib/receiptDocs";
 import { toast } from "sonner";
 import {
   X,
@@ -274,11 +275,9 @@ function DashboardView({
       dueDate = new Date(data.paidInstallmentDueDates[i]);
     }
 
-    // Fecha en que se aprobó el pago. Solo existe si hay un comprobante detrás:
-    // una cuota migrada o registrada a mano no tiene aprobación que mostrar.
-    const payDate = matchingReceipt
-      ? new Date(matchingReceipt.processed_at || matchingReceipt.created_at)
-      : null;
+    // Fecha en que el cliente pagó. Solo existe si hay un comprobante detrás:
+    // una cuota migrada o registrada a mano no tiene nada que mostrar.
+    const payDate = fechaDePagoComprobante(matchingReceipt);
 
     // El recibo oficial siempre está disponible para una cuota pagada: se emite
     // al vuelo, con o sin comprobante del cliente detrás.

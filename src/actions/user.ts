@@ -18,6 +18,7 @@ import {
   isOfficialReceiptDocFor,
   receiptFileType,
   receiptHasFile,
+  fechaDePagoComprobante,
 } from "@/lib/receiptDocs";
 
 const CACHE_TTL = 300;
@@ -512,7 +513,7 @@ export async function getUserLots() {
             return {
               name: buildReceiptDocName(r, ext),
               category: "Comprobantes",
-              uploadedAt: r.processed_at || r.created_at,
+              uploadedAt: fechaDePagoComprobante(r),
               fileType: fileType,
               url: `/api/documents/${r.id}`,
             };
@@ -561,9 +562,10 @@ export async function getUserLots() {
           status: r.status,
           scope: r.scope,
           created_at: r.created_at,
-          // Fecha en que postventa aprobó el pago (la que ve el cliente como
-          // "Fecha de Pago"). Si es un registro antiguo sin procesar, cae a la
-          // de subida.
+          // Las dos fechas del pago: paid_at es la de la transferencia (la que
+          // ve el cliente como "Fecha de Pago") y processed_at la de aprobación,
+          // que es a la que caen los comprobantes anteriores a paid_at.
+          paid_at: r.paid_at,
           processed_at: r.processed_at,
           receipt_url: r.receipt_url,
           nominal_installment_number: r.nominal_installment_number,
