@@ -180,6 +180,7 @@ interface PaymentReceiptPDFProps {
   installmentBreakdown?: { number: number; dueDate: Date; amount: number }[];
   nominalInstallmentNumber?: number | null;
   nominalInstallmentRange?: string | null;
+  /** Logo del proyecto como data-URL. Ver `loadReceiptLogo`. */
   logoPath?: string;
   /**
    * Recibos emitidos desde la reserva (cuotas pagadas sin comprobante detrás)
@@ -188,6 +189,9 @@ interface PaymentReceiptPDFProps {
    */
   hideStampTime?: boolean;
 }
+
+/** Color de marca por defecto: el turquesa de Lomas del Mar. */
+const DEFAULT_BRAND = '#4EA898';
 
 export const PaymentReceiptPDF = ({
   receiptId,
@@ -239,26 +243,37 @@ export const PaymentReceiptPDF = ({
 
   const shortId = receiptId.split('-')[0].toUpperCase();
 
+  // El color de marca viene de la identidad del proyecto; el turquesa queda
+  // solo como respaldo para que un proyecto sin configurar no salga sin color.
+  const brand = legalInfo.brandColor || DEFAULT_BRAND;
+  const tintado = { color: brand };
+  const tintadoFondo = { backgroundColor: brand };
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: brand }]}>
           {logoPath ? (
             <Image src={logoPath} style={styles.logo} />
           ) : (
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#4EA898' }}>{projectName.toUpperCase()}</Text>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: brand }}>{projectName.toUpperCase()}</Text>
           )}
-          <View style={styles.headerTextRight}>
-            <Text style={styles.title}>COMPROBANTE DE PAGO</Text>
+          <View style={[styles.headerTextRight, tintado]}>
+            <Text style={[styles.title, tintado]}>COMPROBANTE DE PAGO</Text>
             <Text style={styles.receiptNumber}>Nº {shortId}</Text>
+            {/* La fecha de emisión es la del PAGO, no la del día en que el
+                cliente descarga. El recibo se genera al vuelo en cada descarga:
+                con `new Date()` el mismo pago salía con una fecha distinta cada
+                vez que lo bajaba, y dos copias del mismo recibo no pueden
+                contradecirse. */}
             <Text style={{ fontSize: 10, color: '#666', marginTop: 4 }}>
-              Fecha Emisión: {format(new Date(), "dd 'de' MMMM, yyyy", { locale: es })}
+              Fecha Emisión: {format(receiptDate, "dd 'de' MMMM, yyyy", { locale: es })}
             </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Datos del Cliente</Text>
+          <Text style={[styles.sectionTitle, tintado]}>Datos del Cliente</Text>
           <View style={styles.row}>
             <Text style={styles.label}>Nombre / Razón Social:</Text>
             <Text style={styles.value}>{clientName}</Text>
@@ -274,7 +289,7 @@ export const PaymentReceiptPDF = ({
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Detalle del Proyecto</Text>
+          <Text style={[styles.sectionTitle, tintado]}>Detalle del Proyecto</Text>
           <View style={styles.row}>
             <Text style={styles.label}>Proyecto:</Text>
             <Text style={styles.value}>{projectName}</Text>
@@ -290,7 +305,7 @@ export const PaymentReceiptPDF = ({
         </View>
 
         <View style={styles.tableBox}>
-          <View style={styles.tableHeaderRow}>
+          <View style={[styles.tableHeaderRow, tintadoFondo]}>
             <Text style={styles.tableHeaderCellItem}>CONCEPTO</Text>
             <Text style={styles.tableHeaderCellAmount}>CANTIDAD (CLP)</Text>
           </View>
@@ -328,8 +343,8 @@ export const PaymentReceiptPDF = ({
           )}
 
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>TOTAL RECIBIDO</Text>
-            <Text style={styles.totalAmount}>
+            <Text style={[styles.totalLabel, tintado]}>TOTAL RECIBIDO</Text>
+            <Text style={[styles.totalAmount, tintado]}>
               {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amountPaid)}
             </Text>
           </View>

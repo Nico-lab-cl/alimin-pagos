@@ -79,9 +79,14 @@ export function buildReceiptDocName(
 }
 
 /**
- * Nombre del PDF oficial de Alimin que el portal genera al aprobar/registrar un
- * pago. Lleva los primeros 6 caracteres del id del comprobante, que es lo que
- * después permite cruzarlo con su respaldo bancario.
+ * Nombre del PDF oficial de Alimin que el portal generaba al aprobar/registrar
+ * un pago. Lleva los primeros 6 caracteres del id del comprobante, que es lo
+ * que después permite cruzarlo con su respaldo bancario.
+ *
+ * @deprecated Ese PDF ya no se genera: quedó uno solo, el recibo oficial que se
+ * emite al vuelo (ver `buildOfficialReceiptFileName`). El nombre sigue acá
+ * porque los archivos viejos siguen guardados y hay que saber reconocerlos para
+ * dejar de mostrarlos.
  */
 export function officialReceiptDocName(receiptId: string): string {
   return `Comprobante_Pago_${receiptId.substring(0, 6)}.pdf`;
@@ -98,6 +103,150 @@ export function isOfficialReceiptDocFor(docName: string, receiptId: string): boo
   // coincidentes se confunda con el comprobante de un pago.
   if (!name.startsWith("Comprobante_Pago_")) return false;
   return name.includes(receiptId.substring(0, 6));
+}
+
+/**
+ * ¿Este documento guardado es uno de los recibos VIEJOS que emitía el portal?
+ *
+ * Durante un tiempo cada aprobación guardaba un PDF propio ("Comprobante_Pago_
+ * a1b2c3.pdf", con el diseño antiguo verde y dorado) además del recibo oficial
+ * que hoy se emite al vuelo con el formato de Lomas del Mar. El cliente
+ * terminaba con dos recibos nuestros distintos para el mismo pago, y cuál le
+ * tocaba dependía de por dónde hiciera clic.
+ *
+ * Ya no se generan. Los que quedan guardados se dejan de mostrar con esta
+ * función: el archivo sigue intacto en la base por si hay que volver atrás,
+ * pero el cliente ve un solo recibo por pago.
+ */
+export function isLegacyStoredReceiptDoc(docName?: string | null): boolean {
+  // Se exige el fragmento de id al final (los 6 primeros caracteres del uuid del
+  // comprobante) porque es la firma de los archivos que generaba el portal. Sin
+  // esa exigencia, un documento que postventa subiera a mano llamado
+  // "Comprobante_Pago_Marzo.pdf" también desaparecería de la vista del cliente.
+  return /^Comprobante_(Pago|Abono_Intereses)_[0-9a-f]{6}\.pdf$/i.test(docName || "");
+}
+
+/**
+ * ¿Este comprobante cubre esa cuota? Una sola transferencia puede pagar un rango
+ * ("12-15"), así que no basta con comparar el número.
+ *
+ * Vive acá y no en `lib/utils` porque `utils` arrastra Capacitor, que no puede
+ * entrar en un server action.
+ */
+export function comprobanteCubreCuota(
+  receipt: {
+    nominal_installment_number?: number | null;
+    nominal_installment_range?: string | null;
+  },
+  cuota: number
+): boolean {
+  if (receipt.nominal_installment_number === cuota) return true;
+  if (receipt.nominal_installment_range) {
+    const [desde, hasta] = String(receipt.nominal_installment_range).split("-").map(Number);
+    if (Number.isFinite(desde) && Number.isFinite(hasta)) {
+      return cuota >= desde && cuota <= hasta;
+    }
+  }
+  return false;
+}
+
+/** Cómo se llama cada concepto dentro del nombre del archivo del recibo. */
+const SCOPE_FILE_LABELS: Record<string, string> = {
+  PIE: "pie",
+  RESERVA: "reserva",
+  GASTOS: "gastos_operacionales",
+  MORA: "abono_intereses",
+};
+
+/**
+ * Nombre del archivo del recibo oficial tal como le llega al cliente a su
+ * carpeta de Descargas: "Recibo_cuota_12_lote_18.pdf".
+ *
+ * Lleva el concepto y el lote porque fuera del portal el archivo pierde todo su
+ * contexto: un cliente con dos lotes y treinta cuotas pagadas necesita saber
+ * cuál es cuál sin abrirlos uno por uno.
+ */
+export function buildOfficialReceiptFileName(receipt: {
+  scope?: string | null;
+  lotNumber?: string | number | null;
+  nominal_installment_number?: number | null;
+  nominal_installment_range?: string | null;
+}): string {
+  // El número de lote viene a veces ya con su prefijo ("L-18") y a veces pelado
+  // ("18"); se normaliza para que el nombre no salga "lote_L-18".
+  const lote = String(receipt.lotNumber ?? "")
+    .trim()
+    .replace(/^l[-\s_]*/i, "");
+  const sufijoLote = lote ? `_lote_${lote}` : "";
+
+  const etiquetaScope = receipt.scope ? SCOPE_FILE_LABELS[receipt.scope] : undefined;
+  if (etiquetaScope) return `Recibo_${etiquetaScope}${sufijoLote}.pdf`;
+
+  if (receipt.nominal_installment_range) {
+    return `Recibo_cuotas_${receipt.nominal_installment_range}${sufijoLote}.pdf`;
+  }
+  if (receipt.nominal_installment_number) {
+    return `Recibo_cuota_${receipt.nominal_installment_number}${sufijoLote}.pdf`;
+  }
+  return `Recibo_pago${sufijoLote}.pdf`;
+}
+
+/**
+ * Título del recibo dentro del portal: lo que el cliente lee en la tarjeta y
+ * por lo que se ordena la lista. A diferencia del nombre de archivo, acá sí van
+ * mayúsculas y acentos.
+ */
+export function buildOfficialReceiptTitle(receipt: {
+  scope?: string | null;
+  nominal_installment_number?: number | null;
+  nominal_installment_range?: string | null;
+}): string {
+  switch (receipt.scope) {
+    case "PIE":
+      return "Recibo de Pie";
+    case "RESERVA":
+      return "Recibo de Reserva";
+    case "GASTOS":
+      return "Recibo de Gastos Operacionales";
+    case "MORA":
+      return "Recibo de Abono de Intereses";
+    default:
+      if (receipt.nominal_installment_range)
+        return `Recibo Cuotas ${receipt.nominal_installment_range}`;
+      if (receipt.nominal_installment_number)
+        return `Recibo Cuota ${String(receipt.nominal_installment_number).padStart(2, "0")}`;
+      return "Recibo de Pago";
+  }
+}
+
+/**
+ * Clave con la que se ordenan los recibos por concepto, en el orden en que
+ * ocurren de verdad: primero la reserva, después el pie, después las cuotas en
+ * orden, y al final los cargos sueltos. Ordenar por el texto del título dejaba
+ * la "Cuota 10" antes que la "Cuota 2".
+ */
+export function conceptSortKey(receipt: {
+  scope?: string | null;
+  nominal_installment_number?: number | null;
+  nominal_installment_range?: string | null;
+}): number {
+  switch (receipt.scope) {
+    case "RESERVA":
+      return 0;
+    case "PIE":
+      return 1;
+    case "GASTOS":
+      return 900_000;
+    case "MORA":
+      return 900_001;
+    default: {
+      const desdeRango = receipt.nominal_installment_range?.match(/^(\d+)/);
+      const numero = desdeRango
+        ? parseInt(desdeRango[1], 10)
+        : receipt.nominal_installment_number || 0;
+      return 100 + numero;
+    }
+  }
 }
 
 /**

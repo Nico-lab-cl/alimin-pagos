@@ -3,7 +3,12 @@
 import { useEffect, useState, useMemo } from "react";
 import { getAdminProjects, approveReceipt, approveReceiptAsInterestPayment, rejectReceipt, getAllReceipts, deletePaymentReceipt } from "@/actions/postventa";
 import { formatCLP, cn, getReceiptDownloadFilename, downloadDocument, downloadCsv } from "@/lib/utils";
-import { SCOPE_LABELS, receiptFormat } from "@/lib/receiptDocs";
+import {
+  SCOPE_LABELS,
+  receiptFormat,
+  fechaDePagoComprobante,
+  conceptSortKey,
+} from "@/lib/receiptDocs";
 import { toast } from "sonner";
 import { 
   Loader2, 
@@ -106,6 +111,26 @@ export default function ReceiptsPage() {
 
   // Local Search state (filters client and project name)
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Orden y rango de fechas. La bandeja crecía solo hacia abajo y con el orden
+  // fijo por fecha de creación: para encontrar los pagos de un cliente, o los de
+  // un mes, había que paginar a mano.
+  const [sortKey, setSortKey] = useState<"CLIENTE" | "FECHA" | "CONCEPTO" | "MONTO">("FECHA");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+
+  /** Cambia la columna de orden, o invierte la dirección si ya era esa. */
+  const toggleSort = (key: typeof sortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      // Fecha y monto se leen mejor de mayor a menor; el nombre, alfabético.
+      setSortDir(key === "CLIENTE" || key === "CONCEPTO" ? "asc" : "desc");
+    }
+    setCurrentPage(1);
+  };
 
   // Detail Modal State
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
@@ -284,8 +309,17 @@ export default function ReceiptsPage() {
   };
 
   // Filter receipts based on Search and Status
+  /** Nombre completo del cliente, para buscar y para ordenar. */
+  const nombreCliente = (r: any) =>
+    `${r.reservation?.name || ""} ${r.reservation?.last_name || ""}`.trim().toLowerCase();
+
   const filteredReceipts = useMemo(() => {
-    return receipts.filter((r) => {
+    // El rango se compara contra la fecha de PAGO, que es la que busca
+    // postventa ("los de marzo"), no contra la de creación del registro.
+    const desde = fechaDesde ? new Date(`${fechaDesde}T00:00:00`).getTime() : null;
+    const hasta = fechaHasta ? new Date(`${fechaHasta}T23:59:59`).getTime() : null;
+
+    const filtrados = receipts.filter((r) => {
       // 1. Status Filter
       if (activeTab !== "ALL" && r.status !== activeTab) return false;
 
@@ -297,10 +331,37 @@ export default function ReceiptsPage() {
         r.reservation?.rut?.toLowerCase().includes(q) ||
         r.lot?.number?.toString().toLowerCase().includes(q) ||
         r.reservation?.project?.name?.toLowerCase().includes(q);
-      
-      return matchesSearch;
+      if (!matchesSearch) return false;
+
+      // 3. Rango de fechas
+      if (desde || hasta) {
+        const fecha = fechaDePagoComprobante(r)?.getTime();
+        // Un comprobante sin ninguna fecha no puede caer dentro de un rango.
+        if (fecha === undefined || fecha === null) return false;
+        if (desde && fecha < desde) return false;
+        if (hasta && fecha > hasta) return false;
+      }
+
+      return true;
     });
-  }, [receipts, activeTab, searchQuery]);
+
+    const signo = sortDir === "asc" ? 1 : -1;
+    return filtrados.sort((a, b) => {
+      switch (sortKey) {
+        case "CLIENTE":
+          return signo * nombreCliente(a).localeCompare(nombreCliente(b), "es");
+        case "MONTO":
+          return signo * ((a.amount_clp || 0) - (b.amount_clp || 0));
+        case "CONCEPTO":
+          return signo * (conceptSortKey(a) - conceptSortKey(b));
+        default: {
+          const fa = fechaDePagoComprobante(a)?.getTime() || 0;
+          const fb = fechaDePagoComprobante(b)?.getTime() || 0;
+          return signo * (fa - fb);
+        }
+      }
+    });
+  }, [receipts, activeTab, searchQuery, fechaDesde, fechaHasta, sortKey, sortDir]);
 
   // Pagination calculations
   const totalItems = filteredReceipts.length;
@@ -510,16 +571,54 @@ export default function ReceiptsPage() {
           </button>
         </div>
 
-        {/* Inline Search Bar (on the right of tabs) */}
-        <div className="relative max-w-xs w-full md:ml-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Buscar cliente o proyecto..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:border-brand-500 outline-none transition-all shadow-sm"
-          />
+        {/* Búsqueda y rango de fechas (a la derecha de las pestañas) */}
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto md:ml-auto">
+          <div className="relative max-w-xs w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar cliente, RUT, lote o proyecto..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:border-brand-500 outline-none transition-all shadow-sm"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => {
+                setFechaDesde(e.target.value);
+                setCurrentPage(1);
+              }}
+              title="Pagos desde"
+              className="bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 focus:border-brand-500 outline-none transition-all shadow-sm"
+            />
+            <span className="text-[10px] font-black text-slate-400 uppercase">a</span>
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => {
+                setFechaHasta(e.target.value);
+                setCurrentPage(1);
+              }}
+              title="Pagos hasta"
+              className="bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 focus:border-brand-500 outline-none transition-all shadow-sm"
+            />
+            {(fechaDesde || fechaHasta) && (
+              <button
+                onClick={() => {
+                  setFechaDesde("");
+                  setFechaHasta("");
+                  setCurrentPage(1);
+                }}
+                title="Quitar filtro de fechas"
+                className="px-2 py-2 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -542,13 +641,34 @@ export default function ReceiptsPage() {
       ) : (
         <div className="bg-white border border-slate-200/60 rounded-[2rem] p-6 shadow-sm">
           
-          {/* Table Header Row (Desktop only) */}
+          {/* Table Header Row (Desktop only). Cliente, Cuota, Monto y Fecha
+              ordenan al hacer clic; el resto son etiquetas. */}
           <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-[10px] font-black text-slate-400 tracking-wider uppercase border-b border-slate-100 mb-2">
-            <div className="col-span-3">Cliente</div>
+            <button
+              onClick={() => toggleSort("CLIENTE")}
+              className="col-span-3 text-left hover:text-slate-700 transition-colors cursor-pointer flex items-center gap-1"
+            >
+              Cliente {sortKey === "CLIENTE" && <span>{sortDir === "asc" ? "↑" : "↓"}</span>}
+            </button>
             <div className="col-span-2">Proyecto y Lote</div>
-            <div className="col-span-1 text-center">Cuota</div>
-            <div className="col-span-2">Monto</div>
-            <div className="col-span-1.5">Fecha de Pago</div>
+            <button
+              onClick={() => toggleSort("CONCEPTO")}
+              className="col-span-1 text-center hover:text-slate-700 transition-colors cursor-pointer flex items-center justify-center gap-1"
+            >
+              Cuota {sortKey === "CONCEPTO" && <span>{sortDir === "asc" ? "↑" : "↓"}</span>}
+            </button>
+            <button
+              onClick={() => toggleSort("MONTO")}
+              className="col-span-2 text-left hover:text-slate-700 transition-colors cursor-pointer flex items-center gap-1"
+            >
+              Monto {sortKey === "MONTO" && <span>{sortDir === "asc" ? "↑" : "↓"}</span>}
+            </button>
+            <button
+              onClick={() => toggleSort("FECHA")}
+              className="col-span-1.5 text-left hover:text-slate-700 transition-colors cursor-pointer flex items-center gap-1"
+            >
+              Fecha de Pago {sortKey === "FECHA" && <span>{sortDir === "asc" ? "↑" : "↓"}</span>}
+            </button>
             <div className="col-span-1">Estado</div>
             <div className="col-span-1 text-center">Comprobante</div>
             <div className="col-span-0.5 text-right"></div>

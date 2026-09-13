@@ -4,7 +4,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getInstallmentDueDate, getNominalInstallmentAmount } from "@/lib/financials";
 import { getReceiptLegalInfo } from "@/lib/receiptLegalInfo";
-import { receiptFileType, fechaDePagoComprobante } from "@/lib/receiptDocs";
+import {
+  receiptFileType,
+  fechaDePagoComprobante,
+  buildOfficialReceiptFileName,
+} from "@/lib/receiptDocs";
+import { loadReceiptLogo } from "@/lib/receiptLogo";
 import { PaymentReceiptPDF } from "@/components/pdf/PaymentReceiptPDF";
 
 const OFFICIAL_RECEIPT_PREFIX = "official-";
@@ -69,6 +74,9 @@ export async function GET(
         reservation.lot.valor_cuota || 0
       );
 
+      const legalInfo = getReceiptLegalInfo(reservation.project.slug);
+      const logoPath = await loadReceiptLogo(legalInfo.logoFile);
+
       const stream = await renderToStream(
         <PaymentReceiptPDF
           // El Nº del recibo se arma con el primer bloque del id, asi que se le
@@ -81,7 +89,8 @@ export async function GET(
           clientRut={reservation.rut || ""}
           clientEmail={reservation.email}
           projectName={reservation.project.name}
-          legalInfo={getReceiptLegalInfo(reservation.project.slug)}
+          legalInfo={legalInfo}
+          logoPath={logoPath}
           lotNumber={reservation.lot.number}
           lotStage={reservation.lot.stage || ""}
           amountPaid={amount}
@@ -95,10 +104,15 @@ export async function GET(
       );
 
       const dispositionMode = forceDownload ? "attachment" : "inline";
+      const fileName = buildOfficialReceiptFileName({
+        scope: "INSTALLMENT",
+        lotNumber: reservation.lot.number,
+        nominal_installment_number: installmentNumber,
+      });
       return new NextResponse(stream as unknown as ReadableStream, {
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `${dispositionMode}; filename="Recibo_Oficial_Cuota_${installmentNumber}_Lote_${reservation.lot.number}.pdf"`,
+          "Content-Disposition": `${dispositionMode}; filename="${fileName}"`,
           "Cache-Control": "no-store",
         },
       });
@@ -159,6 +173,9 @@ export async function GET(
         }
       }
 
+      const legalInfo = getReceiptLegalInfo(receipt.reservation.project.slug);
+      const logoPath = await loadReceiptLogo(legalInfo.logoFile);
+
       const stream = await renderToStream(
         <PaymentReceiptPDF
           receiptId={receipt.id}
@@ -167,7 +184,8 @@ export async function GET(
           clientRut={receipt.reservation.rut || ""}
           clientEmail={receipt.reservation.email}
           projectName={receipt.reservation.project.name}
-          legalInfo={getReceiptLegalInfo(receipt.reservation.project.slug)}
+          legalInfo={legalInfo}
+          logoPath={logoPath}
           lotNumber={receipt.lot.number}
           lotStage={receipt.lot.stage || ""}
           amountPaid={receipt.amount_clp}
@@ -182,10 +200,16 @@ export async function GET(
       );
 
       const dispositionMode = forceDownload ? "attachment" : "inline";
+      const fileName = buildOfficialReceiptFileName({
+        scope: receipt.scope,
+        lotNumber: receipt.lot.number,
+        nominal_installment_number: receipt.nominal_installment_number,
+        nominal_installment_range: receipt.nominal_installment_range,
+      });
       return new NextResponse(stream as unknown as ReadableStream, {
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `${dispositionMode}; filename="Recibo_Oficial_Lote_${receipt.lot.number}.pdf"`,
+          "Content-Disposition": `${dispositionMode}; filename="${fileName}"`,
           "Cache-Control": "no-store",
         },
       });

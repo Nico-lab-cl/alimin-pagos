@@ -12,7 +12,6 @@ import {
   getProjectConfig,
   getChileToday,
   getSantiagoUTCDate,
-  buildInstallmentConcept,
   getNominalInstallmentAmount,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
@@ -23,11 +22,15 @@ import crypto from "crypto";
 import { ENTITY_GROUPS, getEntityLabel, getEntityGroupKey, GROUPS_KEYED_BY_RESERVATION } from "@/lib/auditLabels";
 import {
   SCOPE_LABELS,
-  SCOPE_CONCEPTS,
   SCOPE_TO_LEDGER_CATEGORY,
   LEDGER_CATEGORY_TO_SCOPE,
   buildReceiptDocName,
-  isOfficialReceiptDocFor,
+  buildOfficialReceiptFileName,
+  buildOfficialReceiptTitle,
+  conceptSortKey,
+  comprobanteCubreCuota,
+  isLegacyStoredReceiptDoc,
+  fechaDePagoComprobante,
   receiptFileType,
   receiptHasFile,
 } from "@/lib/receiptDocs";
@@ -1247,55 +1250,11 @@ export async function approveReceipt(
       });
     }
 
-    // Auto-generate Digital Payment Receipt PDF
-    try {
-      const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
-      
-      const clientName = (receipt.reservation.last_name && receipt.reservation.last_name !== "null")
-        ? `${receipt.reservation.name} ${receipt.reservation.last_name}`.trim()
-        : (receipt.reservation.user?.name || receipt.reservation.name || "Cliente Alimin");
-      const rut = receipt.reservation.rut || "No registrado";
-      const email = receipt.reservation.user?.email || receipt.reservation.email || "No registrado";
-      const projectName = receipt.reservation.project?.name || "Alimin SPA";
-      const lotNumber = (receipt.reservation.lot as any)?.number || receipt.lot_id.toString();
-      const stage = receipt.reservation.lot?.stage || "";
-      // El comprobante debe decir QUÉ cuota se pagó y a qué mes/año corresponde,
-      // no solo cuántas cuotas venían en el pago.
-      const concept = receipt.scope !== "INSTALLMENT"
-        ? (SCOPE_CONCEPTS[receipt.scope] || "Pago Registrado")
-        : buildInstallmentConcept({
-            installmentStartDate: receipt.reservation.installment_start_date,
-            dueDay: receipt.reservation.due_day,
-            // Manda la cuota re-estampada al aprobar, no la que traía el
-            // comprobante desde que se subió (ver approvedInstNum).
-            firstInstallmentNumber: approvedInstNum,
-            installmentsCount: receipt.installments_count || 1,
-          });
-
-      const pdfBase64 = await generateReceiptPDF({
-        clientName,
-        rut,
-        email,
-        projectName,
-        lotNumber,
-        stage,
-        concept,
-        amount: receipt.amount_clp,
-        date: new Date(),
-        receiptId: receipt.id.substring(0, 8).toUpperCase(),
-      });
-
-      await prisma.reservationDocument.create({
-        data: {
-          reservation_id: receipt.reservation_id,
-          name: `Comprobante_Pago_${receipt.id.substring(0, 6)}.pdf`,
-          file_type: "application/pdf",
-          base64_content: `data:application/pdf;base64,${pdfBase64}`,
-        }
-      });
-    } catch (err) {
-      console.error("Failed to generate and save PDF receipt:", err);
-    }
+    // Acá se guardaba un segundo PDF del pago, con el diseño antiguo. El recibo
+    // oficial hoy es uno solo y se emite al vuelo desde este mismo comprobante
+    // (ver /api/documents/official-*), así que no hay nada que generar ni que
+    // guardar: el cliente lo descarga siempre actualizado y con el formato de
+    // Lomas del Mar.
 
     // Aviso por WhatsApp. Va después de todo lo demás y nunca lanza: el pago ya
     // está aprobado y esa es la operación que importa. El número de cuota es el
@@ -1449,42 +1408,9 @@ export async function approveReceiptAsInterestPayment(
       });
     }
 
-    // Comprobante digital PDF
-    try {
-      const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
-      const clientName = (receipt.reservation.last_name && receipt.reservation.last_name !== "null")
-        ? `${receipt.reservation.name} ${receipt.reservation.last_name}`.trim()
-        : (receipt.reservation.user?.name || receipt.reservation.name || "Cliente Alimin");
-      const rut = receipt.reservation.rut || "No registrado";
-      const email = receipt.reservation.user?.email || receipt.reservation.email || "No registrado";
-      const projectName = receipt.reservation.project?.name || "Alimin SPA";
-      const lotNumber = (receipt.reservation.lot as any)?.number || receipt.lot_id.toString();
-      const stage = receipt.reservation.lot?.stage || "";
-
-      const pdfBase64 = await generateReceiptPDF({
-        clientName,
-        rut,
-        email,
-        projectName,
-        lotNumber,
-        stage,
-        concept: "Abono de Intereses",
-        amount: appliedToMora,
-        date: new Date(),
-        receiptId: receipt.id.substring(0, 8).toUpperCase(),
-      });
-
-      await prisma.reservationDocument.create({
-        data: {
-          reservation_id: receipt.reservation_id,
-          name: `Comprobante_Abono_Intereses_${receipt.id.substring(0, 6)}.pdf`,
-          file_type: "application/pdf",
-          base64_content: `data:application/pdf;base64,${pdfBase64}`,
-        },
-      });
-    } catch (err) {
-      console.error("Failed to generate PDF for interest payment:", err);
-    }
+    // El recibo del abono de intereses ya no se guarda como archivo: se emite al
+    // vuelo desde este comprobante, igual que el resto. Ver la nota en
+    // `approveReceipt`.
 
     // Se informa lo que efectivamente se aplicó a la mora, no lo que traía el
     // comprobante: si el cliente pagó de más, el excedente no se aplicó y aún
@@ -1837,56 +1763,11 @@ export async function updateFinancialLedgerAmount(
           }
         });
 
-        // Find the PDF document associated with this receipt
-        const docName = `Comprobante_Pago_${receipt.id.substring(0, 6)}.pdf`;
-        const document = await prisma.reservationDocument.findFirst({
-          where: {
-            reservation_id: entry.reservation_id,
-            name: docName
-          }
-        });
-
-        if (document) {
-          const res = entry.reservation;
-          const clientName = res.last_name && res.last_name !== "null"
-            ? `${res.name} ${res.last_name}`.trim()
-            : (res.user?.name || res.name || "Cliente Alimin");
-          const rut = res.rut || "No registrado";
-          const email = res.user?.email || res.email || "No registrado";
-          const projectName = res.project?.name || "Alimin SPA";
-          const lotNumber = res.lot?.number || res.lot_id.toString();
-          const stage = res.lot?.stage || "";
-          const concept = receipt.scope === "PIE"
-            ? "Pago de Pie"
-            : buildInstallmentConcept({
-                installmentStartDate: res.installment_start_date,
-                dueDay: res.due_day,
-                firstInstallmentNumber: receipt.nominal_installment_number,
-                installmentsCount: installmentsCountToUse,
-              });
-
-          const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
-          const pdfBase64 = await generateReceiptPDF({
-            clientName,
-            rut,
-            email,
-            projectName,
-            lotNumber,
-            stage,
-            concept,
-            amount: newAmount,
-            date: receipt.created_at || entry.paid_at || new Date(),
-            receiptId: receipt.id.substring(0, 8).toUpperCase(),
-          });
-
-          await prisma.reservationDocument.update({
-            where: { id: document.id },
-            data: {
-              base64_content: `data:application/pdf;base64,${pdfBase64}`
-            }
-          });
-          console.log(`Regenerated PDF receipt ${docName} with amount ${newAmount}`);
-        }
+        // Ya no hay ningún PDF guardado que regenerar: el recibo oficial se
+        // emite al vuelo desde el PaymentReceipt que acabamos de corregir, así
+        // que el monto nuevo sale solo en la próxima descarga. Antes había que
+        // reescribir el archivo a mano y, si esa reescritura fallaba, al cliente
+        // le quedaba un recibo con el monto viejo.
       }
     } catch (receiptError) {
       console.error("Error updating corresponding PaymentReceipt or PDF document:", receiptError);
@@ -2928,57 +2809,11 @@ export async function registerManualPayment(
       }
     }
 
-    // Auto-generate Digital Payment Receipt PDF for Manual Payment.
-    // Reserva y gastos operacionales siempre lo emiten (ver arriba): son los
-    // casos donde el cliente necesita el documento aunque no exista la
-    // transferencia original.
-    if (data.receiptUrl || kind === "RESERVA" || kind === "GASTOS") {
-      try {
-        const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
-        
-        const clientName = res.last_name 
-          ? `${res.name} ${res.last_name}`.trim()
-          : (res.user?.name || res.name || "Cliente Alimin");
-        const rut = res.rut || "No registrado";
-        const email = res.user?.email || res.email || "No registrado";
-        const projectName = res.project?.name || "Alimin SPA";
-        const lotNumber = (res.lot as any)?.number || res.lot_id.toString();
-        const stage = res.lot?.stage || "";
-        const concept = kind === "CUOTA"
-          ? buildInstallmentConcept({
-              installmentStartDate: res.installment_start_date,
-              dueDay: res.due_day,
-              firstInstallmentNumber: nextInstNum,
-              installmentsCount: data.installmentsCount || 1,
-            })
-          : SCOPE_CONCEPTS[kind];
-
-        const pdfBase64 = await generateReceiptPDF({
-          clientName,
-          rut,
-          email,
-          projectName,
-          lotNumber,
-          stage,
-          concept,
-          amount: data.amount,
-          date: paymentDate,
-          receiptId: receiptId.substring(0, 8).toUpperCase(),
-        });
-
-        await prisma.reservationDocument.create({
-          data: {
-            reservation_id: reservationId,
-            name: `Comprobante_Pago_${receiptId.substring(0, 6)}.pdf`,
-            file_type: "application/pdf",
-            base64_content: `data:application/pdf;base64,${pdfBase64}`,
-            created_at: paymentDate,
-          }
-        });
-      } catch (err) {
-        console.error("Failed to generate and save PDF receipt for manual payment:", err);
-      }
-    }
+    // El pago manual tampoco guarda un PDF propio. El comprobante que se creó
+    // más arriba ya alcanza para emitir el recibo oficial al vuelo, incluso
+    // cuando no hay transferencia detrás (reserva, gastos operacionales, pagos
+    // registrados a mano): ese era justamente el caso que obligaba a guardar un
+    // archivo, y hoy la ruta oficial lo cubre sola.
 
     memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");
@@ -3082,44 +2917,8 @@ export async function registerInterestPayment(
       },
     });
 
-    if (data.receiptUrl) {
-      try {
-        const { generateReceiptPDF } = await import("@/lib/pdfGenerator");
-        const clientName = res.last_name
-          ? `${res.name} ${res.last_name}`.trim()
-          : (res.user?.name || res.name || "Cliente Alimin");
-        const rut = res.rut || "No registrado";
-        const email = res.user?.email || res.email || "No registrado";
-        const projectName = res.project?.name || "Alimin SPA";
-        const lotNumber = (res.lot as any)?.number || res.lot_id.toString();
-        const stage = res.lot?.stage || "";
-
-        const pdfBase64 = await generateReceiptPDF({
-          clientName,
-          rut,
-          email,
-          projectName,
-          lotNumber,
-          stage,
-          concept: "Abono de Intereses",
-          amount: appliedToMora,
-          date: paymentDate,
-          receiptId: receiptId.substring(0, 8).toUpperCase(),
-        });
-
-        await prisma.reservationDocument.create({
-          data: {
-            reservation_id: reservationId,
-            name: `Comprobante_Abono_Intereses_${receiptId.substring(0, 6)}.pdf`,
-            file_type: "application/pdf",
-            base64_content: `data:application/pdf;base64,${pdfBase64}`,
-            created_at: paymentDate,
-          },
-        });
-      } catch (err) {
-        console.error("Failed to generate PDF for manual interest payment:", err);
-      }
-    }
+    // Sin PDF guardado: el recibo del abono se emite al vuelo desde el
+    // comprobante creado arriba.
 
     memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");
@@ -3512,48 +3311,76 @@ export async function getClientPOV(reservationId: string) {
         }));
       } catch {}
     }
-    // Mismo criterio de nombres que el portal real (ver getUserLots): los
-    // recibos oficiales de Alimin se muestran por su concepto en vez del id
-    // opaco con el que se guardaron.
+    // Esta vista tiene que enseñar EXACTAMENTE lo que ve el cliente, así que de
+    // acá para abajo es el mismo armado que `getUserLots`: recibos oficiales
+    // emitidos al vuelo, comprobantes subidos por el cliente aparte, y sin los
+    // recibos viejos que quedaron guardados en la base.
     if (res.documents && res.documents.length > 0) {
-      const newDocs = res.documents.map((d: any) => {
-        const origin = (res.receipts || []).find((r: any) =>
-          isOfficialReceiptDocFor(d.name, r.id)
-        );
-        return {
-          name: origin ? buildReceiptDocName(origin, "pdf") : d.name,
+      const newDocs = res.documents
+        .filter((d: any) => !isLegacyStoredReceiptDoc(d.name))
+        .map((d: any) => ({
+          name: d.name,
+          fileName: d.name,
           category: d.category,
+          kind: "OTRO",
+          conceptOrder: 0,
           uploadedAt: d.created_at,
           fileType: d.file_type,
           url: `/api/documents/${d.id}`,
-        };
-      });
+        }));
       documents = [...newDocs, ...documents];
     }
 
-    // Respaldos bancarios: internos salvo que el pago no tenga recibo oficial.
-    // Esta vista tiene que enseñar EXACTAMENTE lo que ve el cliente, así que
-    // aplica el mismo filtro que getUserLots.
-    if (res.receipts && res.receipts.length > 0) {
-      const receiptDocs = res.receipts
-        .filter((r: any) => {
-          if (!receiptHasFile(r.receipt_url)) return false;
-          return !(res.documents || []).some((d: any) =>
-            isOfficialReceiptDocFor(d.name, r.id)
-          );
-        })
-        .map((r: any) => {
-          const { ext, fileType } = receiptFileType(r.receipt_url);
-          return {
-            name: buildReceiptDocName(r, ext),
-            category: "Comprobantes",
-            uploadedAt: r.processed_at || r.created_at,
-            fileType: fileType,
-            url: `/api/documents/${r.id}`,
-          };
-        });
-      documents = [...documents, ...receiptDocs];
+    const comprobantesAprobados = (res.receipts || []).filter(
+      (r: any) => r.status === "APPROVED" || !r.status
+    );
+
+    const recibosOficiales = comprobantesAprobados.map((r: any) => ({
+      name: buildOfficialReceiptTitle(r),
+      fileName: buildOfficialReceiptFileName({ ...r, lotNumber: lot.number }),
+      category: "Recibos",
+      kind: "RECIBO_OFICIAL",
+      conceptOrder: conceptSortKey(r),
+      uploadedAt: fechaDePagoComprobante(r),
+      fileType: "application/pdf",
+      url: `/api/documents/official-${r.id}`,
+    }));
+
+    for (let n = 1; n <= (res.installments_paid || 0); n++) {
+      if (comprobantesAprobados.some((r: any) => comprobanteCubreCuota(r, n))) continue;
+      recibosOficiales.push({
+        name: buildOfficialReceiptTitle({ nominal_installment_number: n }),
+        fileName: buildOfficialReceiptFileName({
+          scope: "INSTALLMENT",
+          lotNumber: lot.number,
+          nominal_installment_number: n,
+        }),
+        category: "Recibos",
+        kind: "RECIBO_OFICIAL",
+        conceptOrder: conceptSortKey({ nominal_installment_number: n }),
+        uploadedAt: paidInstallmentDueDates[n] ? new Date(paidInstallmentDueDates[n]) : null,
+        fileType: "application/pdf",
+        url: `/api/documents/official-cuota-${res.id}-${n}`,
+      });
     }
+
+    const comprobantesSubidos = comprobantesAprobados
+      .filter((r: any) => receiptHasFile(r.receipt_url))
+      .map((r: any) => {
+        const { ext, fileType } = receiptFileType(r.receipt_url);
+        return {
+          name: buildReceiptDocName(r, ext).replace(/\.[^.]+$/, "").replace(/_/g, " "),
+          fileName: buildReceiptDocName(r, ext),
+          category: "Comprobantes",
+          kind: "COMPROBANTE_CLIENTE",
+          conceptOrder: conceptSortKey(r),
+          uploadedAt: fechaDePagoComprobante(r),
+          fileType,
+          url: `/api/documents/${r.id}`,
+        };
+      });
+
+    documents = [...recibosOficiales, ...comprobantesSubidos, ...documents];
 
     // Sort combined documents by date descending
     documents.sort(

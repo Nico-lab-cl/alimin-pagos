@@ -254,20 +254,11 @@ export async function downloadCsv(csvContent: string, filename: string) {
  * amortizó varias cuotas. El rango cubre TODAS las cuotas del intervalo, no
  * solo sus extremos: leerlo como lista de extremos dejaba las cuotas del medio
  * sin comprobante en el historial del cliente.
+ *
+ * Se re-exporta desde `receiptDocs` para que también puedan usarla los server
+ * actions: este archivo arrastra Capacitor y no puede importarse en el servidor.
  */
-export function comprobanteCubreCuota(
-  receipt: { nominal_installment_number?: number | null; nominal_installment_range?: string | null },
-  cuota: number
-): boolean {
-  if (receipt.nominal_installment_number === cuota) return true;
-  if (receipt.nominal_installment_range) {
-    const [desde, hasta] = String(receipt.nominal_installment_range).split("-").map(Number);
-    if (Number.isFinite(desde) && Number.isFinite(hasta)) {
-      return cuota >= desde && cuota <= hasta;
-    }
-  }
-  return false;
-}
+export { comprobanteCubreCuota } from "@/lib/receiptDocs";
 
 /**
  * URL del recibo OFICIAL de una cuota pagada. Siempre existe: si hay un
