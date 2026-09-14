@@ -33,6 +33,7 @@ import { SearchProvider, useSearch } from "@/context/SearchContext";
 import { getFullPostventaData, getAdminProjects } from "@/actions/postventa";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import LogoAlimin from "@/components/shared/LogoAlimin";
 
 const menuItems = [
   { 
@@ -174,9 +175,16 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         <div className={cn("h-full flex flex-col p-6 transition-all duration-300", isCollapsed && "lg:px-4")}>
           {/* Logo Section */}
           <div className={cn("flex items-center justify-between mb-10 px-2", isCollapsed && "lg:px-0 lg:justify-center")}>
+            {/* Colapsada va solo la hoja, que es lo unico que cabe en 20 de
+                ancho. Expandida va el imagotipo completo: antes era la hoja mas
+                la palabra escrita como texto, dos piezas que no calzaban entre
+                si. */}
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="Alimin Logo" className="w-8 h-8 object-contain" />
-              {!isCollapsed && <h1 className="text-xl font-bold tracking-tight text-brand-600 whitespace-nowrap animate-fade-in">Alimin</h1>}
+              {isCollapsed ? (
+                <img src="/logo.png" alt="Alimin" className="w-8 h-8 object-contain" />
+              ) : (
+                <LogoAlimin className="h-9 w-auto object-contain animate-fade-in" />
+              )}
             </div>
           </div>
 

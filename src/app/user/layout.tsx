@@ -18,6 +18,7 @@ import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { FeedbackFab, FeedbackModal } from "@/components/feedback/FeedbackWidget";
+import LogoAlimin from "@/components/shared/LogoAlimin";
 
 const menuItems = [
   { href: "/user", label: "Dashboard", icon: Home },
@@ -59,13 +60,15 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
       )}>
         <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
           {/* Logo Area */}
-          <Link href="/user" className="flex items-center gap-3 active:scale-95 transition-transform">
-            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center p-1.5 shadow-sm">
-              <img src="/logo.png" alt="Alimin Logo" className="w-full h-full object-contain" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-slate-800 leading-none">Alimin</h1>
-            </div>
+          {/* El imagotipo trae la hoja y la palabra juntas. Antes eran la hoja
+              dentro de un recuadro mas la palabra escrita como texto, y la
+              tipografia no era la de la marca. */}
+          <Link href="/user" className="flex items-center active:scale-95 transition-transform">
+            <LogoAlimin
+              className="h-10 w-auto object-contain"
+              textClassName="text-lg font-bold tracking-tight text-slate-800 leading-none"
+              markClassName="w-9 h-9 object-contain"
+            />
           </Link>
 
           {/* Desktop Navigation Links */}
