@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * El imagotipo de Alimin: la hoja y la palabra en un solo archivo.
@@ -25,6 +25,20 @@ export default function LogoAlimin({
   markClassName?: string;
 }) {
   const [falloLaImagen, setFalloLaImagen] = useState(false);
+  const ref = useRef<HTMLImageElement>(null);
+
+  // No alcanza con `onError`. La página se arma en el servidor, así que el
+  // navegador empieza a cargar la imagen apenas recibe el HTML y, si el archivo
+  // no está, falla ANTES de que React hidrate y enganche el manejador: el error
+  // ya ocurrió y nadie lo escuchó, así que quedaba el ícono de imagen rota que
+  // este respaldo venía justamente a evitar.
+  //
+  // Por eso al montar se revisa el estado real del elemento: una imagen que
+  // termino de cargar (`complete`) pero no tiene ancho es una que fallo.
+  useEffect(() => {
+    const img = ref.current;
+    if (img && img.complete && img.naturalWidth === 0) setFalloLaImagen(true);
+  }, []);
 
   if (falloLaImagen) {
     return (
@@ -37,6 +51,7 @@ export default function LogoAlimin({
 
   return (
     <img
+      ref={ref}
       src="/imagotipo.png"
       alt="Alimin"
       className={className}
