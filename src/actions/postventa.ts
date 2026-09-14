@@ -24,16 +24,10 @@ import {
   SCOPE_LABELS,
   SCOPE_TO_LEDGER_CATEGORY,
   LEDGER_CATEGORY_TO_SCOPE,
-  buildReceiptDocName,
-  buildOfficialReceiptFileName,
-  buildOfficialReceiptTitle,
-  conceptSortKey,
-  comprobanteCubreCuota,
-  isLegacyStoredReceiptDoc,
-  fechaDePagoComprobante,
-  receiptFileType,
+  receiptFormat,
   receiptHasFile,
 } from "@/lib/receiptDocs";
+import { construirDocumentosCliente } from "@/lib/documentosCliente";
 import { detectarFichasFantasma } from "@/lib/fichasDuplicadas";
 
 const CACHE_TTL = 300; // 5 minutes
@@ -3295,97 +3289,16 @@ export async function getClientPOV(reservationId: string) {
       penaltyAmount = Math.max(0, penaltyAmount - aplicadorAbonos.totalAplicado);
     }
 
-    // Documents
-    let documents: any[] = [];
-    if (res.manual_documents) {
-      try {
-        const parsed = Array.isArray(res.manual_documents)
-          ? res.manual_documents
-          : JSON.parse(res.manual_documents as string);
-        documents = parsed.map((d: any) => ({
-          name: d.name,
-          category: d.category,
-          uploadedAt: d.uploadedAt,
-          fileType: d.fileType || d.file_type || null,
-          url: `/api/documents/${res.id}?name=${encodeURIComponent(d.name)}`,
-        }));
-      } catch {}
-    }
-    // Esta vista tiene que enseñar EXACTAMENTE lo que ve el cliente, así que de
-    // acá para abajo es el mismo armado que `getUserLots`: recibos oficiales
-    // emitidos al vuelo, comprobantes subidos por el cliente aparte, y sin los
-    // recibos viejos que quedaron guardados en la base.
-    if (res.documents && res.documents.length > 0) {
-      const newDocs = res.documents
-        .filter((d: any) => !isLegacyStoredReceiptDoc(d.name))
-        .map((d: any) => ({
-          name: d.name,
-          fileName: d.name,
-          category: d.category,
-          kind: "OTRO",
-          conceptOrder: 0,
-          uploadedAt: d.created_at,
-          fileType: d.file_type,
-          url: `/api/documents/${d.id}`,
-        }));
-      documents = [...newDocs, ...documents];
-    }
-
-    const comprobantesAprobados = (res.receipts || []).filter(
-      (r: any) => r.status === "APPROVED" || !r.status
-    );
-
-    const recibosOficiales = comprobantesAprobados.map((r: any) => ({
-      name: buildOfficialReceiptTitle(r),
-      fileName: buildOfficialReceiptFileName({ ...r, lotNumber: lot.number }),
-      category: "Recibos",
-      kind: "RECIBO_OFICIAL",
-      conceptOrder: conceptSortKey(r),
-      uploadedAt: fechaDePagoComprobante(r),
-      fileType: "application/pdf",
-      url: `/api/documents/official-${r.id}`,
-    }));
-
-    for (let n = 1; n <= (res.installments_paid || 0); n++) {
-      if (comprobantesAprobados.some((r: any) => comprobanteCubreCuota(r, n))) continue;
-      recibosOficiales.push({
-        name: buildOfficialReceiptTitle({ nominal_installment_number: n }),
-        fileName: buildOfficialReceiptFileName({
-          scope: "INSTALLMENT",
-          lotNumber: lot.number,
-          nominal_installment_number: n,
-        }),
-        category: "Recibos",
-        kind: "RECIBO_OFICIAL",
-        conceptOrder: conceptSortKey({ nominal_installment_number: n }),
-        uploadedAt: paidInstallmentDueDates[n] ? new Date(paidInstallmentDueDates[n]) : null,
-        fileType: "application/pdf",
-        url: `/api/documents/official-cuota-${res.id}-${n}`,
-      });
-    }
-
-    const comprobantesSubidos = comprobantesAprobados
-      .filter((r: any) => receiptHasFile(r.receipt_url))
-      .map((r: any) => {
-        const { ext, fileType } = receiptFileType(r.receipt_url);
-        return {
-          name: buildReceiptDocName(r, ext).replace(/\.[^.]+$/, "").replace(/_/g, " "),
-          fileName: buildReceiptDocName(r, ext),
-          category: "Comprobantes",
-          kind: "COMPROBANTE_CLIENTE",
-          conceptOrder: conceptSortKey(r),
-          uploadedAt: fechaDePagoComprobante(r),
-          fileType,
-          url: `/api/documents/${r.id}`,
-        };
-      });
-
-    documents = [...recibosOficiales, ...comprobantesSubidos, ...documents];
-
-    // Sort combined documents by date descending
-    documents.sort(
-      (a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime()
-    );
+    // Esta vista tiene que ensenar EXACTAMENTE lo que ve el cliente, asi que
+    // sale del mismo armador que el portal. Antes era una copia aparte y se
+    // desincronizo: el admin quedo mostrando el diseno viejo con datos nuevos.
+    const documentos = construirDocumentosCliente({
+      reservation: res,
+      lotNumber: lot.number,
+      montosPorCuota: paidInstallmentAmounts,
+      vencimientosPorCuota: paidInstallmentDueDates,
+    });
+    const documents = documentos.planos;
 
     const formatMonth = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'UTC' });
     const nextInstallmentMonth = nextDueDate ? formatMonth.format(nextDueDate).toUpperCase() : null;
@@ -3421,6 +3334,7 @@ export async function getClientPOV(reservationId: string) {
         dailyPenalty: activeDailyPenalty,
         upcomingInstallments,
         documents,
+        documentos,
         // La vista "como cliente" tiene que cruzar comprobante <-> cuota igual
         // que el portal real; sin esta lista el historial de postventa mostraba
         // todas las cuotas como "No disponible".

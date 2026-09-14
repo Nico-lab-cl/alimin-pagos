@@ -4,6 +4,7 @@ import { getClientPOV, adjuntarComprobanteACuotaPagada } from "@/actions/postven
 import { uploadPaymentReceipt } from "@/actions/user";
 import { formatCLP, getDownloadFilename, downloadDocument, cn, formatInstallmentsLabel, comprobanteCubreCuota, urlReciboOficial } from "@/lib/utils";
 import { fechaDePagoComprobante } from "@/lib/receiptDocs";
+import DocumentosCliente from "@/components/shared/DocumentosCliente";
 import { toast } from "sonner";
 import {
   X,
@@ -1513,159 +1514,12 @@ function PaymentView({ data, reservationId }: { data: any; reservationId: string
 
 
 /* ──────────────────── DOCUMENTS VIEW ──────────────────── */
+/**
+ * Es exactamente el mismo componente que ve el cliente en su portal.
+ * Antes esta vista tenia su propia copia del diseno y se desincronizo: quedo
+ * mostrando las tarjetas viejas con los datos nuevos. Si hay que cambiar algo,
+ * se cambia en DocumentosCliente y las dos pantallas se mueven juntas.
+ */
 function DocumentsView({ data }: { data: any }) {
-  const [activeCategory, setActiveCategory] = useState<string>("Todos");
-  const hasDocs = data.documents && data.documents.length > 0;
-
-  const getCategoryType = (doc: any) => {
-    const name = doc.name?.toLowerCase() || "";
-    const cat = doc.category?.toLowerCase() || "";
-    if (name.includes("contrato") || name.includes("promesa") || cat.includes("contrato") || cat.includes("promesa")) {
-      return "CONTRATO";
-    }
-    if (name.includes("certificado") || name.includes("inscripcion") || cat.includes("certificado") || cat.includes("inscripcion")) {
-      return "CERTIFICADO";
-    }
-    if (name.includes("comprobante") || name.includes("recibo") || cat.includes("comprobante") || cat.includes("recibo") || name.includes("cuota")) {
-      return "COMPROBANTE";
-    }
-    if (name.includes("ficha") || name.includes("tecnica") || name.includes("reglamento") || cat.includes("ficha") || cat.includes("tecnica") || cat.includes("reglamento")) {
-      return "FICHA";
-    }
-    return "FICHA";
-  };
-
-  const getCategoryTheme = (categoryType: string) => {
-    switch (categoryType) {
-      case "CONTRATO":
-        return {
-          icon: FileText,
-          iconColor: "text-brand-600",
-          bgColor: "bg-brand-50/80 border-brand-100",
-          badgeBg: "bg-brand-50 text-brand-600 border-brand-100",
-          badgeText: "Contrato",
-        };
-      case "CERTIFICADO":
-        return {
-          icon: ShieldCheck,
-          iconColor: "text-brand-600",
-          bgColor: "bg-[#f3faf7] border-[#def7ec]",
-          badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-100",
-          badgeText: "Certificado",
-        };
-      case "COMPROBANTE":
-        return {
-          icon: FileBadge,
-          iconColor: "text-orange-500",
-          bgColor: "bg-orange-50/50 border-orange-100",
-          badgeBg: "bg-orange-50 text-orange-700 border-orange-100",
-          badgeText: "Comprobante",
-        };
-      case "FICHA":
-      default:
-        return {
-          icon: Compass,
-          iconColor: "text-slate-600",
-          bgColor: "bg-slate-50 border-slate-100",
-          badgeBg: "bg-slate-50 text-slate-500 border-slate-100",
-          badgeText: "Ficha",
-        };
-    }
-  };
-
-  const filteredDocs = (data.documents || []).filter((doc: any) => {
-    const type = getCategoryType(doc);
-    if (activeCategory === "Todos") return true;
-    if (activeCategory === "Contratos" && type === "CONTRATO") return true;
-    if (activeCategory === "Certificados" && type === "CERTIFICADO") return true;
-    if (activeCategory === "Comprobantes" && type === "COMPROBANTE") return true;
-    if (activeCategory === "Fichas" && type === "FICHA") return true;
-    return false;
-  });
-
-  return (
-    <div className="space-y-6">
-      {/* Title Header */}
-      <div>
-        <h2 className="text-xl font-extrabold text-brand-800 tracking-tight leading-none mb-1">Mis Documentos</h2>
-        <p className="text-xs text-slate-500 font-medium">Todos tus documentos en un solo lugar</p>
-      </div>
-
-      {/* Filter Pills */}
-      <div className="flex flex-wrap gap-2">
-        {["Todos", "Contratos", "Certificados", "Comprobantes", "Fichas"].map((cat) => {
-          const isActive = activeCategory === cat;
-          const label = cat === "Comprobantes" ? "Comprobantes de Pago" : cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-2 rounded-full text-xs font-bold border transition-all cursor-pointer ${
-                isActive 
-                  ? "bg-brand-600 border-brand-600 text-white shadow-sm" 
-                  : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Documents Grid */}
-      {!hasDocs || filteredDocs.length === 0 ? (
-        <div className="text-center py-20 bg-white border border-slate-200 rounded-2xl shadow-sm">
-          <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-          <h3 className="text-sm font-bold text-slate-700">Sin Documentos</h3>
-          <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
-            No se encontraron documentos en esta categoría para tu cuenta.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredDocs.map((doc: any, idx: number) => {
-            const type = getCategoryType(doc);
-            const theme = getCategoryTheme(type);
-            const Icon = theme.icon;
-
-            return (
-              <div 
-                key={idx} 
-                className="bg-white border border-slate-200 hover:border-brand-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all group"
-              >
-                <div className="flex flex-col items-center justify-center py-4 text-center">
-                  <div className={`w-16 h-16 rounded-2xl ${theme.bgColor} flex items-center justify-center border mb-2 group-hover:scale-105 transition-transform duration-300`}>
-                    <Icon className={`w-8 h-8 ${theme.iconColor}`} />
-                  </div>
-                  
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest border ${theme.badgeBg}`}>
-                    {theme.badgeText}
-                  </span>
-                </div>
-
-                <div className="mt-3 flex-1 text-center">
-                  <h4 className="text-xs font-bold text-slate-800 line-clamp-2 leading-tight">
-                    {doc.name}
-                  </h4>
-                  <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-wide">
-                    {doc.uploadedAt ? `Emitido ${new Date(doc.uploadedAt).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })}` : "Emitido recientemente"}
-                  </p>
-                </div>
-
-                <div className="mt-5 pt-3 border-t border-slate-100 flex items-center gap-2">
-                  <button 
-                    onClick={() => downloadDocument(doc.url, doc.name, doc.fileType)}
-                    className="flex-1 h-10 rounded-xl border border-brand-600 hover:bg-brand-50 text-brand-600 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Descargar
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+  return <DocumentosCliente documentos={data.documentos} />;
 }

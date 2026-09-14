@@ -13,17 +13,8 @@ import {
   getNominalInstallmentAmount,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
-import {
-  buildReceiptDocName,
-  buildOfficialReceiptFileName,
-  buildOfficialReceiptTitle,
-  conceptSortKey,
-  isLegacyStoredReceiptDoc,
-  receiptFileType,
-  receiptHasFile,
-  fechaDePagoComprobante,
-  comprobanteCubreCuota,
-} from "@/lib/receiptDocs";
+import { fechaDePagoComprobante } from "@/lib/receiptDocs";
+import { construirDocumentosCliente } from "@/lib/documentosCliente";
 
 const CACHE_TTL = 300;
 
@@ -451,137 +442,17 @@ export async function getUserLots() {
         }
       }
 
-      // Documentos del cliente.
-      //
-      // Hay tres cosas distintas que antes se mezclaban en una sola lista, y
-      // por eso el cliente no entendía cuál era cuál:
-      //
-      //   RECIBO_OFICIAL      el documento que emitimos nosotros. Uno por pago,
-      //                       siempre con el formato de Lomas del Mar, siempre
-      //                       generado al vuelo (nunca un archivo guardado).
-      //   COMPROBANTE_CLIENTE el respaldo bancario que subió el cliente: la
-      //                       foto o el PDF de su transferencia.
-      //   OTRO                contratos, certificados, fichas, reglamentos.
-      //
-      // Cada documento se va etiquetado con `kind` para que el portal los pueda
-      // mostrar separados, y con `conceptOrder` para poder ordenarlos por
-      // concepto (Reserva → Pie → Cuota 01 → Cuota 02 …) y no alfabéticamente,
-      // que dejaba la Cuota 10 antes que la Cuota 2.
-      let documents: any[] = [];
-
-      // Contratos, certificados y fichas cargados a mano (formato antiguo).
-      if (res.manual_documents) {
-        try {
-          const parsed = Array.isArray(res.manual_documents)
-            ? res.manual_documents
-            : JSON.parse(res.manual_documents as string);
-          documents = parsed.map((d: any) => ({
-            name: d.name,
-            fileName: d.name,
-            category: d.category,
-            kind: "OTRO",
-            conceptOrder: 0,
-            uploadedAt: d.uploadedAt,
-            fileType: d.fileType || d.file_type || null,
-            url: `/api/documents/${res.id}?name=${encodeURIComponent(d.name)}`,
-          }));
-        } catch {}
-      }
-
-      // Documentos guardados. Se dejan fuera los recibos VIEJOS que el portal
-      // generaba y guardaba con cada aprobación: el cliente terminaba con dos
-      // recibos nuestros del mismo pago, con diseños distintos, y cuál le tocaba
-      // dependía de por dónde hiciera clic. Hoy el recibo es uno solo y se emite
-      // al vuelo; los archivos viejos siguen en la base, solo dejan de mostrarse.
-      if (res.documents && res.documents.length > 0) {
-        const newDocs = res.documents
-          .filter((d: any) => !isLegacyStoredReceiptDoc(d.name))
-          .map((d: any) => ({
-            name: d.name,
-            fileName: d.name,
-            category: d.category,
-            kind: "OTRO",
-            conceptOrder: 0,
-            uploadedAt: d.created_at,
-            fileType: d.file_type,
-            url: `/api/documents/${d.id}`,
-          }));
-        documents = [...newDocs, ...documents];
-      }
-
-      // Recibos oficiales: uno por cada pago aprobado.
-      const comprobantesAprobados = (res.receipts || []).filter(
-        (r: any) => r.status === "APPROVED" || !r.status
-      );
-
-      const recibosOficiales = comprobantesAprobados.map((r: any) => ({
-        name: buildOfficialReceiptTitle(r),
-        fileName: buildOfficialReceiptFileName({ ...r, lotNumber: lot.number }),
-        category: "Recibos",
-        kind: "RECIBO_OFICIAL",
-        conceptOrder: conceptSortKey(r),
-        // La fecha del recibo es la del PAGO, no la de cuándo se generó el
-        // archivo: es la que el cliente reconoce en su cartola.
-        uploadedAt: fechaDePagoComprobante(r),
-        fileType: "application/pdf",
-        url: `/api/documents/official-${r.id}`,
-      }));
-
-      // Cuotas que están pagadas pero que no tienen ningún comprobante detrás
-      // (historial migrado de la planilla, pagos que postventa registró a mano).
-      // El recibo lo emitimos nosotros, así que no tiene por qué depender de que
-      // el cliente haya subido su transferencia: se emite desde la reserva.
-      for (let n = 1; n <= (res.installments_paid || 0); n++) {
-        const yaCubierta = comprobantesAprobados.some((r: any) =>
-          comprobanteCubreCuota(r, n)
-        );
-        if (yaCubierta) continue;
-
-        recibosOficiales.push({
-          name: buildOfficialReceiptTitle({ nominal_installment_number: n }),
-          fileName: buildOfficialReceiptFileName({
-            scope: "INSTALLMENT",
-            lotNumber: lot.number,
-            nominal_installment_number: n,
-          }),
-          category: "Recibos",
-          kind: "RECIBO_OFICIAL",
-          conceptOrder: conceptSortKey({ nominal_installment_number: n }),
-          // Sin comprobante detrás no se conoce la fecha real de pago; la del
-          // vencimiento pactado es lo más cercano y es la que imprime el recibo.
-          uploadedAt: paidInstallmentDueDates[n] ? new Date(paidInstallmentDueDates[n]) : null,
-          fileType: "application/pdf",
-          url: `/api/documents/official-cuota-${res.id}-${n}`,
-        });
-      }
-
-      // Los respaldos bancarios que subió el cliente. Antes se le ocultaban
-      // porque, al llamarse igual que el recibo oficial, duplicaban cada pago en
-      // la lista. Ahora van en su propia sección, así que se muestran todos: son
-      // suyos y tiene derecho a volver a verlos.
-      const comprobantesSubidos = comprobantesAprobados
-        .filter((r: any) => receiptHasFile(r.receipt_url))
-        .map((r: any) => {
-          const { ext, fileType } = receiptFileType(r.receipt_url);
-          return {
-            name: buildReceiptDocName(r, ext).replace(/\.[^.]+$/, "").replace(/_/g, " "),
-            fileName: buildReceiptDocName(r, ext),
-            category: "Comprobantes",
-            kind: "COMPROBANTE_CLIENTE",
-            conceptOrder: conceptSortKey(r),
-            uploadedAt: fechaDePagoComprobante(r),
-            fileType,
-            url: `/api/documents/${r.id}`,
-          };
-        });
-
-      documents = [...recibosOficiales, ...comprobantesSubidos, ...documents];
-
-      // Orden por defecto: lo más reciente arriba. El portal puede reordenar por
-      // concepto sin volver a pedir los datos.
-      documents.sort(
-        (a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime()
-      );
+      // Documentos del cliente: cuotas, otros pagos, lo que subio el y sus
+      // contratos. Se arma en @/lib/documentosCliente, el mismo codigo que usa
+      // la vista del cliente en el admin: antes esto estaba escrito dos veces y
+      // las copias se desincronizaron.
+      const documentos = construirDocumentosCliente({
+        reservation: res,
+        lotNumber: lot.number,
+        montosPorCuota: paidInstallmentAmounts,
+        vencimientosPorCuota: paidInstallmentDueDates,
+      });
+      const documents = documentos.planos;
 
       return {
         reservationId: res.id,
@@ -613,6 +484,7 @@ export async function getUserLots() {
         dailyPenalty: res.daily_penalty ?? project.daily_penalty_amount ?? 10000,
         upcomingInstallments,
         documents,
+        documentos,
         receipts: res.receipts.map((r: any) => ({
           id: r.id,
           amount_clp: r.amount_clp,
