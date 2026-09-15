@@ -1405,28 +1405,36 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                             </button>
                           </>
                         )}
-                        {doc.type !== "official_receipt" && (
-                          <button
-                            onClick={async () => {
-                              if (confirm("¿Estás seguro de que deseas eliminar este archivo? Esta acción quedará registrada en la bitácora.")) {
-                                const res = doc.type === "legacy"
-                                  ? await deleteLegacyDocument(selectedClient.id, doc.name)
-                                  : await deleteDocument(doc.id);
-                                if (res.success) {
-                                  setDocs(docs.filter((d) => d.id !== doc.id));
-                                  toast.success("Documento eliminado.");
-                                  fetchNotesAndHistory();
-                                } else {
-                                  toast.error(res.error || "No se pudo eliminar.");
-                                }
+                        {/* El recibo oficial no es un archivo guardado: se emite
+                            al vuelo desde el pago. Antes el botón se escondía
+                            porque no había nada que borrar; ahora se puede
+                            sacar de la vista sin tocar el pago. El aviso dice
+                            una cosa distinta en cada caso, porque son cosas
+                            distintas. */}
+                        <button
+                          onClick={async () => {
+                            const esRecibo = doc.type === "official_receipt";
+                            const aviso = esRecibo
+                              ? "Este recibo se va a dejar de mostrar, acá y en el portal del cliente.\n\nEl PAGO no se toca: las cuotas pagadas, la caja y el saldo quedan exactamente igual. Si lo que querés es deshacer el pago, eso se hace desde la Bandeja de Pagos.\n\nQueda registrado en la bitácora. ¿Ocultar el recibo?"
+                              : "¿Estás seguro de que deseas eliminar este archivo? Esta acción quedará registrada en la bitácora.";
+                            if (confirm(aviso)) {
+                              const res = doc.type === "legacy"
+                                ? await deleteLegacyDocument(selectedClient.id, doc.name)
+                                : await deleteDocument(doc.id);
+                              if (res.success) {
+                                setDocs(docs.filter((d) => d.id !== doc.id));
+                                toast.success(esRecibo ? "Recibo ocultado. El pago quedó intacto." : "Documento eliminado.");
+                                fetchNotesAndHistory();
+                              } else {
+                                toast.error(res.error || "No se pudo eliminar.");
                               }
-                            }}
-                            className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm cursor-pointer"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
+                            }
+                          }}
+                          className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm cursor-pointer"
+                          title={doc.type === "official_receipt" ? "Ocultar este recibo (no toca el pago)" : "Eliminar"}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
                   ))

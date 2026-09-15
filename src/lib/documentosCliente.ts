@@ -140,19 +140,29 @@ export function construirDocumentosCliente(opts: {
     (r: any) => r.status === "APPROVED" || !r.status
   );
 
+  // Recibos que postventa sacó de la vista porque quedaron mal emitidos (ver
+  // `ocultarReciboOficial`). El PAGO sigue contando igual —cuotas, caja y saldo
+  // no cambian—; lo único que desaparece es el papel.
+  const visibles = aprobados.filter((r: any) => !r.oculto_at);
+
   // ------------------------------------------------------------------ cuotas
   const cuotas: FilaCuota[] = [];
   const pagadas = res.installments_paid || 0;
 
   for (let n = pagadas; n >= 1; n--) {
+    // La fecha y el agrupamiento salen del pago aunque su recibo esté oculto:
+    // ocultar un papel no borra el hecho de que la cuota se pagó ese día.
     const origen = aprobados.find((r: any) => comprobanteCubreCuota(r, n));
+    // Los archivos, en cambio, solo salen de un pago visible.
+    const origenVisible = visibles.find((r: any) => comprobanteCubreCuota(r, n));
 
     // El recibo de una cuota SIN comprobante detrás (historial migrado, pago
-    // registrado a mano) se emite igual, desde los datos de la reserva: lo
-    // emitimos nosotros, no depende de que el cliente haya subido su
-    // transferencia.
-    const recibo = origen
-      ? archivoDelRecibo(origen, lotNumber)
+    // registrado a mano, o recibo ocultado) se emite igual, desde los datos de
+    // la reserva: lo emitimos nosotros, no depende de que el cliente haya
+    // subido su transferencia. Si el recibo de un rango se ocultó, cada cuota
+    // pasa a tener el suyo, limpio y por separado.
+    const recibo = origenVisible
+      ? archivoDelRecibo(origenVisible, lotNumber)
       : {
           nombre: buildOfficialReceiptTitle({ nominal_installment_number: n }),
           archivo: buildOfficialReceiptFileName({
@@ -173,7 +183,7 @@ export function construirDocumentosCliente(opts: {
       etiqueta: `Cuota ${String(n).padStart(2, "0")}`,
       // Si vino dentro de un pago que cubrio varias cuotas, se dice cuál: es la
       // explicacion de por que esas filas comparten recibo y comprobante.
-      agrupadaCon: origen?.nominal_installment_range || null,
+      agrupadaCon: origenVisible?.nominal_installment_range || null,
       vencimiento: aFecha(vencimientosPorCuota[n]),
       fechaPago: origen ? fechaDePagoComprobante(origen) : null,
       // El monto PACTADO de esta cuota, no el total del comprobante: una sola
@@ -181,7 +191,7 @@ export function construirDocumentosCliente(opts: {
       // suma completa en cada fila.
       monto: montosPorCuota[n] || 0,
       recibo,
-      comprobante: origen ? archivoDelComprobante(origen) : null,
+      comprobante: origenVisible ? archivoDelComprobante(origenVisible) : null,
     });
   }
 
@@ -197,7 +207,7 @@ export function construirDocumentosCliente(opts: {
   const documentos: FilaDocumento[] = [];
 
   const pagosSueltos: FilaDocumento[] = [];
-  for (const r of aprobados) {
+  for (const r of visibles) {
     const esScopeSuelto = SCOPES_SUELTOS.includes(r.scope);
 
     // Un abono de intereses NO queda guardado con scope "MORA": tanto

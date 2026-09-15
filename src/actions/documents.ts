@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { memoryCache } from "@/lib/cache";
 import { deletePaymentReceipt, logSystemNote } from "@/actions/postventa";
 import {
+  SCOPE_LABELS,
   buildReceiptDocName,
   receiptFileType,
   receiptHasFile,
@@ -95,6 +96,7 @@ export async function getReservationDocuments(reservationId: string) {
         created_at: true,
         processed_at: true,
         paid_at: true,
+        oculto_at: true,
       },
       orderBy: { created_at: "desc" },
     });
@@ -131,7 +133,9 @@ export async function getReservationDocuments(reservationId: string) {
     // Recibo OFICIAL emitido por Alimin (distinto del comprobante que sube el
     // cliente): un documento adicional por cada comprobante aprobado, generado
     // al vuelo (sin archivo guardado) via /api/documents/official-{id}.
-    const officialReceiptDocs = receipts.map((r: any) => {
+    // Un recibo ocultado por postventa deja de listarse. El pago sigue ahi: su
+    // respaldo bancario se sigue viendo mas arriba como INTERNO.
+    const officialReceiptDocs = receipts.filter((r: any) => !r.oculto_at).map((r: any) => {
       const docName = buildReceiptDocName(r, "pdf").replace(
         /^Comprobante_(Pago_)?/,
         "Recibo_Oficial_"
@@ -190,7 +194,18 @@ export async function deleteDocument(documentId: string) {
       return { success: true };
     }
 
-    // 2. Comprobante bancario (PaymentReceipt): reutiliza la lógica de reversión
+    // 2. Recibo OFICIAL de un pago. No es un archivo: se genera al vuelo, así
+    // que no hay nada que borrar. Antes esto no encontraba nada y devolvía
+    // "Documento no encontrado", así que el botón simplemente no funcionaba.
+    //
+    // Se oculta en vez de borrar, y el pago queda intacto: monto, cuotas y caja
+    // no se tocan. Para deshacer un pago está el botón de la bandeja, que avisa
+    // lo que revierte.
+    if (documentId.startsWith("official-")) {
+      return await ocultarReciboOficial(documentId.slice("official-".length));
+    }
+
+    // 3. Comprobante bancario (PaymentReceipt): reutiliza la lógica de reversión
     // financiera (revierte cuotas/ledger si estaba aprobado) y ya deja su propio
     // registro en la Bitácora.
     const receipt = await prisma.paymentReceipt.findUnique({
@@ -247,5 +262,76 @@ export async function deleteLegacyDocument(reservationId: string, docName: strin
   } catch (error) {
     console.error("[ACTION] Error deleting legacy document:", error);
     return { error: "Error al eliminar el documento" };
+  }
+}
+
+/**
+ * Saca de la vista el recibo oficial de un pago, sin tocar el pago.
+ *
+ * Existe porque son dos cosas distintas que antes no se podían separar:
+ *
+ *   - Deshacer un PAGO (revertir cuotas y sacar la plata de caja) es
+ *     `deletePaymentReceipt`, y avisa exactamente lo que revierte.
+ *   - Sacar de la lista un RECIBO que quedó mal emitido —por ejemplo con rangos
+ *     de cuota pisados— es esto, y no mueve un peso.
+ *
+ * El recibo se genera al vuelo desde el comprobante, así que no hay archivo que
+ * borrar: se marca el comprobante y deja de listarse. Es reversible.
+ *
+ * No escribe en `financial_ledger` ni en `reservations`: no cambia cuotas
+ * pagadas, saldos, mora ni montos.
+ */
+export async function ocultarReciboOficial(receiptId: string, motivo?: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const receipt = await prisma.paymentReceipt.findUnique({
+      where: { id: receiptId },
+      select: {
+        id: true,
+        reservation_id: true,
+        amount_clp: true,
+        scope: true,
+        nominal_installment_number: true,
+        nominal_installment_range: true,
+      },
+    });
+
+    if (!receipt) return { error: "Comprobante no encontrado" };
+
+    await prisma.paymentReceipt.update({
+      where: { id: receiptId },
+      data: { oculto_at: new Date(), oculto_motivo: motivo?.trim() || null },
+    });
+
+    const cual = receipt.nominal_installment_range
+      ? `Cuotas ${receipt.nominal_installment_range}`
+      : receipt.nominal_installment_number
+        ? `Cuota ${receipt.nominal_installment_number}`
+        : SCOPE_LABELS[receipt.scope] || receipt.scope;
+
+    await logSystemNote(
+      receipt.reservation_id,
+      `Recibo oficial ocultado: ${cual} (monto $${receipt.amount_clp.toLocaleString(
+        "es-CL"
+      )}). El pago NO se modificó: cuotas, caja y saldo quedan igual.${
+        motivo?.trim() ? ` Motivo: ${motivo.trim()}` : ""
+      }`,
+      "PaymentReceipt"
+    );
+
+    memoryCache.deleteByPrefix("user_data_");
+    memoryCache.deleteByPrefix("postventa_");
+    revalidatePath("/admin/clients");
+    revalidatePath("/user/documents");
+
+    return { success: true };
+  } catch (error) {
+    console.error("[ACTION] Error ocultando recibo oficial:", error);
+    return { error: "Error al ocultar el recibo" };
   }
 }
