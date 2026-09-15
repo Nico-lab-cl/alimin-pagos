@@ -8,6 +8,7 @@ import {
   receiptFileType,
   fechaDePagoComprobante,
   buildOfficialReceiptFileName,
+  esAbonoDeIntereses,
 } from "@/lib/receiptDocs";
 import { loadReceiptLogo } from "@/lib/receiptLogo";
 import { PaymentReceiptPDF } from "@/components/pdf/PaymentReceiptPDF";
@@ -150,7 +151,9 @@ export async function GET(
 
       let installmentDueDate: Date | undefined;
       let installmentBreakdown: { number: number; dueDate: Date; amount: number }[] | undefined;
-      if (receipt.scope === "INSTALLMENT" && receipt.installments_count) {
+      // Un abono de intereses no tiene vencimiento: no corresponde a ninguna
+      // cuota. Sin este filtro el recibo imprimia el vencimiento de la cuota 1.
+      if (receipt.scope === "INSTALLMENT" && receipt.installments_count && !esAbonoDeIntereses(receipt)) {
         let effectiveInstallmentNum = receipt.nominal_installment_number || receipt.installments_count || 1;
         const rangeMatch = receipt.nominal_installment_range?.match(/^(\d+)-(\d+)$/);
         if (rangeMatch) effectiveInstallmentNum = parseInt(rangeMatch[2], 10);
@@ -189,7 +192,10 @@ export async function GET(
           lotNumber={receipt.lot.number}
           lotStage={receipt.lot.stage || ""}
           amountPaid={receipt.amount_clp}
-          paymentScope={receipt.scope}
+          // Un abono de intereses viene guardado como "INSTALLMENT" sin numero
+          // de cuota, asi que el PDF salia diciendo "Cuota #00/44". Se le pasa
+          // el concepto real para que diga lo que es.
+          paymentScope={esAbonoDeIntereses(receipt) ? "MORA" : receipt.scope}
           installmentsCount={receipt.installments_count || 0}
           totalInstallments={receipt.lot.cuotas || 0}
           nominalInstallmentNumber={receipt.nominal_installment_number}

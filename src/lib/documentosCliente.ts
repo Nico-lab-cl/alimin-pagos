@@ -198,9 +198,25 @@ export function construirDocumentosCliente(opts: {
 
   const pagosSueltos: FilaDocumento[] = [];
   for (const r of aprobados) {
-    if (!SCOPES_SUELTOS.includes(r.scope)) continue;
+    const esScopeSuelto = SCOPES_SUELTOS.includes(r.scope);
+
+    // Un abono de intereses NO queda guardado con scope "MORA": tanto
+    // `registerInterestPayment` como `approveReceiptAsInterestPayment` lo dejan
+    // como "INSTALLMENT" sin número ni rango de cuota. Por eso no lo reclama
+    // ninguna cuota —`comprobanteCubreCuota` no lo matchea con ninguna— y, si no
+    // se lo recogiera acá, el pago se caía de las dos tablas y el cliente no
+    // veía por ningún lado que lo hizo.
+    const esAbonoDeIntereses =
+      r.scope === "INSTALLMENT" &&
+      !r.nominal_installment_number &&
+      !r.nominal_installment_range;
+
+    if (!esScopeSuelto && !esAbonoDeIntereses) continue;
+
     pagosSueltos.push({
-      nombre: SCOPE_LABELS[r.scope] || r.scope,
+      nombre: esScopeSuelto
+        ? SCOPE_LABELS[r.scope] || r.scope
+        : SCOPE_LABELS.MORA,
       tipo: "Pago",
       fecha: fechaDePagoComprobante(r),
       monto: r.amount_clp || 0,

@@ -150,6 +150,33 @@ export function comprobanteCubreCuota(
   return false;
 }
 
+/**
+ * ¿Este comprobante es un abono de intereses?
+ *
+ * No alcanza con mirar el scope. Un abono NO queda guardado como "MORA":
+ * `registerInterestPayment` lo crea con scope "INSTALLMENT", y
+ * `approveReceiptAsInterestPayment` aprueba el comprobante de cuota que subió el
+ * cliente sin cambiarle el scope. Lo que los distingue es que no quedan
+ * asociados a ninguna cuota: ni número ni rango.
+ *
+ * Sin este criterio el pago se rotula como cuota en todos lados —el PDF sale
+ * diciendo "Cuota #00", que es el error que reportó postventa— y en el listado
+ * nuevo no lo reclamaba ninguna tabla, así que desaparecía de la vista del
+ * cliente.
+ */
+export function esAbonoDeIntereses(receipt: {
+  scope?: string | null;
+  nominal_installment_number?: number | null;
+  nominal_installment_range?: string | null;
+}): boolean {
+  if (receipt.scope === "MORA") return true;
+  return (
+    receipt.scope === "INSTALLMENT" &&
+    !receipt.nominal_installment_number &&
+    !receipt.nominal_installment_range
+  );
+}
+
 /** Cómo se llama cada concepto dentro del nombre del archivo del recibo. */
 const SCOPE_FILE_LABELS: Record<string, string> = {
   PIE: "pie",
@@ -179,7 +206,9 @@ export function buildOfficialReceiptFileName(receipt: {
     .replace(/^l[-\s_]*/i, "");
   const sufijoLote = lote ? `_lote_${lote}` : "";
 
-  const etiquetaScope = receipt.scope ? SCOPE_FILE_LABELS[receipt.scope] : undefined;
+  // Un abono de intereses se rotula como tal aunque venga guardado como cuota.
+  const scopeReal = esAbonoDeIntereses(receipt) ? "MORA" : receipt.scope;
+  const etiquetaScope = scopeReal ? SCOPE_FILE_LABELS[scopeReal] : undefined;
   if (etiquetaScope) return `Recibo_${etiquetaScope}${sufijoLote}.pdf`;
 
   if (receipt.nominal_installment_range) {
@@ -201,6 +230,7 @@ export function buildOfficialReceiptTitle(receipt: {
   nominal_installment_number?: number | null;
   nominal_installment_range?: string | null;
 }): string {
+  if (esAbonoDeIntereses(receipt)) return "Recibo de Abono de Intereses";
   switch (receipt.scope) {
     case "PIE":
       return "Recibo de Pie";

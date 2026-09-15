@@ -3,6 +3,7 @@ import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/render
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { ReceiptLegalInfo } from '@/lib/receiptLegalInfo';
+import { SCOPE_CONCEPTS } from '@/lib/receiptDocs';
 
 const styles = StyleSheet.create({
   page: {
@@ -235,11 +236,13 @@ export const PaymentReceiptPDF = ({
     installmentLabel = `Cuota #${String(installmentsCount).padStart(2, '0')}`;
   }
 
+  // El concepto sale de la tabla compartida. Antes esto era un ternario con dos
+  // salidas, asi que TODO lo que no fuera cuota ni pie se imprimia como "Pago de
+  // Reserva": un abono de intereses y unos gastos operacionales salian rotulados
+  // como una reserva.
   const itemName = isCuotas
     ? `${installmentLabel}/${totalInstallments}${monthYear}`
-    : paymentScope === 'PIE'
-      ? 'Pago de Pie'
-      : 'Pago de Reserva';
+    : SCOPE_CONCEPTS[paymentScope] || 'Pago Registrado';
 
   const shortId = receiptId.split('-')[0].toUpperCase();
 
