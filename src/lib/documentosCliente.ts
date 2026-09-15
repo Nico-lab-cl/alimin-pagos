@@ -6,16 +6,18 @@
  * desincronizaron: la vista del admin seguía mostrando el diseño viejo con los
  * datos nuevos. Ahora las dos llaman acá.
  *
- * La pantalla ya no es una grilla de tarjetas sino cuatro tablas:
+ * La pantalla ya no es una grilla de tarjetas sino dos tablas:
  *
- *   cuotas        una fila por cuota pagada, de la más reciente a la más
- *                 antigua, con su recibo y el comprobante que subió el cliente.
- *   otrosPagos    reserva, pie, gastos operacionales y abono de intereses:
- *                 cargos que no pertenecen al plan de cuotas.
- *   pagosSubidos  solo lo que envió el cliente. Es el único lugar donde puede
- *                 revisar sus propias transferencias sin mezclarlas con los
- *                 recibos que emitimos nosotros.
- *   archivos      contratos, certificados y fichas.
+ *   cuotas      una fila por cuota pagada, de la más reciente a la más antigua,
+ *               con el comprobante que emitimos nosotros y el que subió el
+ *               cliente, uno al lado del otro.
+ *   documentos  todo lo que no es una cuota: reserva, pie, gastos
+ *               operacionales, abono de intereses, y el contrato, certificados
+ *               y fichas de la propiedad.
+ *
+ * Las dos columnas de archivo van juntas en cada fila a propósito. Antes lo que
+ * subía el cliente vivía en una pestaña aparte, y para saber si su transferencia
+ * de la cuota 7 estaba respaldada había que cambiar de pestaña y buscarla.
  */
 import {
   SCOPE_LABELS,
@@ -23,7 +25,6 @@ import {
   buildOfficialReceiptFileName,
   buildOfficialReceiptTitle,
   comprobanteCubreCuota,
-  conceptSortKey,
   fechaDePagoComprobante,
   isLegacyStoredReceiptDoc,
   receiptFileType,
@@ -56,37 +57,36 @@ export type FilaCuota = {
   comprobante: ArchivoCliente | null;
 };
 
-export type FilaOtroPago = {
-  concepto: string;
-  fechaPago: Date | null;
-  monto: number;
-  recibo: ArchivoCliente;
+/**
+ * Una fila de la pestaña Documentos. Cubre dos cosas a la vez: los pagos que no
+ * son cuota (reserva, pie, gastos operacionales, abono de intereses) y los
+ * archivos de la propiedad (contrato, certificados, fichas).
+ */
+export type FilaDocumento = {
+  nombre: string;
+  /** "Pago", "Contratos", "Certificados" o "Fichas". */
+  tipo: string;
+  fecha: Date | null;
+  /** NULL en los que no son un pago: un contrato no tiene monto. */
+  monto: number | null;
+  /** El archivo que emitimos nosotros. */
+  emitido: ArchivoCliente;
+  /** La transferencia que subió el cliente. NULL en los archivos. */
   comprobante: ArchivoCliente | null;
-  orden: number;
-};
-
-export type FilaPagoSubido = {
-  /** A qué se aplicó: "Cuota 07", "Pie", "Gastos Operacionales". */
-  aplicadoA: string;
-  fechaPago: Date | null;
-  monto: number;
-  archivo: ArchivoCliente;
   orden: number;
 };
 
 export type DocumentosCliente = {
   cuotas: FilaCuota[];
-  otrosPagos: FilaOtroPago[];
-  pagosSubidos: FilaPagoSubido[];
-  archivos: (ArchivoCliente & { categoria: string; fecha: Date | null })[];
+  documentos: FilaDocumento[];
   /**
-   * Lista plana de todo, como la devolvía antes esta función. El panel nuevo no
-   * la usa, pero el dashboard sigue buscando ahí el contrato y el certificado.
+   * Lista plana de los archivos. El panel no la usa, pero el dashboard sigue
+   * buscando ahí el contrato y el certificado.
    */
   planos: any[];
 };
 
-/** Scopes que no son cuotas: van en su propia pestaña. */
+/** Scopes que no son cuotas: van en la pestaña Documentos. */
 const SCOPES_SUELTOS = ["RESERVA", "PIE", "GASTOS", "MORA"];
 
 function archivoDelRecibo(receipt: any, lotNumber: string): ArchivoCliente {
@@ -185,52 +185,40 @@ export function construirDocumentosCliente(opts: {
     });
   }
 
-  // ------------------------------------------------------------- otros pagos
-  const otrosPagos: FilaOtroPago[] = aprobados
-    .filter((r: any) => SCOPES_SUELTOS.includes(r.scope))
-    .map((r: any) => ({
-      concepto: SCOPE_LABELS[r.scope] || r.scope,
-      fechaPago: fechaDePagoComprobante(r),
+  // ------------------------------------------------------------- documentos
+  // Una sola lista con dos clases de fila, porque para el cliente son lo mismo:
+  // papeles suyos que no son una cuota.
+  //
+  //   pagos sueltos  reserva, pie, gastos operacionales y abono de intereses.
+  //                  Traen el comprobante que emitimos nosotros y, si la subió,
+  //                  la transferencia del cliente.
+  //   archivos       contrato, certificados y fichas. Un solo archivo, el que
+  //                  emitimos nosotros; ahí nunca hay nada que el cliente suba.
+  const documentos: FilaDocumento[] = [];
+
+  const pagosSueltos: FilaDocumento[] = [];
+  for (const r of aprobados) {
+    if (!SCOPES_SUELTOS.includes(r.scope)) continue;
+    pagosSueltos.push({
+      nombre: SCOPE_LABELS[r.scope] || r.scope,
+      tipo: "Pago",
+      fecha: fechaDePagoComprobante(r),
       monto: r.amount_clp || 0,
-      recibo: archivoDelRecibo(r, lotNumber),
+      emitido: archivoDelRecibo(r, lotNumber),
       comprobante: archivoDelComprobante(r),
-      orden: conceptSortKey(r),
-    }))
-    .sort((a: FilaOtroPago, b: FilaOtroPago) => a.orden - b.orden);
-
-  // ----------------------------------------------------------- pagos subidos
-  // Todo lo que envió el cliente, sin importar a qué se aplicó. Es su registro
-  // de lo que mandó.
-  const pagosSubidos: FilaPagoSubido[] = aprobados
-    .filter((r: any) => receiptHasFile(r.receipt_url))
-    .map((r: any) => {
-      const archivo = archivoDelComprobante(r)!;
-      const aplicadoA = SCOPES_SUELTOS.includes(r.scope)
-        ? SCOPE_LABELS[r.scope] || r.scope
-        : r.nominal_installment_range
-          ? `Cuotas ${r.nominal_installment_range}`
-          : r.nominal_installment_number
-            ? `Cuota ${String(r.nominal_installment_number).padStart(2, "0")}`
-            : "Pago";
-      return {
-        aplicadoA,
-        fechaPago: fechaDePagoComprobante(r),
-        monto: r.amount_clp || 0,
-        archivo,
-        orden: conceptSortKey(r),
-      };
-    })
-    .sort((a: FilaPagoSubido, b: FilaPagoSubido) => {
-      const fa = a.fechaPago?.getTime() || 0;
-      const fb = b.fechaPago?.getTime() || 0;
-      return fb - fa;
+      // Los pagos primero; los archivos de la propiedad, después.
+      orden: 0,
     });
+  }
+  // Lo más reciente arriba, igual que en la tabla de cuotas.
+  pagosSueltos.sort((a, b) => (b.fecha?.getTime() || 0) - (a.fecha?.getTime() || 0));
+  documentos.push(...pagosSueltos);
 
-  // ---------------------------------------------------------------- archivos
+  // Los archivos guardados van después de los pagos. Se dejan fuera los recibos
+  // VIEJOS que el portal generaba con cada aprobación: hoy el comprobante es uno
+  // solo y se emite al vuelo.
   const archivos: (ArchivoCliente & { categoria: string; fecha: Date | null })[] = [];
 
-  // Documentos guardados. Se dejan fuera los recibos VIEJOS que el portal
-  // generaba con cada aprobación: hoy el recibo es uno solo y se emite al vuelo.
   for (const d of res.documents || []) {
     if (isLegacyStoredReceiptDoc(d.name)) continue;
     archivos.push({
@@ -264,6 +252,20 @@ export function construirDocumentosCliente(opts: {
 
   archivos.sort((a, b) => (b.fecha?.getTime() || 0) - (a.fecha?.getTime() || 0));
 
+  for (const a of archivos) {
+    documentos.push({
+      nombre: a.nombre,
+      tipo: a.categoria,
+      fecha: a.fecha,
+      // Un contrato no tiene monto; la celda queda con un guion.
+      monto: null,
+      emitido: { nombre: a.nombre, archivo: a.archivo, url: a.url, fileType: a.fileType },
+      comprobante: null,
+      // Después de los pagos, que son los que el cliente consulta seguido.
+      orden: 1,
+    });
+  }
+
   // ------------------------------------------------------------------ planos
   // El dashboard busca acá el contrato, el certificado y la ficha.
   const planos = archivos.map((a) => ({
@@ -276,5 +278,5 @@ export function construirDocumentosCliente(opts: {
     url: a.url,
   }));
 
-  return { cuotas, otrosPagos, pagosSubidos, archivos, planos };
+  return { cuotas, documentos, planos };
 }

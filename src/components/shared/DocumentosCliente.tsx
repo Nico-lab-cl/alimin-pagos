@@ -6,19 +6,19 @@ import PreviewModal from "@/components/shared/PreviewModal";
 import { downloadDocument, formatCLP } from "@/lib/utils";
 
 /**
- * "Mis Documentos": cuatro pestañas sobre una misma tabla.
+ * "Mis Documentos": dos pestañas sobre una misma tabla.
  *
  * Este componente lo usan las DOS pantallas —el portal del cliente y la vista
  * "como cliente" de postventa— a propósito. Antes cada una tenía su copia y se
  * desincronizaron: el admin quedó mostrando el diseño viejo con los datos
  * nuevos, y nadie se dio cuenta hasta que un cliente lo notó.
  *
- * La grilla de tarjetas anterior no escalaba: con 24 cuotas eran 24 cajas
- * iguales que había que barrer una por una. Una fila por cuota, de la más
- * reciente a la más antigua, se lee de un vistazo.
+ * Cada fila lleva sus dos archivos al lado: el comprobante que emitimos
+ * nosotros y el que subió el cliente. Tenerlos en la misma fila es lo que
+ * permite ver de un vistazo qué pagos tienen respaldo suyo y cuáles no.
  */
 
-type Pestana = "CUOTAS" | "PAGOS" | "OTROS" | "ARCHIVOS";
+type Pestana = "CUOTAS" | "DOCUMENTOS";
 
 const PESTANAS: { id: Pestana; etiqueta: string; ayuda: string }[] = [
   {
@@ -27,23 +27,12 @@ const PESTANAS: { id: Pestana; etiqueta: string; ayuda: string }[] = [
     ayuda: "Tus cuotas pagadas, de la más reciente a la más antigua.",
   },
   {
-    id: "PAGOS",
-    etiqueta: "Pagos",
-    ayuda: "Las transferencias que nos enviaste. Todo lo que subiste, en un solo lugar.",
-  },
-  {
-    id: "OTROS",
-    etiqueta: "Otros pagos",
-    ayuda: "Reserva, pie, gastos operacionales y abonos de intereses.",
-  },
-  {
-    id: "ARCHIVOS",
+    id: "DOCUMENTOS",
     etiqueta: "Documentos",
-    ayuda: "Contratos, certificados y fichas de tu propiedad.",
+    ayuda:
+      "Reserva, pie, gastos operacionales y los documentos de tu propiedad: contrato, certificados y fichas.",
   },
 ];
-
-const CATEGORIAS_ARCHIVO = ["Todos", "Contratos", "Certificados", "Fichas"] as const;
 
 function formatFecha(valor: any): string {
   if (!valor) return "—";
@@ -55,13 +44,10 @@ function formatFecha(valor: any): string {
 export default function DocumentosCliente({ documentos }: { documentos: any }) {
   const [pestana, setPestana] = useState<Pestana>("CUOTAS");
   const [query, setQuery] = useState("");
-  const [categoria, setCategoria] = useState<(typeof CATEGORIAS_ARCHIVO)[number]>("Todos");
   const [preview, setPreview] = useState<{ url: string; title: string; type: string } | null>(null);
 
   const cuotas = documentos?.cuotas || [];
-  const pagos = documentos?.pagosSubidos || [];
-  const otros = documentos?.otrosPagos || [];
-  const archivos = documentos?.archivos || [];
+  const otros = documentos?.documentos || [];
 
   const coincide = (campos: any[]) => {
     const q = query.trim().toLowerCase();
@@ -77,31 +63,14 @@ export default function DocumentosCliente({ documentos }: { documentos: any }) {
     [cuotas, query]
   );
 
-  const pagosFiltrados = useMemo(
-    () => pagos.filter((p: any) => coincide([p.aplicadoA, formatFecha(p.fechaPago)])),
-    [pagos, query]
-  );
-
   const otrosFiltrados = useMemo(
-    () => otros.filter((o: any) => coincide([o.concepto, formatFecha(o.fechaPago)])),
+    () => otros.filter((o: any) => coincide([o.nombre, o.tipo, formatFecha(o.fecha)])),
     [otros, query]
-  );
-
-  const archivosFiltrados = useMemo(
-    () =>
-      archivos.filter(
-        (a: any) =>
-          coincide([a.nombre, a.categoria, formatFecha(a.fecha)]) &&
-          (categoria === "Todos" || a.categoria === categoria)
-      ),
-    [archivos, query, categoria]
   );
 
   const conteos: Record<Pestana, number> = {
     CUOTAS: cuotas.length,
-    PAGOS: pagos.length,
-    OTROS: otros.length,
-    ARCHIVOS: archivos.length,
+    DOCUMENTOS: otros.length,
   };
 
   const abrir = (archivo: any) =>
@@ -187,24 +156,6 @@ export default function DocumentosCliente({ documentos }: { documentos: any }) {
         </div>
       </div>
 
-      {pestana === "ARCHIVOS" && (
-        <div className="flex flex-wrap gap-2">
-          {CATEGORIAS_ARCHIVO.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategoria(c)}
-              className={`px-4 py-1.5 rounded-full text-[11px] font-bold transition-all border cursor-pointer ${
-                categoria === c
-                  ? "bg-slate-800 border-slate-800 text-white"
-                  : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* La tabla se desplaza dentro de su propio marco: en el teléfono la
           página nunca se mueve de lado. */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -217,14 +168,14 @@ export default function DocumentosCliente({ documentos }: { documentos: any }) {
                   : "Todavía no hay cuotas pagadas registradas."
               )
             ) : (
-              <table className="w-full text-left border-collapse min-w-[760px]">
+              <table className="w-full text-left border-collapse min-w-[820px]">
                 <thead>
                   <tr className="bg-slate-50/60 border-b border-slate-100">
                     <th className={thBase}>Cuota</th>
                     <th className={thBase}>Vencimiento</th>
                     <th className={thBase}>Fecha de pago</th>
                     <th className={`${thBase} text-right`}>Monto</th>
-                    <th className={thBase}>Recibo</th>
+                    <th className={thBase}>Comprobante emitido</th>
                     <th className={thBase}>Tu comprobante</th>
                   </tr>
                 </thead>
@@ -246,106 +197,62 @@ export default function DocumentosCliente({ documentos }: { documentos: any }) {
                       <td className={`${tdBase} text-right font-bold text-slate-900`}>
                         {formatCLP(c.monto)}
                       </td>
-                      <td className={tdBase}>{acciones(c.recibo, "recibo")}</td>
-                      <td className={tdBase}>{acciones(c.comprobante, "comprobante")}</td>
+                      <td className={tdBase}>{acciones(c.recibo, "comprobante emitido")}</td>
+                      <td className={tdBase}>{acciones(c.comprobante, "tu comprobante")}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ))}
 
-          {pestana === "PAGOS" &&
-            (pagosFiltrados.length === 0 ? (
-              vacio(
-                query
-                  ? "Ningún pago coincide con tu búsqueda."
-                  : "Aún no has subido comprobantes desde el portal."
-              )
-            ) : (
-              <table className="w-full text-left border-collapse min-w-[620px]">
-                <thead>
-                  <tr className="bg-slate-50/60 border-b border-slate-100">
-                    <th className={thBase}>Fecha de pago</th>
-                    <th className={thBase}>Se aplicó a</th>
-                    <th className={`${thBase} text-right`}>Monto</th>
-                    <th className={thBase}>Comprobante</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pagosFiltrados.map((p: any, i: number) => (
-                    <tr key={`${p.archivo.url}-${i}`} className="hover:bg-slate-50/40 transition-colors">
-                      <td className={`${tdBase} font-bold text-slate-900`}>
-                        {formatFecha(p.fechaPago)}
-                      </td>
-                      <td className={tdBase}>{p.aplicadoA}</td>
-                      <td className={`${tdBase} text-right font-bold text-slate-900`}>
-                        {formatCLP(p.monto)}
-                      </td>
-                      <td className={tdBase}>{acciones(p.archivo, "comprobante")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ))}
-
-          {pestana === "OTROS" &&
+          {pestana === "DOCUMENTOS" &&
             (otrosFiltrados.length === 0 ? (
               vacio(
                 query
-                  ? "Ningún pago coincide con tu búsqueda."
-                  : "No hay pagos de reserva, pie ni gastos registrados."
+                  ? "Ningún documento coincide con tu búsqueda."
+                  : "Todavía no hay documentos disponibles para tu cuenta."
               )
             ) : (
-              <table className="w-full text-left border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="bg-slate-50/60 border-b border-slate-100">
-                    <th className={thBase}>Concepto</th>
-                    <th className={thBase}>Fecha de pago</th>
-                    <th className={`${thBase} text-right`}>Monto</th>
-                    <th className={thBase}>Recibo</th>
-                    <th className={thBase}>Tu comprobante</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {otrosFiltrados.map((o: any, i: number) => (
-                    <tr key={`${o.concepto}-${i}`} className="hover:bg-slate-50/40 transition-colors">
-                      <td className={`${tdBase} font-bold text-slate-900`}>{o.concepto}</td>
-                      <td className={tdBase}>{formatFecha(o.fechaPago)}</td>
-                      <td className={`${tdBase} text-right font-bold text-slate-900`}>
-                        {formatCLP(o.monto)}
-                      </td>
-                      <td className={tdBase}>{acciones(o.recibo, "recibo")}</td>
-                      <td className={tdBase}>{acciones(o.comprobante, "comprobante")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ))}
-
-          {pestana === "ARCHIVOS" &&
-            (archivosFiltrados.length === 0 ? (
-              vacio("No se encontraron documentos en esta categoría para tu cuenta.")
-            ) : (
-              <table className="w-full text-left border-collapse min-w-[560px]">
+              <table className="w-full text-left border-collapse min-w-[820px]">
                 <thead>
                   <tr className="bg-slate-50/60 border-b border-slate-100">
                     <th className={thBase}>Documento</th>
                     <th className={thBase}>Tipo</th>
                     <th className={thBase}>Fecha</th>
-                    <th className={thBase}>Archivo</th>
+                    <th className={`${thBase} text-right`}>Monto</th>
+                    <th className={thBase}>Comprobante emitido</th>
+                    <th className={thBase}>Tu comprobante</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {archivosFiltrados.map((a: any, i: number) => (
-                    <tr key={`${a.url}-${i}`} className="hover:bg-slate-50/40 transition-colors">
-                      <td className={`${tdBase} font-bold text-slate-900`}>{a.nombre}</td>
+                  {otrosFiltrados.map((o: any, i: number) => (
+                    <tr
+                      key={`${o.emitido?.url || o.nombre}-${i}`}
+                      className="hover:bg-slate-50/40 transition-colors"
+                    >
+                      <td className={`${tdBase} font-bold text-slate-900`}>
+                        {o.nombre}
+                        {o.lote && (
+                          <span className="block text-[10px] font-bold text-slate-400 mt-0.5">
+                            {o.lote}
+                          </span>
+                        )}
+                      </td>
                       <td className={tdBase}>
                         <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest border bg-slate-50 text-slate-500 border-slate-100">
-                          {a.categoria}
+                          {o.tipo}
                         </span>
                       </td>
-                      <td className={`${tdBase} text-slate-500`}>{formatFecha(a.fecha)}</td>
-                      <td className={tdBase}>{acciones(a, "documento")}</td>
+                      <td className={`${tdBase} text-slate-500`}>{formatFecha(o.fecha)}</td>
+                      <td className={`${tdBase} text-right font-bold text-slate-900`}>
+                        {o.monto === null || o.monto === undefined ? (
+                          <span className="text-slate-300 font-medium">—</span>
+                        ) : (
+                          formatCLP(o.monto)
+                        )}
+                      </td>
+                      <td className={tdBase}>{acciones(o.emitido, "documento")}</td>
+                      <td className={tdBase}>{acciones(o.comprobante, "tu comprobante")}</td>
                     </tr>
                   ))}
                 </tbody>

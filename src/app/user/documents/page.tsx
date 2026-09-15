@@ -26,9 +26,7 @@ export default function UserDocuments() {
 
     const unido = {
       cuotas: [] as any[],
-      pagosSubidos: [] as any[],
-      otrosPagos: [] as any[],
-      archivos: [] as any[],
+      documentos: [] as any[],
     };
 
     for (const lot of lots) {
@@ -38,22 +36,20 @@ export default function UserDocuments() {
       // ruido repetido en cada fila.
       const etiqueta = lots.length > 1 ? `Lote ${lot.lotNumber}` : "";
       unido.cuotas.push(...marcar(d.cuotas || [], etiqueta));
-      unido.pagosSubidos.push(...marcar(d.pagosSubidos || [], etiqueta));
-      unido.otrosPagos.push(...marcar(d.otrosPagos || [], etiqueta));
-      unido.archivos.push(...marcar(d.archivos || [], etiqueta));
+      unido.documentos.push(...marcar(d.documentos || [], etiqueta));
     }
 
     // Con varios lotes hay que reordenar: cada lote venía ordenado por dentro,
     // pero concatenarlos deja la cuota 1 del primero antes que la 20 del
     // segundo.
     if (lots.length > 1) {
-      const porFecha = (a: any, b: any) =>
+      const masReciente = (a: any, b: any) =>
         new Date(b.fechaPago || b.fecha || 0).getTime() -
         new Date(a.fechaPago || a.fecha || 0).getTime();
-      unido.cuotas.sort(porFecha);
-      unido.pagosSubidos.sort(porFecha);
-      unido.otrosPagos.sort((a, b) => (a.orden || 0) - (b.orden || 0));
-      unido.archivos.sort(porFecha);
+      unido.cuotas.sort(masReciente);
+      // Mismo criterio que arma el servidor: primero los pagos, después los
+      // archivos de la propiedad, y dentro de cada grupo lo más reciente arriba.
+      unido.documentos.sort((a, b) => (a.orden || 0) - (b.orden || 0) || masReciente(a, b));
     }
 
     return unido;
