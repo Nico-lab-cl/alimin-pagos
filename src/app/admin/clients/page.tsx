@@ -16,6 +16,22 @@ import ClientDetailView from "@/components/admin/ClientDetailView";
 
 export default function ClientsPage() {
   const { search, setSearch, selectedClientId, setSelectedClientId, selectedClientProject, setSelectedClientProject } = useSearch();
+  // Permite abrir una ficha por URL: /admin/clients?cliente=<id>&proyecto=<slug>.
+  // El cliente seleccionado vivia solo en memoria, asi que desde la Revision de
+  // Comprobantes no habia forma de enlazar a la ficha del cliente con problema:
+  // habia que anotar el nombre y buscarlo a mano.
+  // Se lee del navegador y no con useSearchParams a proposito: ese hook obliga
+  // a envolver toda la pagina en un Suspense para que Next pueda prerenderizarla,
+  // y aca solo hace falta leer el parametro una vez al abrir.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cliente = params.get("cliente");
+    const proyecto = params.get("proyecto");
+    if (!cliente) return;
+    setSelectedClientId(cliente);
+    if (proyecto) setSelectedClientProject(proyecto);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [data, setData] = useState<any>(null);
