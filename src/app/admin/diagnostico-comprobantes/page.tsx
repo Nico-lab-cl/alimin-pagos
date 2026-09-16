@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getNominalInstallmentAmount } from "@/lib/financials";
+import { getNominalInstallmentAmount, getInstallmentDueDate } from "@/lib/financials";
 import { SCOPE_LABELS, esAbonoDeIntereses, fechaDePagoComprobante } from "@/lib/receiptDocs";
 import { auditarFicha, cuotasQueCubre, resumirNumeros } from "@/lib/auditoriaComprobantes";
 import RevisionComprobantes from "@/components/admin/RevisionComprobantes";
@@ -62,6 +62,8 @@ export default async function DiagnosticoComprobantesPage() {
       installments_paid: true,
       project_id: true,
       installment_ranges: true,
+      installment_start_date: true,
+      due_day: true,
       lot: { select: { number: true, stage: true, cuotas: true, valor_cuota: true } },
       receipts: {
         orderBy: { created_at: "desc" },
@@ -109,6 +111,11 @@ export default async function DiagnosticoComprobantesPage() {
   const slugProyecto = new Map(proyectos.map((p) => [p.id, p.slug]));
 
   const filas = reservas.map((res) => {
+    const vencimientoDe = (n: number) => {
+      if (!n || !res.installment_start_date) return "—";
+      return fmt(getInstallmentDueDate(res.installment_start_date, n, res.due_day || undefined));
+    };
+
     const valorDeCuota = (n: number) =>
       getNominalInstallmentAmount(res.installment_ranges, n, res.lot?.valor_cuota || 0);
 
@@ -136,6 +143,12 @@ export default async function DiagnosticoComprobantesPage() {
       recibidoEnCuotas: auditoria.recibidoEnCuotas,
       pactadoDeCuotasCubiertas: auditoria.pactadoDeCuotasCubiertas,
       caja: auditoria.caja,
+      // El vencimiento pactado de la ultima cuota contada y el de la ultima que
+      // tiene comprobante. Puestos uno al lado del otro, un desfase se ve sin
+      // tener que abrir nada.
+      ultimaConComprobante: auditoria.ultimaConComprobante,
+      vencimientoUltimaContada: vencimientoDe(auditoria.cuotasContadas),
+      vencimientoUltimoComprobante: vencimientoDe(auditoria.ultimaConComprobante),
       hallazgos: auditoria.hallazgos,
       comprobantes: res.receipts.map((r) => {
         const cubre = cuotasQueCubre(r as any);

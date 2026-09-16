@@ -35,6 +35,9 @@ type Fila = {
   recibidoEnCuotas: number;
   pactadoDeCuotasCubiertas: number;
   caja: number | null;
+  ultimaConComprobante: number;
+  vencimientoUltimaContada: string;
+  vencimientoUltimoComprobante: string;
   hallazgos: { severidad: string; chequeo: string; titulo: string; detalle: string }[];
   comprobantes: {
     id: string;
@@ -109,8 +112,11 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
       "Lote",
       "Cuotas contadas",
       "Cuotas con respaldo",
+      "Pago hasta la cuota",
+      "Vencimiento de esa cuota",
+      "Ultimo comprobante (cuota)",
+      "Vencimiento de esa cuota",
       "Respaldado por comprobantes",
-      "Pactado de esas cuotas",
       "Ingresado en caja",
       "Hallazgos",
     ];
@@ -122,8 +128,11 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
       f.lote,
       f.cuotasContadas,
       f.cuotasConRespaldo,
+      f.cuotasContadas,
+      f.vencimientoUltimaContada,
+      f.ultimaConComprobante || "",
+      f.vencimientoUltimoComprobante,
       f.recibidoEnCuotas,
-      f.pactadoDeCuotasCubiertas,
       f.caja ?? "",
       f.hallazgos.map((h) => `${h.chequeo}: ${h.titulo}`).join(" | "),
     ]);
@@ -211,8 +220,8 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                 <th className={th}>Lote</th>
                 <th className={`${th} text-center`}>Cuotas</th>
                 <th className={`${th} text-center`}>Con respaldo</th>
-                <th className={`${th} text-right`}>Respaldado</th>
-                <th className={`${th} text-right`}>En caja</th>
+                <th className={th}>Pagó hasta</th>
+                <th className={th}>Último comprobante</th>
                 <th className={th}>Qué pasa</th>
                 <th className={th}></th>
               </tr>
@@ -265,16 +274,20 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                           {f.cuotasConRespaldo}
                         </span>
                       </td>
-                      <td className={`${td} text-right font-bold`}>
-                        {formatCLP(f.recibidoEnCuotas)}
+                      <td className={td}>
+                        <span className="font-bold text-slate-900">Cuota {f.cuotasContadas}</span>
+                        <span className="block text-[10px] font-bold text-slate-400">venció {f.vencimientoUltimaContada}</span>
                       </td>
-                      <td className={`${td} text-right`}>
-                        {f.caja === null ? (
-                          <span className="text-slate-300">—</span>
+                      <td className={td}>
+                        {f.ultimaConComprobante === 0 ? (
+                          <span className="text-slate-300">Ninguno</span>
                         ) : (
-                          <span className={f.caja !== f.recibidoEnCuotas ? "font-bold text-amber-600" : "text-slate-500"}>
-                            {formatCLP(f.caja)}
-                          </span>
+                          <>
+                            <span className={f.ultimaConComprobante !== f.cuotasContadas ? "font-bold text-red-600" : "font-bold text-slate-900"}>
+                              Cuota {f.ultimaConComprobante}
+                            </span>
+                            <span className="block text-[10px] font-bold text-slate-400">venció {f.vencimientoUltimoComprobante}</span>
+                          </>
                         )}
                       </td>
                       <td className={`${td} max-w-[280px] truncate text-xs`}>

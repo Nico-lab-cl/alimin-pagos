@@ -10,15 +10,18 @@
  * `nominal_installment_number` —un solo número— y nunca comparaba los RANGOS
  * entre sí.
  *
- * Son cuatro preguntas, de menor a mayor alcance:
+ * Son cinco preguntas:
  *
  *   1. COBERTURA  cada cuota contada como pagada, ¿tiene un comprobante que la
  *                 cubra? Lo contrario es una cuota que figura pagada sin que
  *                 nadie la haya pagado.
- *   2. TRASLAPE   ¿hay dos comprobantes cubriendo la misma cuota?
- *   3. PLATA      la suma de los comprobantes, ¿coincide con lo pactado por las
+ *   2. DESFASE    si la ficha dice que pagó hasta la cuota N, ¿el último
+ *                 comprobante que emitimos habla de esa misma cuota? Es la
+ *                 comparación que delata un caso como el de Luis de una mirada.
+ *   3. TRASLAPE   ¿hay dos comprobantes cubriendo la misma cuota?
+ *   4. PLATA      la suma de los comprobantes, ¿coincide con lo pactado por las
  *                 cuotas que dicen cubrir?
- *   4. CAJA       el FinancialLedger, que es lo que alimenta el "Total Pagado"
+ *   5. CAJA       el FinancialLedger, que es lo que alimenta el "Total Pagado"
  *                 del cliente, ¿dice lo mismo que los comprobantes?
  *
  * Todo es de SOLO LECTURA y se calcula sobre datos ya cargados: acá no se
@@ -30,8 +33,8 @@ export type Severidad = "ROJO" | "AMBAR" | "VERDE";
 
 export type Hallazgo = {
   severidad: Exclude<Severidad, "VERDE">;
-  /** Cuál de los cuatro chequeos lo encontró. */
-  chequeo: "Cobertura" | "Traslape" | "Plata" | "Caja";
+  /** Cuál de los cinco chequeos lo encontró. */
+  chequeo: "Cobertura" | "Desfase" | "Traslape" | "Plata" | "Caja";
   titulo: string;
   detalle: string;
 };
@@ -73,6 +76,12 @@ export function cuotasQueCubre(r: ComprobanteAuditado): number[] {
   return [];
 }
 
+/** La cuota más alta que tiene algún comprobante detrás. 0 si no hay ninguna. */
+function cuotasCubiertasOrdenadas(porCuota: Map<number, unknown[]>): number {
+  const nums = [...porCuota.keys()];
+  return nums.length === 0 ? 0 : Math.max(...nums);
+}
+
 const clp = (n: number) => "$" + Math.round(n).toLocaleString("es-CL");
 
 export type ResultadoAuditoria = {
@@ -84,6 +93,8 @@ export type ResultadoAuditoria = {
   cuotasPisadas: number[];
   /** Resumen numérico, para la tabla y el Excel. */
   cuotasContadas: number;
+  /** La cuota más alta con comprobante. 0 si no hay ninguno. */
+  ultimaConComprobante: number;
   cuotasConRespaldo: number;
   recibidoEnCuotas: number;
   pactadoDeCuotasCubiertas: number;
@@ -137,7 +148,31 @@ export function auditarFicha(opts: {
     });
   }
 
-  // ----------------------------------------------------------- 2. TRASLAPE
+  // ------------------------------------------------- 2. DESFASE DEL FINAL
+  // La pregunta más directa: si la ficha dice que el cliente pagó hasta la
+  // cuota N, ¿el último comprobante que emitimos habla de esa misma cuota?
+  //
+  // Es el chequeo que delata de una mirada un caso como el de Luis Donoso: su
+  // ficha contaba 22 cuotas y sus comprobantes llegaban hasta la 24. Dos cifras
+  // que tendrían que ser la misma y no lo eran.
+  const ultimaConComprobante = cuotasCubiertasOrdenadas(porCuota);
+  if (cuotasContadas > 0 && deCuotas.length > 0 && ultimaConComprobante !== cuotasContadas) {
+    const faltan = ultimaConComprobante < cuotasContadas;
+    hallazgos.push({
+      severidad: "ROJO",
+      chequeo: "Desfase",
+      titulo: faltan
+        ? `La ficha llega a la cuota ${cuotasContadas} y el último comprobante solo a la ${ultimaConComprobante}`
+        : `Hay comprobantes hasta la cuota ${ultimaConComprobante}, pero la ficha solo cuenta ${cuotasContadas}`,
+      detalle: faltan
+        ? `Faltan los comprobantes de las cuotas ${resumirNumeros(
+            Array.from({ length: cuotasContadas - ultimaConComprobante }, (_, i) => ultimaConComprobante + 1 + i)
+          )}. El último papel que emitimos no refleja hasta dónde dice la ficha que pagó el cliente.`
+        : `Hay ${ultimaConComprobante - cuotasContadas} cuota(s) con comprobante que la ficha no cuenta como pagadas. O el contador quedó corto, o esos comprobantes apuntan a una cuota equivocada.`,
+    });
+  }
+
+  // ----------------------------------------------------------- 3. TRASLAPE
   const cuotasPisadas = [...porCuota.entries()]
     .filter(([, lista]) => lista.length > 1)
     .map(([n]) => n)
@@ -158,7 +193,7 @@ export function auditarFicha(opts: {
     });
   }
 
-  // -------------------------------------------------------------- 3. PLATA
+  // -------------------------------------------------------------- 4. PLATA
   const recibidoEnCuotas = deCuotas.reduce((a, r) => a + (r.amount_clp || 0), 0);
   const cuotasCubiertas = [...porCuota.keys()];
   const pactadoDeCuotasCubiertas = cuotasCubiertas.reduce((a, n) => a + valorDeCuota(n), 0);
@@ -181,7 +216,7 @@ export function auditarFicha(opts: {
     });
   }
 
-  // --------------------------------------------------------------- 4. CAJA
+  // --------------------------------------------------------------- 5. CAJA
   if (caja !== null && (caja > 0 || recibidoEnCuotas > 0)) {
     const brecha = caja - recibidoEnCuotas;
     if (Math.abs(brecha) >= umbral) {
@@ -206,6 +241,7 @@ export function auditarFicha(opts: {
     cuotasSinRespaldo,
     cuotasPisadas,
     cuotasContadas,
+    ultimaConComprobante,
     cuotasConRespaldo: cuotasCubiertas.filter((n) => n <= cuotasContadas).length,
     recibidoEnCuotas,
     pactadoDeCuotasCubiertas,
