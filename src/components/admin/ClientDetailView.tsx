@@ -12,11 +12,13 @@ import { toast } from "sonner";
 import {
   updateClientProfile, updateClientFinancials, toggleAlContado,
   registerManualPayment, registerInterestPayment, getFinancialHistory, addClientNote, getClientNotes,
-  sendClientObservation, updateFinancialLedgerAmount, deleteFinancialLedgerEntry, getAdvisors, updateClientAdvisor
+  sendClientObservation, updateFinancialLedgerAmount, deleteFinancialLedgerEntry, getAdvisors, updateClientAdvisor,
+  getClientPOV
 } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, deleteLegacyDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
+import DocumentosCliente from "@/components/shared/DocumentosCliente";
 import { cn } from "@/lib/utils";
 
 interface ClientDetailViewProps {
@@ -27,7 +29,30 @@ interface ClientDetailViewProps {
 }
 
 export default function ClientDetailView({ selectedClient, onBack, onUpdate, projectSlug }: ClientDetailViewProps) {
-  const [activeTab, setActiveTab] = useState<"GENERAL" | "FINANCES" | "LOG">("GENERAL");
+  const [activeTab, setActiveTab] = useState<"GENERAL" | "FINANCES" | "LOG" | "DOCS">("GENERAL");
+  // Los documentos tal como los ve el cliente. Se piden recien al abrir la
+  // pestana: traerlos con la ficha haria mas lenta la carga de todos los
+  // clientes para algo que casi nunca se mira.
+  const [docsCliente, setDocsCliente] = useState<any>(null);
+  const [cargandoDocsCliente, setCargandoDocsCliente] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== "DOCS" || docsCliente || cargandoDocsCliente) return;
+    const id = selectedClient?.id;
+    if (!id) return;
+    setCargandoDocsCliente(true);
+    getClientPOV(id)
+      .then((r: any) => setDocsCliente(r?.data?.documentos || null))
+      .catch(() => setDocsCliente(null))
+      .finally(() => setCargandoDocsCliente(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedClient?.id]);
+
+  // Si se cambia de cliente, lo cargado deja de servir.
+  useEffect(() => {
+    setDocsCliente(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClient?.id]);
   const [loading, setLoading] = useState(false);
   const [isFrozen, setIsFrozen] = useState(selectedClient.mora_frozen || false);
   const [isSavingMora, setIsSavingMora] = useState(false);
@@ -932,6 +957,15 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
           >
             Bitácora
           </button>
+          <button
+            onClick={() => setActiveTab("DOCS")}
+            className={cn(
+              "pb-3.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-0.5 cursor-pointer",
+              activeTab === "DOCS" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-800"
+            )}
+          >
+            Documentos
+          </button>
         </div>
 
         {isFrozen && (
@@ -1269,178 +1303,6 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
               )}
             </div>
 
-            {/* Repositorio de Documentos */}
-            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-4.5 h-4.5 text-slate-400" />
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Documentos del Cliente</h3>
-                </div>
-              </div>
-
-              {/* Upload New Document Box */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Cargar Nuevo Documento</p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    placeholder="Nombre (ej. Copia Contrato, Cédula)"
-                    value={docName}
-                    onChange={(e) => setDocName(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-brand-500 outline-none"
-                  />
-                  <label className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0">
-                    {uploadingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                    Subir
-                    <input
-                      type="file"
-                      className="hidden"
-                      disabled={uploadingDoc}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (!docName.trim()) {
-                          toast.error("Ingresa un nombre para el documento.");
-                          e.target.value = "";
-                          return;
-                        }
-                        if (file.size > 8 * 1024 * 1024) {
-                          toast.error("El archivo es demasiado grande. Máximo 8MB.");
-                          e.target.value = "";
-                          return;
-                        }
-
-                        setUploadingDoc(true);
-                        try {
-                          const base64 = await new Promise<string>((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result as string);
-                            reader.onerror = () => reject(new Error("Error al leer archivo"));
-                            reader.readAsDataURL(file);
-                          });
-                          const res = await uploadDocument({
-                            reservationId: selectedClient.id,
-                            name: docName.trim(),
-                            fileType: file.type,
-                            base64Content: base64,
-                          });
-                          if (res.success) {
-                            setDocName("");
-                            refreshDocs();
-                            toast.success("Documento subido correctamente.");
-                          } else {
-                            toast.error(res.error || "Fallo en la carga");
-                          }
-                        } catch (err) {
-                          toast.error("Error al procesar el archivo.");
-                        } finally {
-                          setUploadingDoc(false);
-                          e.target.value = "";
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Documents List */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
-                {loadingDocs ? (
-                  <div className="col-span-full py-8 flex flex-col items-center justify-center gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                    <Loader2 className="w-5 h-5 animate-spin text-brand-500/50" />
-                  </div>
-                ) : docs.length === 0 ? (
-                  <div className="col-span-full py-8 flex flex-col items-center justify-center gap-2 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-center">
-                    <Building className="w-5 h-5 opacity-40" />
-                    <p className="text-[9px] font-bold uppercase tracking-[0.2em]">Sin documentos cargados</p>
-                  </div>
-                ) : (
-                  docs.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-brand-500/30 transition-all gap-2 shadow-sm"
-                    >
-                      <div className="flex items-center gap-2.5 overflow-hidden">
-                        <div className="w-8 h-8 rounded-lg bg-brand-50/50 border border-brand-100 flex items-center justify-center shrink-0">
-                          <FileText className="w-3.5 h-3.5 text-brand-600" />
-                        </div>
-                        <div className="overflow-hidden min-w-0">
-                          <p className="text-[11px] font-bold text-slate-800 truncate" title={doc.name}>
-                            {doc.name}
-                          </p>
-                          <p className="text-[8px] font-semibold text-slate-400 uppercase mt-0.5">
-                            {new Date(doc.date).toLocaleDateString("es-CL")}
-                            {/* El respaldo bancario ya no le llega al cliente:
-                                el portal le muestra solo el recibo oficial. */}
-                            {doc.internal && <span className="ml-1.5 text-slate-500">· Interno</span>}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-1 shrink-0">
-                        {doc.hasFile === false ? (
-                          <span
-                            className="px-2 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-[8px] font-bold uppercase tracking-wider"
-                            title="Pago del historial migrado, sin archivo digital asociado"
-                          >
-                            Sin archivo
-                          </span>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => {
-                                setPreviewData({ url: doc.url, title: doc.name, type: doc.fileType });
-                                setIsPreviewOpen(true);
-                              }}
-                              className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors shadow-sm cursor-pointer"
-                              title="Visualizar"
-                            >
-                              <Eye className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={() => downloadDocument(doc.url, doc.name, doc.fileType)}
-                              className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-600 transition-colors shadow-sm cursor-pointer"
-                              title="Descargar"
-                            >
-                              <Download className="w-3 h-3" />
-                            </button>
-                          </>
-                        )}
-                        {/* El recibo oficial no es un archivo guardado: se emite
-                            al vuelo desde el pago. Antes el botón se escondía
-                            porque no había nada que borrar; ahora se puede
-                            sacar de la vista sin tocar el pago. El aviso dice
-                            una cosa distinta en cada caso, porque son cosas
-                            distintas. */}
-                        <button
-                          onClick={async () => {
-                            const esRecibo = doc.type === "official_receipt";
-                            const aviso = esRecibo
-                              ? "Este recibo se va a dejar de mostrar, acá y en el portal del cliente.\n\nEl PAGO no se toca: las cuotas pagadas, la caja y el saldo quedan exactamente igual. Si lo que querés es deshacer el pago, eso se hace desde la Bandeja de Pagos.\n\nQueda registrado en la bitácora. ¿Ocultar el recibo?"
-                              : "¿Estás seguro de que deseas eliminar este archivo? Esta acción quedará registrada en la bitácora.";
-                            if (confirm(aviso)) {
-                              const res = doc.type === "legacy"
-                                ? await deleteLegacyDocument(selectedClient.id, doc.name)
-                                : await deleteDocument(doc.id);
-                              if (res.success) {
-                                setDocs(docs.filter((d) => d.id !== doc.id));
-                                toast.success(esRecibo ? "Recibo ocultado. El pago quedó intacto." : "Documento eliminado.");
-                                fetchNotesAndHistory();
-                              } else {
-                                toast.error(res.error || "No se pudo eliminar.");
-                              }
-                            }
-                          }}
-                          className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm cursor-pointer"
-                          title={doc.type === "official_receipt" ? "Ocultar este recibo (no toca el pago)" : "Eliminar"}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Right Side: Land Info & Financial Summary */}
@@ -2055,6 +1917,214 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === "DOCS" && (
+        <div className="space-y-6">
+          {/* Arriba, exactamente lo que ve el cliente en su portal: mismas dos
+              pestanas, mismas columnas. Antes esta seccion vivia dentro de Datos
+              Generales como una lista plana de archivos, que no dejaba ver que
+              cuota respalda cada uno. */}
+          <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4 mb-5">
+              <Eye className="w-4.5 h-4.5 text-slate-400" />
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                  Como lo ve el cliente
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Es la misma pantalla que abre el cliente en su portal.
+                </p>
+              </div>
+            </div>
+            {cargandoDocsCliente ? (
+              <div className="py-16 flex justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
+              </div>
+            ) : docsCliente ? (
+              <DocumentosCliente documentos={docsCliente} />
+            ) : (
+              <p className="py-10 text-center text-xs text-slate-400">
+                No se pudieron cargar los documentos del cliente.
+              </p>
+            )}
+          </div>
+
+          {/* Abajo, el repositorio de postventa: subir, eliminar, y los archivos
+              internos que el cliente no ve. */}
+            {/* Repositorio de Documentos */}
+            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-4.5 h-4.5 text-slate-400" />
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Documentos del Cliente</h3>
+                </div>
+              </div>
+
+              {/* Upload New Document Box */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Cargar Nuevo Documento</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nombre (ej. Copia Contrato, Cédula)"
+                    value={docName}
+                    onChange={(e) => setDocName(e.target.value)}
+                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-brand-500 outline-none"
+                  />
+                  <label className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0">
+                    {uploadingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    Subir
+                    <input
+                      type="file"
+                      className="hidden"
+                      disabled={uploadingDoc}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (!docName.trim()) {
+                          toast.error("Ingresa un nombre para el documento.");
+                          e.target.value = "";
+                          return;
+                        }
+                        if (file.size > 8 * 1024 * 1024) {
+                          toast.error("El archivo es demasiado grande. Máximo 8MB.");
+                          e.target.value = "";
+                          return;
+                        }
+
+                        setUploadingDoc(true);
+                        try {
+                          const base64 = await new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result as string);
+                            reader.onerror = () => reject(new Error("Error al leer archivo"));
+                            reader.readAsDataURL(file);
+                          });
+                          const res = await uploadDocument({
+                            reservationId: selectedClient.id,
+                            name: docName.trim(),
+                            fileType: file.type,
+                            base64Content: base64,
+                          });
+                          if (res.success) {
+                            setDocName("");
+                            refreshDocs();
+                            toast.success("Documento subido correctamente.");
+                          } else {
+                            toast.error(res.error || "Fallo en la carga");
+                          }
+                        } catch (err) {
+                          toast.error("Error al procesar el archivo.");
+                        } finally {
+                          setUploadingDoc(false);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Documents List */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                {loadingDocs ? (
+                  <div className="col-span-full py-8 flex flex-col items-center justify-center gap-3 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <Loader2 className="w-5 h-5 animate-spin text-brand-500/50" />
+                  </div>
+                ) : docs.length === 0 ? (
+                  <div className="col-span-full py-8 flex flex-col items-center justify-center gap-2 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-center">
+                    <Building className="w-5 h-5 opacity-40" />
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em]">Sin documentos cargados</p>
+                  </div>
+                ) : (
+                  docs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-brand-500/30 transition-all gap-2 shadow-sm"
+                    >
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        <div className="w-8 h-8 rounded-lg bg-brand-50/50 border border-brand-100 flex items-center justify-center shrink-0">
+                          <FileText className="w-3.5 h-3.5 text-brand-600" />
+                        </div>
+                        <div className="overflow-hidden min-w-0">
+                          <p className="text-[11px] font-bold text-slate-800 truncate" title={doc.name}>
+                            {doc.name}
+                          </p>
+                          <p className="text-[8px] font-semibold text-slate-400 uppercase mt-0.5">
+                            {new Date(doc.date).toLocaleDateString("es-CL")}
+                            {/* El respaldo bancario ya no le llega al cliente:
+                                el portal le muestra solo el recibo oficial. */}
+                            {doc.internal && <span className="ml-1.5 text-slate-500">· Interno</span>}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {doc.hasFile === false ? (
+                          <span
+                            className="px-2 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-[8px] font-bold uppercase tracking-wider"
+                            title="Pago del historial migrado, sin archivo digital asociado"
+                          >
+                            Sin archivo
+                          </span>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => {
+                                setPreviewData({ url: doc.url, title: doc.name, type: doc.fileType });
+                                setIsPreviewOpen(true);
+                              }}
+                              className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors shadow-sm cursor-pointer"
+                              title="Visualizar"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => downloadDocument(doc.url, doc.name, doc.fileType)}
+                              className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-600 transition-colors shadow-sm cursor-pointer"
+                              title="Descargar"
+                            >
+                              <Download className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
+                        {/* El recibo oficial no es un archivo guardado: se emite
+                            al vuelo desde el pago. Antes el botón se escondía
+                            porque no había nada que borrar; ahora se puede
+                            sacar de la vista sin tocar el pago. El aviso dice
+                            una cosa distinta en cada caso, porque son cosas
+                            distintas. */}
+                        <button
+                          onClick={async () => {
+                            const esRecibo = doc.type === "official_receipt";
+                            const aviso = esRecibo
+                              ? "Este recibo se va a dejar de mostrar, acá y en el portal del cliente.\n\nEl PAGO no se toca: las cuotas pagadas, la caja y el saldo quedan exactamente igual. Si lo que querés es deshacer el pago, eso se hace desde la Bandeja de Pagos.\n\nQueda registrado en la bitácora. ¿Ocultar el recibo?"
+                              : "¿Estás seguro de que deseas eliminar este archivo? Esta acción quedará registrada en la bitácora.";
+                            if (confirm(aviso)) {
+                              const res = doc.type === "legacy"
+                                ? await deleteLegacyDocument(selectedClient.id, doc.name)
+                                : await deleteDocument(doc.id);
+                              if (res.success) {
+                                setDocs(docs.filter((d) => d.id !== doc.id));
+                                toast.success(esRecibo ? "Recibo ocultado. El pago quedó intacto." : "Documento eliminado.");
+                                fetchNotesAndHistory();
+                              } else {
+                                toast.error(res.error || "No se pudo eliminar.");
+                              }
+                            }
+                          }}
+                          className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm cursor-pointer"
+                          title={doc.type === "official_receipt" ? "Ocultar este recibo (no toca el pago)" : "Eliminar"}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
         </div>
       )}
 
