@@ -33,6 +33,7 @@ type Fila = {
   totalCuotas: number;
   cuotasConRespaldo: number;
   recibidoEnCuotas: number;
+  recibidoConMora: number;
   pactadoDeCuotasCubiertas: number;
   caja: number | null;
   ultimaConComprobante: number;
@@ -342,7 +343,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                               {[
                                 ["Cuotas contadas", String(f.cuotasContadas)],
                                 ["Cuotas con respaldo", String(f.cuotasConRespaldo)],
-                                ["Respaldado por comprobantes", formatCLP(f.recibidoEnCuotas)],
+                                ["Respaldado por comprobantes", formatCLP(f.recibidoConMora)],
                                 ["Pactado de esas cuotas", formatCLP(f.pactadoDeCuotasCubiertas)],
                                 ["Ingresado en caja", f.caja === null ? "Sin datos" : formatCLP(f.caja)],
                               ].map(([k, v]) => (

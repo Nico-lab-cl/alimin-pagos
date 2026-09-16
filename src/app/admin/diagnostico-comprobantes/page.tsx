@@ -102,7 +102,9 @@ export default async function DiagnosticoComprobantesPage() {
   const cajaPorReserva = new Map<string, number>();
   const sumas = await prisma.financialLedger.groupBy({
     by: ["reservation_id"],
-    where: { category: "CUOTA" },
+    // CUOTA y PENALTY juntas: un pago de cuota con mora encima deja una fila de
+    // cada una, y el comprobante guarda la suma de las dos.
+    where: { category: { in: ["CUOTA", "PENALTY"] } },
     _sum: { amount_clp: true },
   });
   for (const s of sumas) cajaPorReserva.set(s.reservation_id, s._sum.amount_clp || 0);
@@ -141,6 +143,7 @@ export default async function DiagnosticoComprobantesPage() {
       totalCuotas: res.lot?.cuotas || 0,
       cuotasConRespaldo: auditoria.cuotasConRespaldo,
       recibidoEnCuotas: auditoria.recibidoEnCuotas,
+      recibidoConMora: auditoria.recibidoConMora,
       pactadoDeCuotasCubiertas: auditoria.pactadoDeCuotasCubiertas,
       caja: auditoria.caja,
       // El vencimiento pactado de la ultima cuota contada y el de la ultima que

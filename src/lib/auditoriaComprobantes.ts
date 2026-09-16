@@ -110,6 +110,8 @@ export type ResultadoAuditoria = {
   ultimoComprobanteEtiqueta: string;
   cuotasConRespaldo: number;
   recibidoEnCuotas: number;
+  /** Toda la plata de comprobantes de cuota, mora incluida. Se compara con la caja. */
+  recibidoConMora: number;
   pactadoDeCuotasCubiertas: number;
   caja: number | null;
 };
@@ -245,6 +247,12 @@ export function auditarFicha(opts: {
 
   // -------------------------------------------------------------- 5. PLATA
   const recibidoEnCuotas = deCuotas.reduce((a, r) => a + (r.amount_clp || 0), 0);
+  // Los abonos de intereses tambien son comprobantes de scope INSTALLMENT y su
+  // plata cae en la categoria PENALTY, asi que entran en la comparacion contra
+  // la caja aunque no cubran ninguna cuota.
+  const recibidoConMora = aprobados
+    .filter((r) => r.scope === "INSTALLMENT")
+    .reduce((a, r) => a + (r.amount_clp || 0), 0);
   const cuotasCubiertas = [...porCuota.keys()];
   const pactadoDeCuotasCubiertas = cuotasCubiertas.reduce((a, n) => a + valorDeCuota(n), 0);
   const diferencia = recibidoEnCuotas - pactadoDeCuotasCubiertas;
@@ -267,14 +275,35 @@ export function auditarFicha(opts: {
   }
 
   // --------------------------------------------------------------- 6. CAJA
-  if (caja !== null && (caja > 0 || recibidoEnCuotas > 0)) {
-    const brecha = caja - recibidoEnCuotas;
+  //
+  // Cuidado con qué se compara contra qué. Al aprobar un pago, la plata se parte
+  // en DOS filas de caja:
+  //
+  //   cuotaPaidAmount   = min(pagado, lo pactado)   -> categoría CUOTA
+  //   penaltyPaidAmount = max(0, pagado - pactado)  -> categoría PENALTY
+  //
+  // pero el comprobante guarda el monto COMPLETO. Comparar el total de los
+  // comprobantes contra la categoría CUOTA sola le inventaba un descuadre a todo
+  // cliente que alguna vez pagó la cuota junto con su mora. Por eso los dos lados
+  // toman lo mismo: toda la plata que entró por comprobantes de cuota, mora
+  // incluida, contra CUOTA + PENALTY.
+  if (caja !== null && (caja > 0 || recibidoConMora > 0)) {
+    const brecha = caja - recibidoConMora;
     if (Math.abs(brecha) >= umbral) {
+      const faltaEnCaja = brecha < 0;
       hallazgos.push({
         severidad: "ROJO",
         chequeo: "Caja",
-        titulo: `La caja y los comprobantes difieren en ${clp(Math.abs(brecha))}`,
-        detalle: `El historial financiero registra ${clp(caja)} en cuotas y los comprobantes suman ${clp(recibidoEnCuotas)}. La caja es lo que alimenta el "Total Pagado" y el saldo que ve el cliente, así que si no coinciden, el saldo está mal.`,
+        titulo: faltaEnCaja
+          ? `Hay ${clp(-brecha)} en comprobantes que no entraron a la caja`
+          : `Hay ${clp(brecha)} en la caja sin comprobante que los respalde`,
+        detalle: faltaEnCaja
+          ? `Los comprobantes suman ${clp(recibidoConMora)} y el historial financiero registra ${clp(
+              caja
+            )}. Falta la fila de caja de algún pago: el comprobante existe y está aprobado, pero esa plata no se sumó al "Total Pagado" del cliente, así que su saldo figura más alto de lo que corresponde.`
+          : `El historial financiero registra ${clp(caja)} y los comprobantes suman ${clp(
+              recibidoConMora
+            )}. Hay plata contabilizada sin comprobante detrás: puede ser un pago registrado a mano sin adjuntar archivo, que escribe la caja pero no crea comprobante.`,
       });
     }
   }
@@ -295,6 +324,7 @@ export function auditarFicha(opts: {
     ultimoComprobanteEtiqueta: etiquetaDelUltimo(porCuota, ultimaConComprobante),
     cuotasConRespaldo: cuotasCubiertas.filter((n) => n <= cuotasContadas).length,
     recibidoEnCuotas,
+    recibidoConMora,
     pactadoDeCuotasCubiertas,
     caja,
   };
