@@ -109,9 +109,9 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
       "Lote",
       "Cuotas contadas",
       "Cuotas con respaldo",
-      "Recibido en cuotas",
+      "Respaldado por comprobantes",
       "Pactado de esas cuotas",
-      "Caja",
+      "Ingresado en caja",
       "Hallazgos",
     ];
     const rows = visibles.map((f) => [
@@ -211,7 +211,8 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                 <th className={th}>Lote</th>
                 <th className={`${th} text-center`}>Cuotas</th>
                 <th className={`${th} text-center`}>Con respaldo</th>
-                <th className={`${th} text-right`}>Recibido</th>
+                <th className={`${th} text-right`}>Respaldado</th>
+                <th className={`${th} text-right`}>En caja</th>
                 <th className={th}>Qué pasa</th>
                 <th className={th}></th>
               </tr>
@@ -219,7 +220,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
             <tbody className="divide-y divide-slate-100">
               {visibles.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-xs text-slate-400">
+                  <td colSpan={9} className="px-4 py-16 text-center text-xs text-slate-400">
                     Ningún cliente coincide con el filtro.
                   </td>
                 </tr>
@@ -267,6 +268,15 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                       <td className={`${td} text-right font-bold`}>
                         {formatCLP(f.recibidoEnCuotas)}
                       </td>
+                      <td className={`${td} text-right`}>
+                        {f.caja === null ? (
+                          <span className="text-slate-300">—</span>
+                        ) : (
+                          <span className={f.caja !== f.recibidoEnCuotas ? "font-bold text-amber-600" : "text-slate-500"}>
+                            {formatCLP(f.caja)}
+                          </span>
+                        )}
+                      </td>
                       <td className={`${td} max-w-[280px] truncate text-xs`}>
                         {f.hallazgos.length === 0 ? (
                           <span className="text-emerald-600 font-semibold inline-flex items-center gap-1">
@@ -287,7 +297,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
 
                     {abierto && (
                       <tr key={`${f.id}-detalle`} className="bg-slate-50/50">
-                        <td colSpan={8} className="px-6 py-5">
+                        <td colSpan={9} className="px-6 py-5">
                           <div className="space-y-4">
                             {/* Hallazgos */}
                             {f.hallazgos.length > 0 && (
@@ -316,8 +326,9 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                               {[
                                 ["Cuotas contadas", String(f.cuotasContadas)],
                                 ["Cuotas con respaldo", String(f.cuotasConRespaldo)],
-                                ["Recibido en cuotas", formatCLP(f.recibidoEnCuotas)],
+                                ["Respaldado por comprobantes", formatCLP(f.recibidoEnCuotas)],
                                 ["Pactado de esas cuotas", formatCLP(f.pactadoDeCuotasCubiertas)],
+                                ["Ingresado en caja", f.caja === null ? "Sin datos" : formatCLP(f.caja)],
                               ].map(([k, v]) => (
                                 <div key={k} className="bg-white border border-slate-200 rounded-xl p-3">
                                   <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">

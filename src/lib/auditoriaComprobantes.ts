@@ -133,7 +133,7 @@ export function auditarFicha(opts: {
         : `${cuotasSinRespaldo.length} cuotas figuran pagadas sin comprobante`,
       detalle: migradaCompleta
         ? `La ficha cuenta ${cuotasContadas} cuotas pagadas y no tiene ningún comprobante de cuota: viene de la planilla. Hay que cargar los respaldos o dejar constancia de que no existen.`
-        : `Cuotas ${resumirNumeros(cuotasSinRespaldo)}. La ficha las cuenta como pagadas pero ningún comprobante las cubre: o se sumaron a mano, o el comprobante quedó con otro número.`,
+        : `Cuotas ${resumirNumeros(cuotasSinRespaldo)}. La plata puede estar perfectamente ingresada —de hecho suele estarlo—: cuando postventa registra una cuota a mano SIN adjuntar archivo, se escribe la caja y sube el contador, pero no se crea ningún comprobante. Lo que falta acá es el papel, no necesariamente el pago. Compará la columna "En caja" para saber cuál de los dos casos es.`,
     });
   }
 
