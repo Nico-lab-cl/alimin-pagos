@@ -13,7 +13,7 @@ import {
   updateClientProfile, updateClientFinancials, toggleAlContado,
   registerManualPayment, registerInterestPayment, getFinancialHistory, addClientNote, getClientNotes,
   sendClientObservation, updateFinancialLedgerAmount, deleteFinancialLedgerEntry, getAdvisors, updateClientAdvisor,
-  getClientPOV
+  getClientPOV, adjuntarComprobanteACuotaPagada
 } from "@/actions/postventa";
 import { uploadDocument, deleteDocument, deleteLegacyDocument, getReservationDocuments } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
@@ -1943,7 +1943,25 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
               </div>
             ) : docsCliente ? (
-              <DocumentosCliente documentos={docsCliente} />
+              <DocumentosCliente
+                documentos={docsCliente}
+                onAdjuntar={async (cuota: number, d: any) => {
+                  const r = await adjuntarComprobanteACuotaPagada(selectedClient.id, cuota, {
+                    receiptBase64: d.base64,
+                    amount: d.monto,
+                    paidAt: d.fecha,
+                  });
+                  if (r.error) { toast.error(r.error); return r; }
+                  toast.success(`Comprobante adjuntado a la cuota ${cuota}`, {
+                    description: "El cliente ya lo ve en su portal. No se sumaron cuotas ni se movio caja.",
+                    duration: 7000,
+                  });
+                  const nuevo = await getClientPOV(selectedClient.id);
+                  setDocsCliente((nuevo as any)?.data?.documentos || null);
+                  refreshDocs();
+                  return r;
+                }}
+              />
             ) : (
               <p className="py-10 text-center text-xs text-slate-400">
                 No se pudieron cargar los documentos del cliente.

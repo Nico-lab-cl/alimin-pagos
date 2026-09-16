@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Upload,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -12,6 +13,7 @@ import {
   Search,
 } from "lucide-react";
 import { downloadCsv, formatCLP } from "@/lib/utils";
+import ModalDocumentosCliente from "@/components/admin/ModalDocumentosCliente";
 
 /**
  * Revisión de Comprobantes: la cartera completa, un semáforo por cliente.
@@ -75,6 +77,9 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
   const [estado, setEstado] = useState<"TODOS" | "ROJO" | "AMBAR" | "VERDE">("TODOS");
   const [query, setQuery] = useState("");
   const [abierta, setAbierta] = useState<string | null>(null);
+  // Cliente cuyo modal de documentos esta abierto. Desde ahi se adjuntan los
+  // comprobantes que esta misma pantalla acaba de senalar como faltantes.
+  const [enModal, setEnModal] = useState<Fila | null>(null);
 
   const proyectos = useMemo(
     () => [...new Set(filas.map((f) => f.proyecto))].sort(),
@@ -437,6 +442,14 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                               </div>
                             </div>
 
+                            <div className="flex flex-wrap items-center gap-3">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setEnModal(f); }}
+                              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold cursor-pointer"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              Subir comprobantes que faltan
+                            </button>
                             <a
                               href={`/admin/clients?cliente=${f.id}&proyecto=${f.proyectoSlug}`}
                               onClick={(e) => e.stopPropagation()}
@@ -446,6 +459,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                               Abrir la ficha de {f.cliente}
                               <ExternalLink className="w-3 h-3" />
                             </a>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -457,6 +471,15 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
           </table>
         </div>
       </div>
+
+      {enModal && (
+        <ModalDocumentosCliente
+          reservationId={enModal.id}
+          nombre={enModal.cliente}
+          onClose={() => setEnModal(null)}
+          onCambio={() => window.location.reload()}
+        />
+      )}
     </div>
   );
 }

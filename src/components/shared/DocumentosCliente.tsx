@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Eye, FileText, Search } from "lucide-react";
+import { Download, Eye, FileText, Loader2, Search, Upload, X } from "lucide-react";
 import PreviewModal from "@/components/shared/PreviewModal";
 import { downloadDocument, formatCLP } from "@/lib/utils";
 
@@ -41,10 +41,30 @@ function formatFecha(valor: any): string {
   return d.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-export default function DocumentosCliente({ documentos }: { documentos: any }) {
+export default function DocumentosCliente({
+  documentos,
+  /**
+   * Adjuntar el respaldo de una cuota que ya figura pagada pero quedo sin
+   * comprobante. Se recibe como funcion y no se importa la accion aca a
+   * proposito: este componente tambien lo usa el portal del cliente, y el
+   * cliente no puede subir nada. Sin esta prop, la columna solo muestra "—".
+   */
+  onAdjuntar,
+}: {
+  documentos: any;
+  onAdjuntar?: (
+    cuota: number,
+    datos: { base64: string; monto: number; fecha: string }
+  ) => Promise<{ error?: string; success?: boolean }>;
+}) {
   const [pestana, setPestana] = useState<Pestana>("CUOTAS");
   const [query, setQuery] = useState("");
   const [preview, setPreview] = useState<{ url: string; title: string; type: string } | null>(null);
+  const [subiendoPara, setSubiendoPara] = useState<any>(null);
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [monto, setMonto] = useState(0);
+  const [fecha, setFecha] = useState("");
+  const [guardando, setGuardando] = useState(false);
 
   const cuotas = documentos?.cuotas || [];
   const otros = documentos?.documentos || [];
@@ -76,9 +96,51 @@ export default function DocumentosCliente({ documentos }: { documentos: any }) {
   const abrir = (archivo: any) =>
     setPreview({ url: archivo.url, title: archivo.nombre, type: archivo.fileType });
 
+  const abrirSubida = (fila: any) => {
+    setArchivo(null);
+    setMonto(fila.monto || 0);
+    // Se propone el vencimiento pactado de esa cuota; postventa lo corrige con
+    // la fecha real que diga la transferencia, que es la que verá el cliente.
+    const v = fila.vencimiento ? new Date(fila.vencimiento) : new Date();
+    setFecha(Number.isNaN(v.getTime()) ? "" : v.toISOString().split("T")[0]);
+    setSubiendoPara(fila);
+  };
+
+  const guardarSubida = async () => {
+    if (!subiendoPara || !onAdjuntar) return;
+    if (!archivo) return;
+    setGuardando(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result as string);
+        fr.onerror = () => rej(new Error("no se pudo leer"));
+        fr.readAsDataURL(archivo);
+      });
+      const r = await onAdjuntar(subiendoPara.numero, { base64, monto, fecha });
+      if (!r?.error) setSubiendoPara(null);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   /** Los dos botones de una celda de archivo: ver y descargar. */
-  const acciones = (archivo: any, etiqueta: string) => {
+  const acciones = (archivo: any, etiqueta: string, filaCuota?: any) => {
     if (!archivo) {
+      // Cuando quien mira puede adjuntar —postventa, nunca el cliente— la celda
+      // vacía deja de ser un guion muerto y pasa a ser la forma de arreglarlo.
+      if (onAdjuntar && filaCuota) {
+        return (
+          <button
+            onClick={() => abrirSubida(filaCuota)}
+            className="px-2.5 h-8 rounded-lg border border-dashed border-brand-300 bg-brand-50/30 text-[11px] font-bold text-brand-600 hover:bg-brand-50 transition-all cursor-pointer inline-flex items-center gap-1.5"
+            title={`Adjuntar el comprobante de la cuota ${filaCuota.numero}`}
+          >
+            <Upload className="w-3 h-3" />
+            Subir
+          </button>
+        );
+      }
       return <span className="text-xs text-slate-300 font-medium">—</span>;
     }
     return (
@@ -198,7 +260,7 @@ export default function DocumentosCliente({ documentos }: { documentos: any }) {
                         {formatCLP(c.monto)}
                       </td>
                       <td className={tdBase}>{acciones(c.recibo, "comprobante emitido")}</td>
-                      <td className={tdBase}>{acciones(c.comprobante, "tu comprobante")}</td>
+                      <td className={tdBase}>{acciones(c.comprobante, "tu comprobante", c)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -260,6 +322,98 @@ export default function DocumentosCliente({ documentos }: { documentos: any }) {
             ))}
         </div>
       </div>
+
+      {/* Adjuntar el respaldo de una cuota que ya figura pagada.
+          NO es registrar un pago: la cuota ya está contada y la plata ya está en
+          caja. Acá solo se sube el papel que faltaba. */}
+      {subiendoPara && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Adjuntar comprobante
+                </p>
+                <h3 className="text-lg font-extrabold text-slate-900">
+                  {subiendoPara.etiqueta}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSubiendoPara(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 border border-slate-100 rounded-xl p-3">
+              Esta cuota ya figura pagada: lo único que falta es el papel. Adjuntarlo{" "}
+              <span className="font-bold">no suma cuotas, no mueve caja ni mora</span>. El
+              cliente pasa a verlo en su portal con la fecha que pongas acá.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
+                  Comprobante del cliente
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setArchivo(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-slate-600 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white file:text-[10px] file:font-bold file:uppercase file:tracking-wider file:cursor-pointer"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
+                    Monto
+                  </label>
+                  <input
+                    type="number"
+                    value={monto}
+                    onChange={(e) => setMonto(Number(e.target.value))}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-brand-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
+                    Fecha del pago
+                  </label>
+                  <input
+                    type="date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 outline-none focus:border-brand-400"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Se propone el vencimiento pactado. Corregilo con la fecha real que diga la
+                transferencia: es la que va a ver el cliente.
+              </p>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-1">
+              <button
+                onClick={() => setSubiendoPara(null)}
+                className="px-4 h-10 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarSubida}
+                disabled={!archivo || guardando || !fecha}
+                className="px-4 h-10 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold cursor-pointer inline-flex items-center gap-2"
+              >
+                {guardando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Adjuntar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <PreviewModal
         isOpen={!!preview}
