@@ -147,6 +147,7 @@ export default async function DiagnosticoComprobantesPage() {
       // tiene comprobante. Puestos uno al lado del otro, un desfase se ve sin
       // tener que abrir nada.
       ultimaConComprobante: auditoria.ultimaConComprobante,
+      ultimoComprobanteEtiqueta: auditoria.ultimoComprobanteEtiqueta,
       vencimientoUltimaContada: vencimientoDe(auditoria.cuotasContadas),
       vencimientoUltimoComprobante: vencimientoDe(auditoria.ultimaConComprobante),
       hallazgos: auditoria.hallazgos,

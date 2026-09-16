@@ -34,7 +34,7 @@ export type Severidad = "ROJO" | "AMBAR" | "VERDE";
 export type Hallazgo = {
   severidad: Exclude<Severidad, "VERDE">;
   /** Cuál de los cinco chequeos lo encontró. */
-  chequeo: "Cobertura" | "Desfase" | "Traslape" | "Plata" | "Caja";
+  chequeo: "Cobertura" | "Desfase" | "Varias cuotas" | "Traslape" | "Plata" | "Caja";
   titulo: string;
   detalle: string;
 };
@@ -82,6 +82,17 @@ function cuotasCubiertasOrdenadas(porCuota: Map<number, unknown[]>): number {
   return nums.length === 0 ? 0 : Math.max(...nums);
 }
 
+/**
+ * Como se lee el comprobante que cubre la cuota mas alta. Importa que diga
+ * "Cuotas 22-23" y no solo "23": los errores se esconden justo en los rangos.
+ */
+function etiquetaDelUltimo(porCuota: Map<number, ComprobanteAuditado[]>, ultima: number): string {
+  if (!ultima) return "—";
+  const r = (porCuota.get(ultima) || [])[0];
+  if (!r) return `Cuota ${ultima}`;
+  return r.nominal_installment_range ? `Cuotas ${r.nominal_installment_range}` : `Cuota ${ultima}`;
+}
+
 const clp = (n: number) => "$" + Math.round(n).toLocaleString("es-CL");
 
 export type ResultadoAuditoria = {
@@ -95,6 +106,8 @@ export type ResultadoAuditoria = {
   cuotasContadas: number;
   /** La cuota más alta con comprobante. 0 si no hay ninguno. */
   ultimaConComprobante: number;
+  /** Como se lee ese ultimo comprobante: "Cuota 8" o "Cuotas 7-8". */
+  ultimoComprobanteEtiqueta: string;
   cuotasConRespaldo: number;
   recibidoEnCuotas: number;
   pactadoDeCuotasCubiertas: number;
@@ -172,7 +185,44 @@ export function auditarFicha(opts: {
     });
   }
 
-  // ----------------------------------------------------------- 3. TRASLAPE
+  // ------------------------------------- 3. COMPROBANTES DE VARIAS CUOTAS
+  // Un comprobante que paga varias cuotas de una vez guarda tres cosas que
+  // tienen que decir lo mismo: el rango ("7-9"), la cantidad (3) y el monto.
+  // Los tres caminos que crean un comprobante los escriben coherentes, así que
+  // si acá no coinciden es porque algo los reescribió después por separado.
+  for (const r of deCuotas) {
+    const cubre = cuotasQueCubre(r);
+    if (cubre.length < 2) continue;
+
+    const cantidadDeclarada = r.installments_count || 1;
+    if (cantidadDeclarada !== cubre.length) {
+      hallazgos.push({
+        severidad: "ROJO",
+        chequeo: "Varias cuotas",
+        titulo: `Un comprobante dice cubrir ${cubre.length} cuotas pero está marcado como ${cantidadDeclarada}`,
+        detalle: `El comprobante ${r.id.slice(0, 8)} tiene el rango ${r.nominal_installment_range} —que son ${cubre.length} cuotas— y la cantidad declarada es ${cantidadDeclarada}. Las dos cifras salen del mismo lugar al crearlo, así que una fue reescrita después.`,
+      });
+    }
+
+    // El monto puede ser MAYOR que lo pactado (suele traer la mora encima), pero
+    // nunca menor: eso significa que se contaron más cuotas de las que se pagaron.
+    const pactado = cubre.reduce((a, n) => a + valorDeCuota(n), 0);
+    if (pactado > 0 && (r.amount_clp || 0) < pactado) {
+      const alcanzaPara = valorDeCuota(cubre[0]) > 0 ? (r.amount_clp || 0) / valorDeCuota(cubre[0]) : 0;
+      hallazgos.push({
+        severidad: "ROJO",
+        chequeo: "Varias cuotas",
+        titulo: `Un comprobante cubre ${cubre.length} cuotas pero el monto alcanza para ${alcanzaPara.toFixed(1)}`,
+        detalle: `El comprobante ${r.id.slice(0, 8)} dice cubrir las cuotas ${resumirNumeros(
+          cubre
+        )}, que valen ${clp(pactado)}, y trae ${clp(r.amount_clp || 0)}. Faltan ${clp(
+          pactado - (r.amount_clp || 0)
+        )}: se le contaron al cliente cuotas que ese pago no alcanzó a cubrir.`,
+      });
+    }
+  }
+
+  // ----------------------------------------------------------- 4. TRASLAPE
   const cuotasPisadas = [...porCuota.entries()]
     .filter(([, lista]) => lista.length > 1)
     .map(([n]) => n)
@@ -193,7 +243,7 @@ export function auditarFicha(opts: {
     });
   }
 
-  // -------------------------------------------------------------- 4. PLATA
+  // -------------------------------------------------------------- 5. PLATA
   const recibidoEnCuotas = deCuotas.reduce((a, r) => a + (r.amount_clp || 0), 0);
   const cuotasCubiertas = [...porCuota.keys()];
   const pactadoDeCuotasCubiertas = cuotasCubiertas.reduce((a, n) => a + valorDeCuota(n), 0);
@@ -216,7 +266,7 @@ export function auditarFicha(opts: {
     });
   }
 
-  // --------------------------------------------------------------- 5. CAJA
+  // --------------------------------------------------------------- 6. CAJA
   if (caja !== null && (caja > 0 || recibidoEnCuotas > 0)) {
     const brecha = caja - recibidoEnCuotas;
     if (Math.abs(brecha) >= umbral) {
@@ -242,6 +292,7 @@ export function auditarFicha(opts: {
     cuotasPisadas,
     cuotasContadas,
     ultimaConComprobante,
+    ultimoComprobanteEtiqueta: etiquetaDelUltimo(porCuota, ultimaConComprobante),
     cuotasConRespaldo: cuotasCubiertas.filter((n) => n <= cuotasContadas).length,
     recibidoEnCuotas,
     pactadoDeCuotasCubiertas,

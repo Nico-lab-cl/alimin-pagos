@@ -36,6 +36,7 @@ type Fila = {
   pactadoDeCuotasCubiertas: number;
   caja: number | null;
   ultimaConComprobante: number;
+  ultimoComprobanteEtiqueta: string;
   vencimientoUltimaContada: string;
   vencimientoUltimoComprobante: string;
   hallazgos: { severidad: string; chequeo: string; titulo: string; detalle: string }[];
@@ -130,7 +131,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
       f.cuotasConRespaldo,
       f.cuotasContadas,
       f.vencimientoUltimaContada,
-      f.ultimaConComprobante || "",
+      f.ultimoComprobanteEtiqueta,
       f.vencimientoUltimoComprobante,
       f.recibidoEnCuotas,
       f.caja ?? "",
@@ -276,7 +277,9 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                       </td>
                       <td className={td}>
                         <span className="font-bold text-slate-900">Cuota {f.cuotasContadas}</span>
-                        <span className="block text-[10px] font-bold text-slate-400">venció {f.vencimientoUltimaContada}</span>
+                        <span className="block text-[10px] font-bold text-slate-400">
+                          venció {f.vencimientoUltimaContada} · va en la {f.cuotasContadas + 1}
+                        </span>
                       </td>
                       <td className={td}>
                         {f.ultimaConComprobante === 0 ? (
@@ -284,7 +287,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                         ) : (
                           <>
                             <span className={f.ultimaConComprobante !== f.cuotasContadas ? "font-bold text-red-600" : "font-bold text-slate-900"}>
-                              Cuota {f.ultimaConComprobante}
+                              {f.ultimoComprobanteEtiqueta}
                             </span>
                             <span className="block text-[10px] font-bold text-slate-400">venció {f.vencimientoUltimoComprobante}</span>
                           </>
