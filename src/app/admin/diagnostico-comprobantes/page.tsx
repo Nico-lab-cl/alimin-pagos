@@ -97,8 +97,14 @@ export default async function DiagnosticoComprobantesPage() {
   `;
   for (const f of filasArchivo) archivoPorComprobante.set(f.id, f.tiene_archivo);
 
-  // La caja: lo que el historial financiero registró como cuotas. Es lo que
-  // alimenta el "Total Pagado" y el saldo que ve el cliente.
+  // La caja: lo que el historial financiero registró como cuotas.
+  //
+  // OJO con qué es esto y qué no. NO alimenta el "Total Pagado" ni el saldo del
+  // cliente: esos se calculan recorriendo `installments_paid` contra el valor
+  // pactado de cada cuota (ver `totalPaid` en actions/user.ts). Esta tabla
+  // alimenta el REPORTE DE RECAUDACIÓN del proyecto (ver recauAgg en
+  // actions/postventa.ts). Que a una ficha le falten filas acá no le mueve el
+  // saldo al cliente; le quita plata al reporte.
   const cajaPorReserva = new Map<string, number>();
   const sumas = await prisma.financialLedger.groupBy({
     by: ["reservation_id"],

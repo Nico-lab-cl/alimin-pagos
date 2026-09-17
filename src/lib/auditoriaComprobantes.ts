@@ -340,15 +340,22 @@ export function auditarFicha(opts: {
     if (Math.abs(brecha) >= umbral) {
       const faltaEnCaja = brecha < 0;
       hallazgos.push({
-        severidad: "ROJO",
+        // Que falte la fila de caja NO descuadra al cliente: su "Total Pagado" y
+        // su saldo se calculan desde el contador de cuotas (ver `totalPaid` en
+        // actions/user.ts), no desde el historial financiero. Lo que queda corto
+        // es el REPORTE DE RECAUDACION del proyecto, que si suma desde esta
+        // tabla. Es algo que hay que arreglar, pero no es una contradiccion en la
+        // ficha, y ademas le pasa a casi toda la cartera migrada: las
+        // aprobaciones viejas no escribian esta tabla. Por eso ambar y no rojo.
+        severidad: faltaEnCaja ? "AMBAR" : "ROJO",
         chequeo: "Caja",
         titulo: faltaEnCaja
-          ? `Hay ${clp(-brecha)} en comprobantes que no entraron a la caja`
+          ? `${clp(-brecha)} en comprobantes que no llegaron al reporte de recaudación`
           : `Hay ${clp(brecha)} en la caja sin comprobante que los respalde`,
         detalle: faltaEnCaja
           ? `Los comprobantes suman ${clp(recibidoConMora)} y el historial financiero registra ${clp(
               caja
-            )}. Falta la fila de caja de algún pago: el comprobante existe y está aprobado, pero esa plata no se sumó al "Total Pagado" del cliente, así que su saldo figura más alto de lo que corresponde.`
+            )}. El saldo del cliente NO está afectado: ese se calcula desde el contador de cuotas, no desde esta tabla. Lo que queda corto es la recaudación que reporta el proyecto, porque esos pagos nunca dejaron su fila acá.`
           : `El historial financiero registra ${clp(caja)} y los comprobantes suman ${clp(
               recibidoConMora
             )}. De esa diferencia, ${clp(
