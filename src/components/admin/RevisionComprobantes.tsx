@@ -292,7 +292,11 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                           <span className="text-slate-300">Ninguno</span>
                         ) : (
                           <>
-                            <span className={f.ultimaConComprobante !== f.cuotasContadas ? "font-bold text-red-600" : "font-bold text-slate-900"}>
+                            {/* Rojo solo cuando el comprobante va MAS ADELANTE que
+                                la ficha: eso es una contradiccion. Que vaya atras
+                                solo significa que faltan papeles, y de eso ya
+                                informa la columna "Con respaldo". */}
+                            <span className={f.ultimaConComprobante > f.cuotasContadas ? "font-bold text-red-600" : "font-bold text-slate-900"}>
                               {f.ultimoComprobanteEtiqueta}
                             </span>
                             <span className="block text-[10px] font-bold text-slate-400">venció {f.vencimientoUltimoComprobante}</span>

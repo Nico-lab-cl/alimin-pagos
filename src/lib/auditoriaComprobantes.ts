@@ -15,9 +15,10 @@
  *   1. COBERTURA  cada cuota contada como pagada, ¿tiene un comprobante que la
  *                 cubra? Lo contrario es una cuota que figura pagada sin que
  *                 nadie la haya pagado.
- *   2. DESFASE    si la ficha dice que pagó hasta la cuota N, ¿el último
- *                 comprobante que emitimos habla de esa misma cuota? Es la
- *                 comparación que delata un caso como el de Luis de una mirada.
+ *   2. DESFASE    ¿algún comprobante habla de una cuota que la ficha NO cuenta
+ *                 como pagada? Solo esa dirección: que el último comprobante se
+ *                 quede corto es normal cuando faltan papeles, y ya lo dice
+ *                 Cobertura.
  *   3. TRASLAPE   ¿hay dos comprobantes cubriendo la misma cuota?
  *   4. PLATA      la suma de los comprobantes, ¿coincide con lo pactado por las
  *                 cuotas que dicen cubrir?
@@ -164,26 +165,24 @@ export function auditarFicha(opts: {
   }
 
   // ------------------------------------------------- 2. DESFASE DEL FINAL
-  // La pregunta más directa: si la ficha dice que el cliente pagó hasta la
-  // cuota N, ¿el último comprobante que emitimos habla de esa misma cuota?
+  // Solo interesa UNA dirección: que algún comprobante hable de una cuota que la
+  // ficha NO cuenta como pagada. Eso sí es una contradicción — dos partes del
+  // sistema afirmando cosas distintas sobre la misma cuota — y es el sintoma que
+  // tenia Luis Donoso: su ficha contaba 22 y sus comprobantes llegaban a la 24.
   //
-  // Es el chequeo que delata de una mirada un caso como el de Luis Donoso: su
-  // ficha contaba 22 cuotas y sus comprobantes llegaban hasta la 24. Dos cifras
-  // que tendrían que ser la misma y no lo eran.
+  // La dirección contraria NO se marca. Que el último comprobante se quede corto
+  // es lo normal en cualquier ficha a la que le falten papeles: si a un cliente
+  // le faltan 36 comprobantes, obviamente el último va a quedar atrás. Eso ya lo
+  // dice el chequeo de Cobertura, y repetirlo acá en rojo solo agrega ruido
+  // sobre los clientes que únicamente necesitan que les suban los respaldos.
   const ultimaConComprobante = cuotasCubiertasOrdenadas(porCuota);
-  if (cuotasContadas > 0 && deCuotas.length > 0 && ultimaConComprobante !== cuotasContadas) {
-    const faltan = ultimaConComprobante < cuotasContadas;
+  if (ultimaConComprobante > cuotasContadas) {
+    const sobran = ultimaConComprobante - cuotasContadas;
     hallazgos.push({
       severidad: "ROJO",
       chequeo: "Desfase",
-      titulo: faltan
-        ? `La ficha llega a la cuota ${cuotasContadas} y el último comprobante solo a la ${ultimaConComprobante}`
-        : `Hay comprobantes hasta la cuota ${ultimaConComprobante}, pero la ficha solo cuenta ${cuotasContadas}`,
-      detalle: faltan
-        ? `Faltan los comprobantes de las cuotas ${resumirNumeros(
-            Array.from({ length: cuotasContadas - ultimaConComprobante }, (_, i) => ultimaConComprobante + 1 + i)
-          )}. El último papel que emitimos no refleja hasta dónde dice la ficha que pagó el cliente.`
-        : `Hay ${ultimaConComprobante - cuotasContadas} cuota(s) con comprobante que la ficha no cuenta como pagadas. O el contador quedó corto, o esos comprobantes apuntan a una cuota equivocada.`,
+      titulo: `Hay comprobantes hasta la cuota ${ultimaConComprobante}, pero la ficha solo cuenta ${cuotasContadas}`,
+      detalle: `${sobran} cuota(s) tienen comprobante y la ficha no las cuenta como pagadas. O el contador quedó corto —y al cliente le falta que le acrediten esas cuotas—, o esos comprobantes apuntan a una cuota equivocada. Las dos cosas hay que mirarlas: es la misma señal que tenía Luis Donoso antes de que se le descubrieran los rangos pisados.`,
     });
   }
 
