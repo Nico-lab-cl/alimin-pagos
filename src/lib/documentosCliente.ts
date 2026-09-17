@@ -47,6 +47,11 @@ export type FilaCuota = {
   etiqueta: string;
   /** "2-4" cuando esta cuota se pagó junto con otras en una sola transferencia. */
   agrupadaCon: string | null;
+  /**
+   * Tiene comprobante aprobado pero la ficha NO la cuenta como pagada. Solo se
+   * arma para postventa; el cliente nunca ve estas filas.
+   */
+  noContada?: boolean;
   /** Vencimiento pactado: a qué mes corresponde. */
   vencimiento: Date | null;
   /** Fecha de la transferencia. NULL en las cuotas migradas o registradas a mano. */
@@ -131,8 +136,19 @@ export function construirDocumentosCliente(opts: {
   montosPorCuota: Record<number, number>;
   /** Vencimiento pactado de cada cuota pagada, por número de cuota. */
   vencimientosPorCuota: Record<number, string>;
+  /**
+   * Incluir las cuotas que tienen comprobante pero que la ficha todavía no
+   * cuenta como pagadas. Solo las vistas de postventa lo piden.
+   */
+  incluirNoContadas?: boolean;
 }): DocumentosCliente {
-  const { reservation: res, lotNumber, montosPorCuota, vencimientosPorCuota } = opts;
+  const {
+    reservation: res,
+    lotNumber,
+    montosPorCuota,
+    vencimientosPorCuota,
+    incluirNoContadas = false,
+  } = opts;
 
   // Solo los aprobados. Un comprobante en revisión todavía no respalda nada, y
   // uno rechazado no corresponde mostrarlo como pago.
@@ -148,6 +164,47 @@ export function construirDocumentosCliente(opts: {
   // ------------------------------------------------------------------ cuotas
   const cuotas: FilaCuota[] = [];
   const pagadas = res.installments_paid || 0;
+
+  // Cuotas que TIENEN comprobante pero que la ficha no cuenta como pagadas.
+  //
+  // Existen: es el desfase que marca la Revisión de Comprobantes. Y hasta ahora
+  // eran invisibles en todas las pantallas —el recorrido de abajo solo llega
+  // hasta `installments_paid`, y en Documentos no entran porque no son reserva,
+  // pie ni gastos—, así que postventa veía en la auditoría que el último
+  // comprobante era de la cuota 8 y al abrir los documentos no encontraba nada
+  // de la cuota 8.
+  //
+  // Se muestran SOLO a postventa (`incluirNoContadas`). Al cliente no: su panel
+  // dice que pagó 7, y mostrarle una cuota 8 pagada lo contradiría. Cuál de las
+  // dos cifras está bien es justamente lo que hay que resolver.
+  const noContadas: number[] = [];
+  if (incluirNoContadas) {
+    const maxConComprobante = aprobados.reduce((max: number, r: any) => {
+      const n = r.nominal_installment_range
+        ? Number(String(r.nominal_installment_range).split("-")[1])
+        : r.nominal_installment_number || 0;
+      return Number.isFinite(n) && n > max ? n : max;
+    }, 0);
+    for (let n = maxConComprobante; n > pagadas; n--) {
+      if (aprobados.some((r: any) => comprobanteCubreCuota(r, n))) noContadas.push(n);
+    }
+  }
+
+  for (const n of noContadas) {
+    const origen = aprobados.find((r: any) => comprobanteCubreCuota(r, n));
+    if (!origen) continue;
+    cuotas.push({
+      numero: n,
+      etiqueta: `Cuota ${String(n).padStart(2, "0")}`,
+      agrupadaCon: origen.nominal_installment_range || null,
+      noContada: true,
+      vencimiento: aFecha(vencimientosPorCuota[n]),
+      fechaPago: fechaDePagoComprobante(origen),
+      monto: origen.amount_clp || 0,
+      recibo: archivoDelRecibo(origen, lotNumber),
+      comprobante: archivoDelComprobante(origen),
+    });
+  }
 
   for (let n = pagadas; n >= 1; n--) {
     // La fecha y el agrupamiento salen del pago aunque su recibo esté oculto:

@@ -243,9 +243,24 @@ export default function DocumentosCliente({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {cuotasFiltradas.map((c: any) => (
-                    <tr key={c.numero} className="hover:bg-slate-50/40 transition-colors">
+                    <tr
+                      key={c.numero}
+                      className={`transition-colors ${
+                        c.noContada
+                          ? "bg-amber-50/70 hover:bg-amber-50"
+                          : "hover:bg-slate-50/40"
+                      }`}
+                    >
                       <td className={`${tdBase} font-bold text-slate-900`}>
                         {c.etiqueta}
+                        {/* Solo la ve postventa: hay comprobante pero la ficha no
+                            cuenta esta cuota como pagada. Alguna de las dos esta
+                            mal y hay que revisarla. */}
+                        {c.noContada && (
+                          <span className="block text-[10px] font-bold text-amber-700 mt-0.5">
+                            Tiene comprobante pero la ficha no la cuenta como pagada
+                          </span>
+                        )}
                         {(c.lote || c.agrupadaCon) && (
                           <span className="block text-[10px] font-bold text-slate-400 mt-0.5">
                             {[c.lote, c.agrupadaCon && `Pagada con las cuotas ${c.agrupadaCon}`]

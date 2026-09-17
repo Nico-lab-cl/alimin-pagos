@@ -3289,14 +3289,21 @@ export async function getClientPOV(reservationId: string) {
       penaltyAmount = Math.max(0, penaltyAmount - aplicadorAbonos.totalAplicado);
     }
 
-    // Esta vista tiene que ensenar EXACTAMENTE lo que ve el cliente, asi que
-    // sale del mismo armador que el portal. Antes era una copia aparte y se
-    // desincronizo: el admin quedo mostrando el diseno viejo con datos nuevos.
+    // Esta vista sale del mismo armador que el portal del cliente. Antes era una
+    // copia aparte y se desincronizo: el admin quedo mostrando el diseno viejo
+    // con datos nuevos.
+    //
+    // La unica diferencia es `incluirNoContadas`: postventa ademas ve las cuotas
+    // que tienen comprobante aprobado pero que la ficha todavia no cuenta como
+    // pagadas. Son justo las que hay que ir a arreglar, y mientras no se
+    // mostraban la auditoria marcaba "ultimo comprobante: cuota 8" y al abrir
+    // los documentos no habia nada de la cuota 8.
     const documentos = construirDocumentosCliente({
       reservation: res,
       lotNumber: lot.number,
       montosPorCuota: paidInstallmentAmounts,
       vencimientosPorCuota: paidInstallmentDueDates,
+      incluirNoContadas: true,
     });
     const documents = documentos.planos;
 
