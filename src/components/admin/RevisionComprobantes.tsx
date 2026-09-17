@@ -110,6 +110,22 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
     VERDE: delProyecto.filter((f) => f.severidad === "VERDE").length,
   };
 
+  // Desglose por proyecto. Las tarjetas de arriba responden al filtro y muestran
+  // un proyecto a la vez; esto deja ver los dos juntos y comparar, que es lo que
+  // hace falta para decidir cual atacar primero.
+  const porProyecto = useMemo(() => {
+    const filasDe = (lista: Fila[]) => ({
+      total: lista.length,
+      ROJO: lista.filter((f) => f.severidad === "ROJO").length,
+      AMBAR: lista.filter((f) => f.severidad === "AMBAR").length,
+      VERDE: lista.filter((f) => f.severidad === "VERDE").length,
+    });
+    return proyectos.map((p) => ({
+      nombre: p,
+      ...filasDe(filas.filter((f) => f.proyecto === p)),
+    }));
+  }, [filas, proyectos]);
+
   const exportar = async () => {
     const headers = [
       "Estado",
@@ -181,6 +197,50 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
           </button>
         ))}
       </div>
+
+      {/* Desglose por proyecto. Solo tiene sentido si hay mas de uno. */}
+      {porProyecto.length > 1 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/60 border-b border-slate-100">
+                <th className={th}>Proyecto</th>
+                <th className={`${th} text-center`}>Clientes</th>
+                {(["ROJO", "AMBAR", "VERDE"] as const).map((s) => (
+                  <th key={s} className={`${th} text-center`}>
+                    {ESTILO[s].etiqueta}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {porProyecto.map((p) => {
+                const activo = proyecto === p.nombre;
+                return (
+                  <tr
+                    key={p.nombre}
+                    onClick={() => setProyecto(activo ? "todos" : p.nombre)}
+                    className={`cursor-pointer transition-colors ${
+                      activo ? "bg-brand-50/60" : "hover:bg-slate-50/40"
+                    }`}
+                  >
+                    <td className={`${td} font-bold text-slate-900`}>{p.nombre}</td>
+                    <td className={`${td} text-center text-slate-500`}>{p.total}</td>
+                    {(["ROJO", "AMBAR", "VERDE"] as const).map((s) => (
+                      <td key={s} className={`${td} text-center`}>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${ESTILO[s].punto}`} />
+                          <span className="font-bold text-slate-900">{p[s]}</span>
+                        </span>
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">

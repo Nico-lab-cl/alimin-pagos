@@ -146,21 +146,54 @@ export function auditarFicha(opts: {
     if (!porCuota.has(n)) cuotasSinRespaldo.push(n);
   }
 
-  if (cuotasSinRespaldo.length > 0) {
-    // Una ficha SIN ningún comprobante de cuota es historial migrado de la
-    // planilla: no hay con qué cruzarla y no tiene sentido pintarla de rojo.
-    // Una ficha que tiene comprobantes pero le faltan algunas cuotas sí es una
-    // inconsistencia real.
-    const migradaCompleta = deCuotas.length === 0;
+  // LA FRONTERA DE MIGRACION: la primera cuota que tiene comprobante.
+  //
+  // Casi toda la cartera venia de la planilla con su contador ya avanzado, y los
+  // comprobantes empiezan recien cuando el cliente entro al portal. O sea que en
+  // una ficha normal y sana las cuotas viejas NO tienen papel, y eso no es una
+  // contradiccion: es de donde venimos.
+  //
+  // Antes esto se trataba como todo-o-nada -si la ficha no tenia NINGUN
+  // comprobante era "migrada" en ambar, y bastaba que tuviera uno solo para que
+  // todas sus cuotas viejas la pintaran de ROJO-. El resultado era que
+  // "Descuadra" contaba a practicamente toda la cartera y el numero dejaba de
+  // significar nada.
+  //
+  // Ahora se parte en dos: lo anterior a la frontera es historial sin papeles
+  // (ambar, hay que cargarlo), y un hueco POSTERIOR a la frontera si es una
+  // inconsistencia real (rojo): ahi ya habia comprobantes y falta uno del medio.
+  const primeraConComprobante =
+    porCuota.size > 0 ? Math.min(...porCuota.keys()) : 0;
+
+  const sinRespaldoMigradas = cuotasSinRespaldo.filter(
+    (n) => primeraConComprobante === 0 || n < primeraConComprobante
+  );
+  const sinRespaldoHuecos = cuotasSinRespaldo.filter(
+    (n) => primeraConComprobante > 0 && n > primeraConComprobante
+  );
+
+  if (sinRespaldoHuecos.length > 0) {
     hallazgos.push({
-      severidad: migradaCompleta ? "AMBAR" : "ROJO",
+      severidad: "ROJO",
       chequeo: "Cobertura",
-      titulo: migradaCompleta
-        ? `${cuotasSinRespaldo.length} cuotas sin comprobante (ficha migrada)`
-        : `${cuotasSinRespaldo.length} cuotas figuran pagadas sin comprobante`,
-      detalle: migradaCompleta
-        ? `La ficha cuenta ${cuotasContadas} cuotas pagadas y no tiene ningún comprobante de cuota: viene de la planilla. Hay que cargar los respaldos o dejar constancia de que no existen.`
-        : `Cuotas ${resumirNumeros(cuotasSinRespaldo)}. La plata puede estar perfectamente ingresada —de hecho suele estarlo—: cuando postventa registra una cuota a mano SIN adjuntar archivo, se escribe la caja y sube el contador, pero no se crea ningún comprobante. Lo que falta acá es el papel, no necesariamente el pago. Compará la columna "En caja" para saber cuál de los dos casos es.`,
+      titulo: `${sinRespaldoHuecos.length} cuota(s) sin comprobante en medio de otras que sí lo tienen`,
+      detalle: `Cuotas ${resumirNumeros(
+        sinRespaldoHuecos
+      )}. Esta ficha ya venía emitiendo comprobantes desde la cuota ${primeraConComprobante}, así que estas no son historial viejo: es un hueco. La plata puede estar igual ingresada —cuando postventa registra una cuota a mano SIN adjuntar archivo, se escribe la caja y sube el contador, pero no se crea comprobante—, así que lo que falta suele ser el papel y no el pago. Compará la columna "En caja" para saber cuál de los dos casos es.`,
+    });
+  }
+
+  if (sinRespaldoMigradas.length > 0) {
+    hallazgos.push({
+      severidad: "AMBAR",
+      chequeo: "Cobertura",
+      titulo: `${sinRespaldoMigradas.length} cuotas sin comprobante (historial migrado)`,
+      detalle:
+        primeraConComprobante === 0
+          ? `La ficha cuenta ${cuotasContadas} cuotas pagadas y no tiene ningún comprobante de cuota: viene entera de la planilla. Hay que cargar los respaldos o dejar constancia de que no existen.`
+          : `Cuotas ${resumirNumeros(
+              sinRespaldoMigradas
+            )}: son anteriores al primer comprobante de la ficha (cuota ${primeraConComprobante}), o sea de antes de que el cliente entrara al portal. No se contradice nada; faltan los papeles de esa etapa.`,
     });
   }
 
@@ -286,8 +319,24 @@ export function auditarFicha(opts: {
   // cliente que alguna vez pagó la cuota junto con su mora. Por eso los dos lados
   // toman lo mismo: toda la plata que entró por comprobantes de cuota, mora
   // incluida, contra CUOTA + PENALTY.
+  //
+  // Y hay un segundo cuidado, del mismo tipo que el de Cobertura: en una ficha
+  // migrada la caja trae TODO el historial de la planilla y los comprobantes
+  // empiezan recien en el portal. La diferencia entre los dos lados es entonces
+  // exactamente la plata de las cuotas sin papel, y marcarla era acusar de
+  // descuadre a media cartera por algo que ya sabemos. Solo se reclama lo que
+  // ESAS cuotas no alcanzan a explicar.
   if (caja !== null && (caja > 0 || recibidoConMora > 0)) {
-    const brecha = caja - recibidoConMora;
+    const brechaCruda = caja - recibidoConMora;
+    const explicadoPorCuotasSinPapel = cuotasSinRespaldo.reduce(
+      (a, n) => a + valorDeCuota(n),
+      0
+    );
+    // Solo aplica cuando SOBRA caja: esas cuotas entraron como plata pero no
+    // dejaron comprobante. Si la caja queda CORTA, las cuotas sin papel no
+    // explican nada y la brecha se reclama entera.
+    const brecha =
+      brechaCruda > 0 ? Math.max(0, brechaCruda - explicadoPorCuotasSinPapel) : brechaCruda;
     if (Math.abs(brecha) >= umbral) {
       const faltaEnCaja = brecha < 0;
       hallazgos.push({
@@ -302,7 +351,11 @@ export function auditarFicha(opts: {
             )}. Falta la fila de caja de algún pago: el comprobante existe y está aprobado, pero esa plata no se sumó al "Total Pagado" del cliente, así que su saldo figura más alto de lo que corresponde.`
           : `El historial financiero registra ${clp(caja)} y los comprobantes suman ${clp(
               recibidoConMora
-            )}. Hay plata contabilizada sin comprobante detrás: puede ser un pago registrado a mano sin adjuntar archivo, que escribe la caja pero no crea comprobante.`,
+            )}. De esa diferencia, ${clp(
+              explicadoPorCuotasSinPapel
+            )} se explican por las ${cuotasSinRespaldo.length} cuotas que figuran pagadas sin comprobante; los ${clp(
+              brecha
+            )} restantes no. Es plata contabilizada sin nada detrás: puede ser un pago registrado a mano sin adjuntar archivo, que escribe la caja pero no crea comprobante.`,
       });
     }
   }
