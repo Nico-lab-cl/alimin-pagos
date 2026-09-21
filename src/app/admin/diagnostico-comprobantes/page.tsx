@@ -133,7 +133,13 @@ export default async function DiagnosticoComprobantesPage() {
       vencimientoUltimaContada: vencimientoDe(auditoria.cuotasContadas),
       vencimientoUltimoComprobante: vencimientoDe(auditoria.ultimaConComprobante),
       hallazgos: auditoria.hallazgos,
-      comprobantes: res.receipts.map((r) => {
+      // Los RECHAZADOS quedan fuera de la lista. No respaldan ninguna cuota
+      // -la auditoria solo mira los aprobados-, y un pago rebotado suele dejar
+      // dos o tres copias del mismo comprobante: en pantalla eran puro relleno
+      // que tapaba los que si cuentan.
+      comprobantes: res.receipts
+        .filter((r) => r.status !== "REJECTED")
+        .map((r) => {
         const cubre = cuotasQueCubre(r as any);
         return {
           id: r.id,
