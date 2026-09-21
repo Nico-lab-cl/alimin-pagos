@@ -132,6 +132,7 @@ export function auditarFicha(opts: {
 
   const aprobados = comprobantes.filter((r) => r.status === "APPROVED");
   const deCuotas = aprobados.filter((r) => cuotasQueCubre(r).length > 0);
+  const recibidoEnCuotas = deCuotas.reduce((a, r) => a + (r.amount_clp || 0), 0);
 
   // Qué comprobante cubre cada cuota.
   const porCuota = new Map<number, ComprobanteAuditado[]>();
@@ -262,16 +263,40 @@ export function auditarFicha(opts: {
         .map((r) => (r.nominal_installment_range ? `rango ${r.nominal_installment_range}` : `nº ${r.nominal_installment_number}`))
         .join(" y ")}`;
     });
+    // ¿Se cobró dos veces, o solo se rotuló dos veces?
+    //
+    // Es LA pregunta, y el mensaje no la contestaba: mandaba a postventa a
+    // buscar un pago duplicado que la mayoría de las veces no existe. Un
+    // comprobante se rotula con `nominal_installment_number`, y ese número se
+    // estampa cuando el cliente sube el archivo, con las cuotas que llevaba EN
+    // ESE MOMENTO; los de Lomas, además, llegan con el número que traían de
+    // allá (ver el cron sync-lomas, que lo copia tal cual). Dos comprobantes
+    // terminan diciendo "cuota 3" sin que nadie haya pagado dos veces, y como
+    // efecto espejo la cuota de al lado queda sin rótulo y aparece como hueco
+    // en COBERTURA.
+    //
+    // Se distingue con la plata, no con el ojo: si los comprobantes suman lo
+    // que valen las cuotas que la ficha cuenta como pagadas, no entró plata de
+    // más y lo único duplicado es el rótulo.
+    let pactadoDeContadas = 0;
+    for (let n = 1; n <= cuotasContadas; n++) pactadoDeContadas += valorDeCuota(n);
+    const umbralTraslape = valorDeCuota(1) || 1;
+    const deMas = recibidoEnCuotas - pactadoDeContadas;
+    const soloElRotulo = deMas < umbralTraslape;
+
+    const veredicto = soloElRotulo
+      ? `Los ${deCuotas.length} comprobantes suman ${clp(recibidoEnCuotas)} y las ${cuotasContadas} cuotas que la ficha cuenta como pagadas valen ${clp(pactadoDeContadas)}: NO hay plata de más, así que no busques un pago cargado dos veces. Lo que está duplicado es el rótulo — dos comprobantes quedaron marcados con la misma cuota y otra quedó sin marcar (la que COBERTURA muestra como hueco). Se arregla corrigiendo el número de cuota del comprobante, no borrando pagos.`
+      : `Los ${deCuotas.length} comprobantes suman ${clp(recibidoEnCuotas)} y las ${cuotasContadas} cuotas contadas valen ${clp(pactadoDeContadas)}: hay ${clp(deMas)} de más. Puede ser mora cobrada junto con la cuota, o un pago efectivamente cargado dos veces. Acá sí hay que abrir los dos comprobantes y comparar monto y fecha.`;
+
     hallazgos.push({
       severidad: "ROJO",
       chequeo: "Traslape",
       titulo: `${cuotasPisadas.length} cuota(s) cubiertas por más de un comprobante`,
-      detalle: `${ejemplos.join(" · ")}${cuotasPisadas.length > 3 ? " · …" : ""}. Dos comprobantes cobrando la misma cuota: o un rango está mal escrito, o el pago se cargó dos veces.`,
+      detalle: `${ejemplos.join(" · ")}${cuotasPisadas.length > 3 ? " · …" : ""}. ${veredicto}`,
     });
   }
 
   // -------------------------------------------------------------- 5. PLATA
-  const recibidoEnCuotas = deCuotas.reduce((a, r) => a + (r.amount_clp || 0), 0);
   // Los abonos de intereses tambien son comprobantes de scope INSTALLMENT y su
   // plata cae en la categoria PENALTY, asi que entran en la comparacion contra
   // la caja aunque no cubran ninguna cuota.
