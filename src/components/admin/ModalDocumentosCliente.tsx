@@ -46,18 +46,23 @@ export default function ModalDocumentosCliente({
 
   const adjuntar = async (
     cuota: number,
-    datos: { base64: string; monto: number; fecha: string }
+    datos: { base64: string; monto: number; fecha: string; hasta?: number }
   ) => {
     const r = await adjuntarComprobanteACuotaPagada(reservationId, cuota, {
       receiptBase64: datos.base64,
       amount: datos.monto,
       paidAt: datos.fecha,
+      hasta: datos.hasta,
     });
     if (r.error) {
       toast.error(r.error);
       return r;
     }
-    toast.success(`Comprobante adjuntado a la cuota ${cuota}`, {
+    const aQue =
+      datos.hasta && datos.hasta > cuota
+        ? `a las cuotas ${cuota}-${datos.hasta}`
+        : `a la cuota ${cuota}`;
+    toast.success(`Comprobante adjuntado ${aQue}`, {
       description: "El cliente ya lo ve en su portal. No se sumaron cuotas ni se movió caja.",
       duration: 7000,
     });

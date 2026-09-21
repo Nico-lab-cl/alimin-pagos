@@ -54,7 +54,7 @@ export default function DocumentosCliente({
   documentos: any;
   onAdjuntar?: (
     cuota: number,
-    datos: { base64: string; monto: number; fecha: string }
+    datos: { base64: string; monto: number; fecha: string; hasta?: number }
   ) => Promise<{ error?: string; success?: boolean }>;
 }) {
   const [pestana, setPestana] = useState<Pestana>("CUOTAS");
@@ -64,6 +64,9 @@ export default function DocumentosCliente({
   const [archivo, setArchivo] = useState<File | null>(null);
   const [monto, setMonto] = useState(0);
   const [fecha, setFecha] = useState("");
+  // Ultima cuota del grupo cuando UNA transferencia pago varias seguidas.
+  // Vacio = solo esta.
+  const [hasta, setHasta] = useState("");
   const [guardando, setGuardando] = useState(false);
 
   const cuotas = documentos?.cuotas || [];
@@ -98,6 +101,7 @@ export default function DocumentosCliente({
 
   const abrirSubida = (fila: any) => {
     setArchivo(null);
+    setHasta("");
     setMonto(fila.monto || 0);
     // Se propone el vencimiento pactado de esa cuota; postventa lo corrige con
     // la fecha real que diga la transferencia, que es la que verá el cliente.
@@ -117,7 +121,12 @@ export default function DocumentosCliente({
         fr.onerror = () => rej(new Error("no se pudo leer"));
         fr.readAsDataURL(archivo);
       });
-      const r = await onAdjuntar(subiendoPara.numero, { base64, monto, fecha });
+      const r = await onAdjuntar(subiendoPara.numero, {
+        base64,
+        monto,
+        fecha,
+        hasta: hasta.trim() ? Number(hasta) : undefined,
+      });
       if (!r?.error) setSubiendoPara(null);
     } finally {
       setGuardando(false);
@@ -380,6 +389,29 @@ export default function DocumentosCliente({
                 />
               </div>
 
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
+                  ¿Esta transferencia pagó varias cuotas?
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500 whitespace-nowrap">
+                    De la {subiendoPara?.numero} hasta la
+                  </span>
+                  <input
+                    type="number"
+                    value={hasta}
+                    onChange={(e) => setHasta(e.target.value)}
+                    placeholder={String(subiendoPara?.numero ?? "")}
+                    className="w-20 h-10 px-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-brand-400"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1.5">
+                  Dejalo vacío si el depósito cubrió solo esta cuota. Si cubrió varias,
+                  poné la última: el mismo comprobante queda en todas y el cliente las ve
+                  agrupadas.
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
@@ -405,8 +437,8 @@ export default function DocumentosCliente({
                 </div>
               </div>
               <p className="text-[10px] text-slate-400">
-                Se propone el vencimiento pactado. Corregilo con la fecha real que diga la
-                transferencia: es la que va a ver el cliente.
+                Se propone el vencimiento pactado y el monto de una cuota. Corregilos con
+                lo que diga la transferencia: es lo que va a ver el cliente.
               </p>
             </div>
 

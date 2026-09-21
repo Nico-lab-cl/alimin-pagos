@@ -4155,7 +4155,14 @@ function comprobanteYaCubreCuota(
 export async function adjuntarComprobanteACuotaPagada(
   reservationId: string,
   cuota: number,
-  data: { receiptBase64: string; amount: number; paidAt: string }
+  // `hasta` cubre el caso que reporto postventa: UNA transferencia que pago
+  // varias cuotas seguidas. Antes solo se podia adjuntar a una, y no habia
+  // forma de representar "la 01 y la 02 fueron el mismo deposito": o se
+  // duplicaba el archivo en cada cuota -y la suma de los comprobantes mentia-
+  // o quedaban cuotas sin respaldo. Se guarda como rango, que es lo que el
+  // portal del cliente ya sabe leer: esas filas salen con "Pagada con las
+  // cuotas 1-2" y comparten recibo y comprobante.
+  data: { receiptBase64: string; amount: number; paidAt: string; hasta?: number }
 ) {
   const session = await auth();
   const user = session?.user as any;
@@ -4177,20 +4184,32 @@ export async function adjuntarComprobanteACuotaPagada(
     if (!Number.isInteger(cuota) || cuota < 1) {
       return { error: "Número de cuota inválido" };
     }
+    const hasta = data.hasta ?? cuota;
+    if (!Number.isInteger(hasta) || hasta < cuota) {
+      return { error: "La última cuota del grupo no puede ser anterior a la primera" };
+    }
+    const delGrupo: number[] = [];
+    for (let n = cuota; n <= hasta; n++) delGrupo.push(n);
+
     // Solo cuotas ya contadas. Si la cuota todavía no está pagada, lo que
     // corresponde es Registrar Pago Manual, que sí la suma y la deja en caja.
-    if (cuota > pagadas) {
+    if (hasta > pagadas) {
       return {
-        error: `La cuota ${cuota} todavía no figura pagada (van ${pagadas}). Para sumarla usa Registrar Pago Manual.`,
+        error: `La cuota ${hasta} todavía no figura pagada (van ${pagadas}). Para sumarla usa Registrar Pago Manual.`,
       };
     }
 
-    const yaTiene = res.receipts.find(
-      (r) => r.status === "APPROVED" && comprobanteYaCubreCuota(r, cuota)
+    // Se revisa el grupo entero: si una sola del medio ya tiene respaldo, el
+    // rango la pisaria y esa cuota quedaria cubierta dos veces.
+    const ocupadas = delGrupo.filter((n) =>
+      res.receipts.some((r) => r.status === "APPROVED" && comprobanteYaCubreCuota(r, n))
     );
-    if (yaTiene) {
+    if (ocupadas.length > 0) {
       return {
-        error: `La cuota ${cuota} ya tiene un comprobante adjunto. Si lo vas a reemplazar, elimina primero el anterior.`,
+        error:
+          ocupadas.length === 1
+            ? `La cuota ${ocupadas[0]} ya tiene un comprobante adjunto. Si lo vas a reemplazar, elimina primero el anterior.`
+            : `Las cuotas ${ocupadas.join(", ")} ya tienen comprobante. Elegí un tramo libre o eliminá los anteriores.`,
       };
     }
 
@@ -4215,7 +4234,7 @@ export async function adjuntarComprobanteACuotaPagada(
         amount_clp: data.amount,
         receipt_url: data.receiptBase64,
         scope: "INSTALLMENT",
-        installments_count: 1,
+        installments_count: delGrupo.length,
         status: "APPROVED",
         // paid_at es la fecha de la transferencia — la que el cliente ve como
         // Fecha de Pago; processed_at, el momento en que postventa la adjuntó.
@@ -4223,11 +4242,13 @@ export async function adjuntarComprobanteACuotaPagada(
         paid_at: paymentDate,
         processed_at: new Date(),
         nominal_installment_number: cuota,
+        nominal_installment_range: delGrupo.length > 1 ? `${cuota}-${hasta}` : null,
       },
     });
 
     const lote = `#${res.lot.number}${res.lot.stage ? `(e${res.lot.stage})` : ""}`;
-    const detalle = `Comprobante adjuntado a la cuota ${cuota}, que ya figuraba pagada. Cliente: ${res.name} ${res.last_name || ""} - Lote ${lote}. Monto del comprobante: $${data.amount.toLocaleString("es-CL")}, pagado el ${paymentDate.toLocaleDateString("es-CL")}. Solo respaldo documental: no suma cuotas, no mueve caja ni mora.`;
+    const queCubre = delGrupo.length > 1 ? `las cuotas ${cuota}-${hasta}` : `la cuota ${cuota}`;
+    const detalle = `Comprobante adjuntado a ${queCubre}, que ya figuraba(n) pagada(s). Cliente: ${res.name} ${res.last_name || ""} - Lote ${lote}. Monto del comprobante: $${data.amount.toLocaleString("es-CL")}, pagado el ${paymentDate.toLocaleDateString("es-CL")}. Solo respaldo documental: no suma cuotas, no mueve caja ni mora.`;
 
     await logSystemNote(reservationId, detalle, "PaymentReceipt");
 
