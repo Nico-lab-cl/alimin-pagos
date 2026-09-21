@@ -6,6 +6,7 @@ import {
   Upload,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Download,
   ExternalLink,
@@ -77,6 +78,12 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
   const [estado, setEstado] = useState<"TODOS" | "ROJO" | "AMBAR" | "VERDE">("TODOS");
   const [query, setQuery] = useState("");
   const [abierta, setAbierta] = useState<string | null>(null);
+  // Paginado. La cartera entera en una sola tabla son cientos de filas: el
+  // navegador las dibuja todas, la pagina se arrastra y el hallazgo que hay que
+  // mirar queda a mil scrolls. Las tarjetas de arriba y el Excel siguen contando
+  // TODO lo filtrado, no la pagina: el paginado es para leer, no para medir.
+  const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState(50);
   // Cliente cuyo modal de documentos esta abierto. Desde ahi se adjuntan los
   // comprobantes que esta misma pantalla acaba de senalar como faltantes.
   const [enModal, setEnModal] = useState<Fila | null>(null);
@@ -97,6 +104,27 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
       );
     });
   }, [filas, proyecto, estado, query]);
+
+  // Cambiar de filtro con la pagina 7 abierta dejaba la tabla vacia sin decir
+  // por que, asi que TODO filtro vuelve al principio. Se hace en el mismo
+  // handler y no en un efecto: un efecto que llama setState vuelve a renderizar
+  // la tabla entera de gusto.
+  const filtrar = <T,>(set: (v: T) => void) => (v: T) => {
+    set(v);
+    setPagina(1);
+  };
+  const elegirProyecto = filtrar(setProyecto);
+  const elegirEstado = filtrar(setEstado);
+  const elegirQuery = filtrar(setQuery);
+  const elegirPorPagina = filtrar(setPorPagina);
+
+  const totalPaginas = Math.max(1, Math.ceil(visibles.length / porPagina));
+  const paginaSegura = Math.min(pagina, totalPaginas);
+  const desde = (paginaSegura - 1) * porPagina;
+  const enPagina = useMemo(
+    () => visibles.slice(desde, desde + porPagina),
+    [visibles, desde, porPagina]
+  );
 
   // El conteo es sobre el proyecto elegido, no sobre lo que quedó en pantalla:
   // si no, al filtrar por "Descuadra" el resumen diría que el 100% descuadra.
@@ -175,7 +203,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
         {(["ROJO", "AMBAR", "VERDE"] as const).map((s) => (
           <button
             key={s}
-            onClick={() => setEstado(estado === s ? "TODOS" : s)}
+            onClick={() => elegirEstado(estado === s ? "TODOS" : s)}
             className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
               estado === s ? "border-slate-800 shadow-sm" : "border-slate-200 hover:border-slate-300"
             } bg-white`}
@@ -219,7 +247,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                 return (
                   <tr
                     key={p.nombre}
-                    onClick={() => setProyecto(activo ? "todos" : p.nombre)}
+                    onClick={() => elegirProyecto(activo ? "todos" : p.nombre)}
                     className={`cursor-pointer transition-colors ${
                       activo ? "bg-brand-50/60" : "hover:bg-slate-50/40"
                     }`}
@@ -246,7 +274,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
         <select
           value={proyecto}
-          onChange={(e) => setProyecto(e.target.value)}
+          onChange={(e) => elegirProyecto(e.target.value)}
           className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 outline-none focus:border-brand-400"
         >
           <option value="todos">Todos los proyectos</option>
@@ -261,7 +289,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => elegirQuery(e.target.value)}
             placeholder="Buscar cliente, RUT o lote..."
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:border-brand-400"
           />
@@ -294,14 +322,14 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {visibles.length === 0 && (
+              {enPagina.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-16 text-center text-xs text-slate-400">
                     Ningún cliente coincide con el filtro.
                   </td>
                 </tr>
               )}
-              {visibles.map((f) => {
+              {enPagina.map((f) => {
                 const est = ESTILO[f.severidad];
                 const abierto = abierta === f.id;
                 return (
@@ -534,6 +562,50 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
             </tbody>
           </table>
         </div>
+
+        {/* Paginado */}
+        {visibles.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/40">
+            <p className="text-[11px] font-bold text-slate-500">
+              Mostrando {desde + 1}–{Math.min(desde + porPagina, visibles.length)} de{" "}
+              {visibles.length} cliente{visibles.length === 1 ? "" : "s"}
+            </p>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={porPagina}
+                onChange={(e) => elegirPorPagina(Number(e.target.value))}
+                className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-600 outline-none focus:border-brand-400 cursor-pointer"
+              >
+                {[25, 50, 100, 200].map((n) => (
+                  <option key={n} value={n}>
+                    {n} por página
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => setPagina(paginaSegura - 1)}
+                disabled={paginaSegura <= 1}
+                className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer"
+                aria-label="Página anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-[11px] font-bold text-slate-600 tabular-nums px-1">
+                {paginaSegura} / {totalPaginas}
+              </span>
+              <button
+                onClick={() => setPagina(paginaSegura + 1)}
+                disabled={paginaSegura >= totalPaginas}
+                className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer"
+                aria-label="Página siguiente"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {enModal && (
