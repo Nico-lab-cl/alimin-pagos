@@ -35,10 +35,6 @@ type Fila = {
   cuotasContadas: number;
   totalCuotas: number;
   cuotasConRespaldo: number;
-  recibidoEnCuotas: number;
-  recibidoConMora: number;
-  pactadoDeCuotasCubiertas: number;
-  caja: number | null;
   ultimaConComprobante: number;
   ultimoComprobanteEtiqueta: string;
   vencimientoUltimaContada: string;
@@ -165,9 +161,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
       "Vencimiento de esa cuota",
       "Ultimo comprobante (cuota)",
       "Vencimiento de esa cuota",
-      "Respaldado por comprobantes",
-      "Ingresado en caja",
-      "Hallazgos",
+      "Comprobantes que faltan",
     ];
     const rows = visibles.map((f) => [
       ESTILO[f.severidad].etiqueta,
@@ -181,9 +175,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
       f.vencimientoUltimaContada,
       f.ultimoComprobanteEtiqueta,
       f.vencimientoUltimoComprobante,
-      f.recibidoEnCuotas,
-      f.caja ?? "",
-      f.hallazgos.map((h) => `${h.chequeo}: ${h.titulo}`).join(" | "),
+      f.hallazgos.map((h) => h.titulo).join(" | "),
     ]);
     const csv = [headers, ...rows]
       .map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";"))
@@ -427,14 +419,14 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                               </div>
                             )}
 
-                            {/* Las cuentas, para poder verificarlas a mano */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                            {/* El conteo de papeles. Las cifras de plata -lo respaldado, lo
+                                pactado, lo ingresado en caja- se sacaron junto con los
+                                chequeos de descuadre: solo servian para justificarlos, y
+                                el saldo del cliente no sale de acá. */}
+                            <div className="grid grid-cols-2 gap-3 text-xs">
                               {[
                                 ["Cuotas contadas", String(f.cuotasContadas)],
                                 ["Cuotas con respaldo", String(f.cuotasConRespaldo)],
-                                ["Respaldado por comprobantes", formatCLP(f.recibidoConMora)],
-                                ["Pactado de esas cuotas", formatCLP(f.pactadoDeCuotasCubiertas)],
-                                ["Ingresado en caja", f.caja === null ? "Sin datos" : formatCLP(f.caja)],
                               ].map(([k, v]) => (
                                 <div key={k} className="bg-white border border-slate-200 rounded-xl p-3">
                                   <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">

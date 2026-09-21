@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getNominalInstallmentAmount, getInstallmentDueDate } from "@/lib/financials";
+import { getInstallmentDueDate } from "@/lib/financials";
 import { SCOPE_LABELS, esAbonoDeIntereses, fechaDePagoComprobante } from "@/lib/receiptDocs";
 import { auditarFicha, cuotasQueCubre, resumirNumeros } from "@/lib/auditoriaComprobantes";
 import RevisionComprobantes from "@/components/admin/RevisionComprobantes";
@@ -96,24 +96,6 @@ export default async function DiagnosticoComprobantesPage() {
   `;
   for (const f of filasArchivo) archivoPorComprobante.set(f.id, f.tiene_archivo);
 
-  // La caja: lo que el historial financiero registró como cuotas.
-  //
-  // OJO con qué es esto y qué no. NO alimenta el "Total Pagado" ni el saldo del
-  // cliente: esos se calculan recorriendo `installments_paid` contra el valor
-  // pactado de cada cuota (ver `totalPaid` en actions/user.ts). Esta tabla
-  // alimenta el REPORTE DE RECAUDACIÓN del proyecto (ver recauAgg en
-  // actions/postventa.ts). Que a una ficha le falten filas acá no le mueve el
-  // saldo al cliente; le quita plata al reporte.
-  const cajaPorReserva = new Map<string, number>();
-  const sumas = await prisma.financialLedger.groupBy({
-    by: ["reservation_id"],
-    // CUOTA y PENALTY juntas: un pago de cuota con mora encima deja una fila de
-    // cada una, y el comprobante guarda la suma de las dos.
-    where: { category: { in: ["CUOTA", "PENALTY"] } },
-    _sum: { amount_clp: true },
-  });
-  for (const s of sumas) cajaPorReserva.set(s.reservation_id, s._sum.amount_clp || 0);
-
   const nombreProyecto = new Map(proyectos.map((p) => [p.id, p.name]));
   const slugProyecto = new Map(proyectos.map((p) => [p.id, p.slug]));
 
@@ -123,17 +105,9 @@ export default async function DiagnosticoComprobantesPage() {
       return fmt(getInstallmentDueDate(res.installment_start_date, n, res.due_day || undefined));
     };
 
-    const valorDeCuota = (n: number) =>
-      getNominalInstallmentAmount(res.installment_ranges, n, res.lot?.valor_cuota || 0);
-
     const auditoria = auditarFicha({
       cuotasContadas: res.installments_paid || 0,
       comprobantes: res.receipts as any,
-      valorDeCuota,
-      // Dato de contexto para la columna "En caja". Ya no genera ningun
-      // hallazgo: es el reporte de recaudacion del proyecto, no el saldo del
-      // cliente. NULL cuando la ficha no tiene ninguna fila.
-      caja: cajaPorReserva.has(res.id) ? cajaPorReserva.get(res.id)! : null,
     });
 
     return {
@@ -147,10 +121,6 @@ export default async function DiagnosticoComprobantesPage() {
       cuotasContadas: auditoria.cuotasContadas,
       totalCuotas: res.lot?.cuotas || 0,
       cuotasConRespaldo: auditoria.cuotasConRespaldo,
-      recibidoEnCuotas: auditoria.recibidoEnCuotas,
-      recibidoConMora: auditoria.recibidoConMora,
-      pactadoDeCuotasCubiertas: auditoria.pactadoDeCuotasCubiertas,
-      caja: auditoria.caja,
       // El vencimiento pactado de la ultima cuota contada y el de la ultima que
       // tiene comprobante. Puestos uno al lado del otro, un desfase se ve sin
       // tener que abrir nada.

@@ -38,7 +38,6 @@ export type Hallazgo = {
 
 export type ComprobanteAuditado = {
   id: string;
-  amount_clp: number;
   status: string | null;
   scope: string;
   installments_count?: number | null;
@@ -102,33 +101,22 @@ export type ResultadoAuditoria = {
   /** Como se lee ese ultimo comprobante: "Cuota 8" o "Cuotas 7-8". */
   ultimoComprobanteEtiqueta: string;
   cuotasConRespaldo: number;
-  recibidoEnCuotas: number;
-  /** Toda la plata de comprobantes de cuota, mora incluida. */
-  recibidoConMora: number;
-  pactadoDeCuotasCubiertas: number;
-  caja: number | null;
 };
 
 export function auditarFicha(opts: {
   /** `installments_paid` de la reserva. */
   cuotasContadas: number;
   comprobantes: ComprobanteAuditado[];
-  /** Monto pactado de la cuota N. */
-  valorDeCuota: (n: number) => number;
-  /** Suma del FinancialLedger. Se muestra como dato; ya no genera hallazgo. */
-  caja: number | null;
 }): ResultadoAuditoria {
-  const { cuotasContadas, comprobantes, valorDeCuota, caja } = opts;
+  const { cuotasContadas, comprobantes } = opts;
   const hallazgos: Hallazgo[] = [];
 
+  // Acá no se suma un peso. Los montos -lo respaldado por comprobantes, lo
+  // pactado, lo ingresado en caja- se fueron junto con los chequeos de
+  // descuadre: solo existían para justificarlos. El saldo del cliente se
+  // calcula desde `installments_paid` y nunca salió de este archivo.
   const aprobados = comprobantes.filter((r) => r.status === "APPROVED");
   const deCuotas = aprobados.filter((r) => cuotasQueCubre(r).length > 0);
-  const recibidoEnCuotas = deCuotas.reduce((a, r) => a + (r.amount_clp || 0), 0);
-  // Los abonos de intereses tambien son comprobantes de scope INSTALLMENT
-  // aunque no cubran ninguna cuota, asi que su plata entra acá.
-  const recibidoConMora = aprobados
-    .filter((r) => r.scope === "INSTALLMENT")
-    .reduce((a, r) => a + (r.amount_clp || 0), 0);
 
   // Qué comprobante cubre cada cuota.
   const porCuota = new Map<number, ComprobanteAuditado[]>();
@@ -175,10 +163,6 @@ export function auditarFicha(opts: {
     ultimaConComprobante,
     ultimoComprobanteEtiqueta: etiquetaDelUltimo(porCuota, ultimaConComprobante),
     cuotasConRespaldo: cuotasCubiertas.filter((n) => n <= cuotasContadas).length,
-    recibidoEnCuotas,
-    recibidoConMora,
-    pactadoDeCuotasCubiertas: cuotasCubiertas.reduce((a, n) => a + valorDeCuota(n), 0),
-    caja,
   };
 }
 
