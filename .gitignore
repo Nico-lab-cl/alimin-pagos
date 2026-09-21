@@ -41,7 +41,13 @@ yarn-error.log*
 next-env.d.ts
 
 # local development & agents
-/scratch/
+# La carpeta sigue fuera: tiene volcados de correos de clientes, HTML con
+# sesiones y decenas de scripts de un solo uso. Se dejan pasar SOLO los que
+# tienen que correr en el servidor, donde la base responde.
+/scratch/*
+!/scratch/abonos_intereses_mal_rotulados.ts
+!/scratch/rotulos_de_cuota_corridos.ts
+!/scratch/cuotas_pagadas_de_mas.ts
 /brain/
 .DS_Store
 .npm
