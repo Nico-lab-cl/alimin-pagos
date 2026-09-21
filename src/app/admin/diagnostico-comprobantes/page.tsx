@@ -8,10 +8,9 @@ import RevisionComprobantes from "@/components/admin/RevisionComprobantes";
 /**
  * Revisión de Comprobantes. SOLO LECTURA: no escribe nada.
  *
- * Cruza, para cada ficha de la cartera, lo que dice el contador de cuotas contra
- * lo que dicen los comprobantes y contra lo que dice la caja. La lógica de los
- * cuatro chequeos vive en `lib/auditoriaComprobantes` para poder probarla sin
- * base de datos; acá solo se juntan los datos y se dibuja.
+ * Contesta una sola pregunta: a qué clientes les faltan comprobantes. La lógica
+ * vive en `lib/auditoriaComprobantes` para poder probarla sin base de datos;
+ * acá solo se juntan los datos y se dibuja.
  *
  * Se acota a los proyectos de la cuenta que entra (allowedProjects): cada equipo
  * de postventa ve su propia cartera y nunca la de otro proyecto.
@@ -131,9 +130,9 @@ export default async function DiagnosticoComprobantesPage() {
       cuotasContadas: res.installments_paid || 0,
       comprobantes: res.receipts as any,
       valorDeCuota,
-      // Sin filas de caja no se puede comparar nada: la ficha viene de la
-      // planilla. Se manda NULL y el chequeo se saltea, en vez de pintar de rojo
-      // a media cartera por algo que es esperable en el historial migrado.
+      // Dato de contexto para la columna "En caja". Ya no genera ningun
+      // hallazgo: es el reporte de recaudacion del proyecto, no el saldo del
+      // cliente. NULL cuando la ficha no tiene ninguna fila.
       caja: cajaPorReserva.has(res.id) ? cajaPorReserva.get(res.id)! : null,
     });
 
@@ -177,13 +176,14 @@ export default async function DiagnosticoComprobantesPage() {
     };
   });
 
-  // Los rojos primero, después los ámbar, y dentro de cada grupo el que tiene
-  // más cuotas sin respaldo: es el orden en que conviene atacarlos.
-  const peso = { ROJO: 0, AMBAR: 1, VERDE: 2 } as const;
+  // Primero a los que les falta papel, y entre esos el que más comprobantes
+  // debe: es el orden en que conviene atacarlos.
+  const peso = { FALTAN: 0, COMPLETO: 1 } as const;
+  const faltan = (f: (typeof filas)[number]) => f.cuotasContadas - f.cuotasConRespaldo;
   filas.sort(
     (a, b) =>
       peso[a.severidad] - peso[b.severidad] ||
-      b.hallazgos.length - a.hallazgos.length ||
+      faltan(b) - faltan(a) ||
       a.cliente.localeCompare(b.cliente, "es")
   );
 
@@ -197,10 +197,10 @@ export default async function DiagnosticoComprobantesPage() {
           Revisión de Comprobantes
         </h1>
         <p className="text-sm text-slate-500 mt-1 max-w-3xl">
-          Por cada cliente se cruzan cuatro cosas: que cada cuota contada tenga un
-          comprobante que la cubra, que ningún comprobante se pise con otro, que la plata
-          recibida coincida con lo pactado por esas cuotas, y que la caja diga lo mismo
-          que los comprobantes. Es solo lectura: acá no se modifica nada.
+          A quién le faltan comprobantes: por cada cliente se mira si cada cuota que
+          figura pagada tiene su respaldo cargado. Lo que falta es el papel, no el pago —
+          el saldo y el historial financiero del cliente no dependen de esto. Es solo
+          lectura: acá no se modifica nada.
         </p>
       </div>
 

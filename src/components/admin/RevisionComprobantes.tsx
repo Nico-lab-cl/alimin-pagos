@@ -31,7 +31,7 @@ type Fila = {
   proyecto: string;
   proyectoSlug: string;
   lote: string;
-  severidad: "ROJO" | "AMBAR" | "VERDE";
+  severidad: "FALTAN" | "COMPLETO";
   cuotasContadas: number;
   totalCuotas: number;
   cuotasConRespaldo: number;
@@ -56,26 +56,25 @@ type Fila = {
 };
 
 const ESTILO = {
-  ROJO: {
-    punto: "bg-red-500",
-    chip: "bg-red-50 text-red-700 border-red-200",
-    etiqueta: "Descuadra",
-  },
-  AMBAR: {
+  FALTAN: {
     punto: "bg-amber-400",
     chip: "bg-amber-50 text-amber-700 border-amber-200",
-    etiqueta: "Sin respaldo",
+    etiqueta: "Faltan comprobantes",
+    ayuda: "Tienen cuotas pagadas sin el respaldo cargado",
   },
-  VERDE: {
+  COMPLETO: {
     punto: "bg-emerald-500",
     chip: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    etiqueta: "Cuadrado",
+    etiqueta: "Completo",
+    ayuda: "Cada cuota pagada tiene su comprobante",
   },
 } as const;
 
+const ESTADOS = ["FALTAN", "COMPLETO"] as const;
+
 export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
   const [proyecto, setProyecto] = useState("todos");
-  const [estado, setEstado] = useState<"TODOS" | "ROJO" | "AMBAR" | "VERDE">("TODOS");
+  const [estado, setEstado] = useState<"TODOS" | "FALTAN" | "COMPLETO">("TODOS");
   const [query, setQuery] = useState("");
   const [abierta, setAbierta] = useState<string | null>(null);
   // Paginado. La cartera entera en una sola tabla son cientos de filas: el
@@ -127,15 +126,15 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
   );
 
   // El conteo es sobre el proyecto elegido, no sobre lo que quedó en pantalla:
-  // si no, al filtrar por "Descuadra" el resumen diría que el 100% descuadra.
+  // si no, al filtrar por "Faltan comprobantes" el resumen diría que le faltan
+  // al 100%.
   const delProyecto = useMemo(
     () => filas.filter((f) => proyecto === "todos" || f.proyecto === proyecto),
     [filas, proyecto]
   );
   const conteo = {
-    ROJO: delProyecto.filter((f) => f.severidad === "ROJO").length,
-    AMBAR: delProyecto.filter((f) => f.severidad === "AMBAR").length,
-    VERDE: delProyecto.filter((f) => f.severidad === "VERDE").length,
+    FALTAN: delProyecto.filter((f) => f.severidad === "FALTAN").length,
+    COMPLETO: delProyecto.filter((f) => f.severidad === "COMPLETO").length,
   };
 
   // Desglose por proyecto. Las tarjetas de arriba responden al filtro y muestran
@@ -144,9 +143,8 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
   const porProyecto = useMemo(() => {
     const filasDe = (lista: Fila[]) => ({
       total: lista.length,
-      ROJO: lista.filter((f) => f.severidad === "ROJO").length,
-      AMBAR: lista.filter((f) => f.severidad === "AMBAR").length,
-      VERDE: lista.filter((f) => f.severidad === "VERDE").length,
+      FALTAN: lista.filter((f) => f.severidad === "FALTAN").length,
+      COMPLETO: lista.filter((f) => f.severidad === "COMPLETO").length,
     });
     return proyectos.map((p) => ({
       nombre: p,
@@ -199,8 +197,8 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
   return (
     <div className="space-y-5">
       {/* Resumen del proyecto elegido */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {(["ROJO", "AMBAR", "VERDE"] as const).map((s) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {ESTADOS.map((s) => (
           <button
             key={s}
             onClick={() => elegirEstado(estado === s ? "TODOS" : s)}
@@ -215,13 +213,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
               </span>
             </div>
             <p className="text-3xl font-extrabold text-slate-900 mt-1.5">{conteo[s]}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {s === "ROJO"
-                ? "Las cuotas y los comprobantes no dicen lo mismo"
-                : s === "AMBAR"
-                  ? "Falta el respaldo, pero nada se contradice"
-                  : "Cuotas, comprobantes y caja coinciden"}
-            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{ESTILO[s].ayuda}</p>
           </button>
         ))}
       </div>
@@ -234,7 +226,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
               <tr className="bg-slate-50/60 border-b border-slate-100">
                 <th className={th}>Proyecto</th>
                 <th className={`${th} text-center`}>Clientes</th>
-                {(["ROJO", "AMBAR", "VERDE"] as const).map((s) => (
+                {ESTADOS.map((s) => (
                   <th key={s} className={`${th} text-center`}>
                     {ESTILO[s].etiqueta}
                   </th>
@@ -254,7 +246,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                   >
                     <td className={`${td} font-bold text-slate-900`}>{p.nombre}</td>
                     <td className={`${td} text-center text-slate-500`}>{p.total}</td>
-                    {(["ROJO", "AMBAR", "VERDE"] as const).map((s) => (
+                    {ESTADOS.map((s) => (
                       <td key={s} className={`${td} text-center`}>
                         <span className="inline-flex items-center gap-1.5">
                           <span className={`w-1.5 h-1.5 rounded-full ${ESTILO[s].punto}`} />
@@ -420,7 +412,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                                   <div
                                     key={i}
                                     className={`p-3 rounded-xl border text-xs leading-relaxed ${
-                                      h.severidad === "ROJO"
+                                      h.severidad === "FALTAN"
                                         ? "bg-red-50/60 border-red-100 text-red-800"
                                         : "bg-amber-50/60 border-amber-100 text-amber-800"
                                     }`}
