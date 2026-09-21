@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Eye, FileText, Loader2, Search, Upload, X } from "lucide-react";
+import { Download, Eye, FileText, Loader2, Search, Trash2, Upload, X } from "lucide-react";
 import PreviewModal from "@/components/shared/PreviewModal";
 import { downloadDocument, formatCLP } from "@/lib/utils";
 
@@ -50,12 +50,25 @@ export default function DocumentosCliente({
    * cliente no puede subir nada. Sin esta prop, la columna solo muestra "—".
    */
   onAdjuntar,
+  onQuitarArchivo,
+  onRehacerRecibo,
 }: {
   documentos: any;
   onAdjuntar?: (
     cuota: number,
     datos: { base64: string; monto: number; fecha: string; hasta?: number }
   ) => Promise<{ error?: string; success?: boolean }>;
+  /**
+   * Quitar el archivo que subió el cliente, dejando el pago intacto. Solo
+   * postventa: sin esta prop no aparece ningún basurero.
+   */
+  onQuitarArchivo?: (pagoId: string) => Promise<{ error?: string; success?: boolean }>;
+  /**
+   * Rehacer el recibo oficial de un pago. Se oculta el que estaba y el sistema
+   * emite uno limpio por cuota: el recibo no es un archivo guardado, se genera
+   * al vuelo desde los datos del pago.
+   */
+  onRehacerRecibo?: (pagoId: string) => Promise<{ error?: string; success?: boolean }>;
 }) {
   const [pestana, setPestana] = useState<Pestana>("CUOTAS");
   const [query, setQuery] = useState("");
@@ -68,6 +81,7 @@ export default function DocumentosCliente({
   // Vacio = solo esta.
   const [hasta, setHasta] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [borrando, setBorrando] = useState(false);
 
   const cuotas = documentos?.cuotas || [];
   const otros = documentos?.documentos || [];
@@ -133,8 +147,35 @@ export default function DocumentosCliente({
     }
   };
 
+  /**
+   * El basurero de una celda. Pide confirmación antes, porque lo que hay
+   * detrás es el papel de un cliente.
+   */
+  const basurero = (
+    titulo: string,
+    aviso: string,
+    onClick: () => Promise<{ error?: string; success?: boolean }>
+  ) => (
+    <button
+      onClick={async () => {
+        if (!window.confirm(aviso)) return;
+        setBorrando(true);
+        try {
+          await onClick();
+        } finally {
+          setBorrando(false);
+        }
+      }}
+      disabled={borrando}
+      title={titulo}
+      className="w-8 h-8 rounded-lg border border-red-200 bg-red-50/40 flex items-center justify-center text-red-500 hover:bg-red-50 hover:text-red-700 transition-all cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      <Trash2 className="w-3.5 h-3.5" />
+    </button>
+  );
+
   /** Los dos botones de una celda de archivo: ver y descargar. */
-  const acciones = (archivo: any, etiqueta: string, filaCuota?: any) => {
+  const acciones = (archivo: any, etiqueta: string, filaCuota?: any, tipo?: "recibo" | "comprobante") => {
     if (!archivo) {
       // Cuando quien mira puede adjuntar —postventa, nunca el cliente— la celda
       // vacía deja de ser un guion muerto y pasa a ser la forma de arreglarlo.
@@ -168,6 +209,24 @@ export default function DocumentosCliente({
         >
           <Download className="w-3.5 h-3.5" />
         </button>
+
+        {tipo === "comprobante" && onQuitarArchivo && filaCuota?.pagoId &&
+          basurero(
+            "Quitar el archivo que subió el cliente",
+            `¿Quitar el archivo de la cuota ${filaCuota.numero}?
+
+Se borra SOLO el archivo. La cuota sigue pagada: no se toca el contador, ni la caja, ni la mora. La celda vuelve a decir "Subir" para que cargues el correcto.`,
+            () => onQuitarArchivo(filaCuota.pagoId)
+          )}
+
+        {tipo === "recibo" && onRehacerRecibo && filaCuota?.pagoId &&
+          basurero(
+            "Rehacer el recibo oficial",
+            `¿Rehacer el recibo de la cuota ${filaCuota.numero}?
+
+El recibo no es un archivo guardado: se emite al vuelo desde el pago. Se descarta el actual y el sistema emite uno limpio para esta cuota. El pago no se toca.`,
+            () => onRehacerRecibo(filaCuota.pagoId)
+          )}
       </div>
     );
   };
@@ -283,8 +342,8 @@ export default function DocumentosCliente({
                       <td className={`${tdBase} text-right font-bold text-slate-900`}>
                         {formatCLP(c.monto)}
                       </td>
-                      <td className={tdBase}>{acciones(c.recibo, "comprobante emitido")}</td>
-                      <td className={tdBase}>{acciones(c.comprobante, "tu comprobante", c)}</td>
+                      <td className={tdBase}>{acciones(c.recibo, "comprobante emitido", c, "recibo")}</td>
+                      <td className={tdBase}>{acciones(c.comprobante, "tu comprobante", c, "comprobante")}</td>
                     </tr>
                   ))}
                 </tbody>

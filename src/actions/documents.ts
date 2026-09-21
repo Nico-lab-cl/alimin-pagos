@@ -281,6 +281,88 @@ export async function deleteLegacyDocument(reservationId: string, docName: strin
  * No escribe en `financial_ledger` ni en `reservations`: no cambia cuotas
  * pagadas, saldos, mora ni montos.
  */
+/**
+ * Saca el archivo que subió el cliente, dejando el PAGO intacto.
+ *
+ * Lo pide postventa: el cliente sube la foto equivocada -otra transferencia,
+ * una captura cortada, el comprobante de otra cuota- y hay que poder quitarla
+ * para que suba la buena. Hasta ahora la única forma era `deleteDocument` con
+ * el id del comprobante, que llama a `deletePaymentReceipt` y REVIERTE el
+ * pago: baja el contador de cuotas y deshace la caja. Para cambiar una foto
+ * eso es una bomba.
+ *
+ * Acá solo se borra el archivo. La columna `receipt_url` no admite NULL, así
+ * que se deja el centinela "SIN_RESPALDO", que es el que `receiptHasFile` ya
+ * trata como "no hay archivo". La cuota sigue pagada, el recibo oficial se
+ * sigue emitiendo, y la celda vuelve a mostrar "Subir".
+ */
+export async function quitarArchivoComprobante(receiptId: string) {
+  const session = await auth();
+  const user = session?.user as any;
+  if (!session?.user || user?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const receipt = await prisma.paymentReceipt.findUnique({
+      where: { id: receiptId },
+      select: {
+        id: true,
+        reservation_id: true,
+        amount_clp: true,
+        scope: true,
+        receipt_url: true,
+        nominal_installment_number: true,
+        nominal_installment_range: true,
+      },
+    });
+    if (!receipt) return { error: "Comprobante no encontrado" };
+    if (!receiptHasFile(receipt.receipt_url)) {
+      return { error: "Este pago no tiene ningún archivo adjunto" };
+    }
+
+    await prisma.paymentReceipt.update({
+      where: { id: receiptId },
+      data: { receipt_url: "SIN_RESPALDO" },
+    });
+
+    const cual = receipt.nominal_installment_range
+      ? `Cuotas ${receipt.nominal_installment_range}`
+      : receipt.nominal_installment_number
+        ? `Cuota ${receipt.nominal_installment_number}`
+        : SCOPE_LABELS[receipt.scope] || receipt.scope;
+
+    await logSystemNote(
+      receipt.reservation_id,
+      `Archivo del comprobante eliminado: ${cual} (monto ${receipt.amount_clp.toLocaleString(
+        "es-CL"
+      )}). El PAGO no se modificó: cuotas, caja y saldo quedan igual. La cuota vuelve a quedar sin respaldo, lista para adjuntar el archivo correcto.`,
+      "PaymentReceipt"
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "PaymentReceipt",
+        entity_id: receipt.id,
+        details: `Archivo del comprobante eliminado (${cual}). Solo el archivo: el pago queda intacto.`,
+        user_id: user.id,
+        user_email: user.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("user_data_");
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("receipts_");
+    revalidatePath("/admin/clients");
+    revalidatePath("/user/documents");
+    return { success: true };
+  } catch (error) {
+    console.error("Error quitando el archivo del comprobante:", error);
+    return { error: "Error al quitar el archivo" };
+  }
+}
+
 export async function ocultarReciboOficial(receiptId: string, motivo?: string) {
   const session = await auth();
   const user = session?.user as any;

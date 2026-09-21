@@ -60,6 +60,13 @@ export type FilaCuota = {
   recibo: ArchivoCliente;
   /** El respaldo que subió el cliente, si es que hay. */
   comprobante: ArchivoCliente | null;
+  /**
+   * El pago del que salen los archivos de esta fila. Lo necesita postventa para
+   * poder actuar sobre él: quitar el archivo que subió el cliente, o rehacer el
+   * recibo. NULL cuando la cuota figura pagada sin ningún pago detrás (historial
+   * migrado), que es justo cuando no hay nada que quitar.
+   */
+  pagoId: string | null;
 };
 
 /**
@@ -203,6 +210,7 @@ export function construirDocumentosCliente(opts: {
       monto: origen.amount_clp || 0,
       recibo: archivoDelRecibo(origen, lotNumber),
       comprobante: archivoDelComprobante(origen),
+      pagoId: origen.id,
     });
   }
 
@@ -249,6 +257,7 @@ export function construirDocumentosCliente(opts: {
       monto: montosPorCuota[n] || 0,
       recibo,
       comprobante: origenVisible ? archivoDelComprobante(origenVisible) : null,
+      pagoId: origenVisible?.id || null,
     });
   }
 

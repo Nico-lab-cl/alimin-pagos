@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { getClientPOV, adjuntarComprobanteACuotaPagada } from "@/actions/postventa";
+import { quitarArchivoComprobante, ocultarReciboOficial } from "@/actions/documents";
 import DocumentosCliente from "@/components/shared/DocumentosCliente";
 
 /**
@@ -71,6 +72,42 @@ export default function ModalDocumentosCliente({
     return r;
   };
 
+  // Quitar el archivo que subió el cliente. NO deshace el pago: para eso está
+  // el botón de la bandeja, que avisa lo que revierte.
+  const quitarArchivo = async (pagoId: string) => {
+    const r = await quitarArchivoComprobante(pagoId);
+    if (r.error) {
+      toast.error(r.error);
+      return r;
+    }
+    toast.success("Archivo quitado", {
+      description:
+        "La cuota sigue pagada: no se tocó el contador, ni la caja, ni la mora. Ya podés subir el correcto.",
+      duration: 7000,
+    });
+    setHuboCambios(true);
+    cargar();
+    return r;
+  };
+
+  // Rehacer el recibo oficial. Se oculta el que estaba y el sistema emite uno
+  // limpio por cuota, porque el recibo se genera al vuelo desde el pago.
+  const rehacerRecibo = async (pagoId: string) => {
+    const r = await ocultarReciboOficial(pagoId);
+    if (r.error) {
+      toast.error(r.error);
+      return r;
+    }
+    toast.success("Recibo rehecho", {
+      description:
+        "Se descartó el anterior y se emitió uno limpio para esta cuota. El pago no se modificó.",
+      duration: 7000,
+    });
+    setHuboCambios(true);
+    cargar();
+    return r;
+  };
+
   const cerrar = () => {
     if (huboCambios) onCambio?.();
     onClose();
@@ -103,7 +140,12 @@ export default function ModalDocumentosCliente({
               </p>
             </div>
           ) : documentos ? (
-            <DocumentosCliente documentos={documentos} onAdjuntar={adjuntar} />
+            <DocumentosCliente
+              documentos={documentos}
+              onAdjuntar={adjuntar}
+              onQuitarArchivo={quitarArchivo}
+              onRehacerRecibo={rehacerRecibo}
+            />
           ) : (
             <p className="py-20 text-center text-xs text-slate-400">
               No se pudieron cargar los documentos de este cliente.

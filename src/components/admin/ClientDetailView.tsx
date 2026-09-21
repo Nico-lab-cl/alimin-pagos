@@ -15,7 +15,10 @@ import {
   sendClientObservation, updateFinancialLedgerAmount, deleteFinancialLedgerEntry, getAdvisors, updateClientAdvisor,
   getClientPOV, adjuntarComprobanteACuotaPagada
 } from "@/actions/postventa";
-import { uploadDocument, deleteDocument, deleteLegacyDocument, getReservationDocuments } from "@/actions/documents";
+import {
+  uploadDocument, deleteDocument, deleteLegacyDocument, getReservationDocuments,
+  quitarArchivoComprobante, ocultarReciboOficial,
+} from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
 import DocumentosCliente from "@/components/shared/DocumentosCliente";
@@ -53,6 +56,14 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
     setDocsCliente(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClient?.id]);
+
+  // Despues de tocar un papel -adjuntar, quitar el archivo, rehacer el recibo-
+  // la tabla se vuelve a pedir: los archivos los arma el servidor.
+  const recargarDocsCliente = async () => {
+    const nuevo = await getClientPOV(selectedClient.id);
+    setDocsCliente((nuevo as any)?.data?.documentos || null);
+    refreshDocs();
+  };
   const [loading, setLoading] = useState(false);
   const [isFrozen, setIsFrozen] = useState(selectedClient.mora_frozen || false);
   const [isSavingMora, setIsSavingMora] = useState(false);
@@ -1950,15 +1961,41 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     receiptBase64: d.base64,
                     amount: d.monto,
                     paidAt: d.fecha,
+                    hasta: d.hasta,
                   });
                   if (r.error) { toast.error(r.error); return r; }
-                  toast.success(`Comprobante adjuntado a la cuota ${cuota}`, {
-                    description: "El cliente ya lo ve en su portal. No se sumaron cuotas ni se movio caja.",
+                  toast.success(
+                    d.hasta && d.hasta > cuota
+                      ? `Comprobante adjuntado a las cuotas ${cuota}-${d.hasta}`
+                      : `Comprobante adjuntado a la cuota ${cuota}`,
+                    {
+                      description: "El cliente ya lo ve en su portal. No se sumaron cuotas ni se movio caja.",
+                      duration: 7000,
+                    }
+                  );
+                  await recargarDocsCliente();
+                  return r;
+                }}
+                onQuitarArchivo={async (pagoId: string) => {
+                  const r = await quitarArchivoComprobante(pagoId);
+                  if (r.error) { toast.error(r.error); return r; }
+                  toast.success("Archivo quitado", {
+                    description:
+                      "La cuota sigue pagada: no se toco el contador, ni la caja, ni la mora. Ya podes subir el correcto.",
                     duration: 7000,
                   });
-                  const nuevo = await getClientPOV(selectedClient.id);
-                  setDocsCliente((nuevo as any)?.data?.documentos || null);
-                  refreshDocs();
+                  await recargarDocsCliente();
+                  return r;
+                }}
+                onRehacerRecibo={async (pagoId: string) => {
+                  const r = await ocultarReciboOficial(pagoId);
+                  if (r.error) { toast.error(r.error); return r; }
+                  toast.success("Recibo rehecho", {
+                    description:
+                      "Se descarto el anterior y se emitio uno limpio para esta cuota. El pago no se modifico.",
+                    duration: 7000,
+                  });
+                  await recargarDocsCliente();
                   return r;
                 }}
               />
