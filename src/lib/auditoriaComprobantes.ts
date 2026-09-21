@@ -20,8 +20,9 @@
  *                 quede corto es normal cuando faltan papeles, y ya lo dice
  *                 Cobertura.
  *   3. TRASLAPE   ¿hay dos comprobantes cubriendo la misma cuota?
- *   4. PLATA      la suma de los comprobantes, ¿coincide con lo pactado por las
- *                 cuotas que dicen cubrir?
+ *   4. PLATA      la suma de los comprobantes, ¿ALCANZA para lo pactado por las
+ *                 cuotas que dicen cubrir? Solo esa dirección: que sobre es lo
+ *                 normal, porque el comprobante trae la mora encima.
  *   5. CAJA       el FinancialLedger, que es lo que alimenta el "Total Pagado"
  *                 del cliente, ¿dice lo mismo que los comprobantes?
  *
@@ -165,9 +166,6 @@ export function auditarFicha(opts: {
   const primeraConComprobante =
     porCuota.size > 0 ? Math.min(...porCuota.keys()) : 0;
 
-  const sinRespaldoMigradas = cuotasSinRespaldo.filter(
-    (n) => primeraConComprobante === 0 || n < primeraConComprobante
-  );
   const sinRespaldoHuecos = cuotasSinRespaldo.filter(
     (n) => primeraConComprobante > 0 && n > primeraConComprobante
   );
@@ -183,19 +181,14 @@ export function auditarFicha(opts: {
     });
   }
 
-  if (sinRespaldoMigradas.length > 0) {
-    hallazgos.push({
-      severidad: "AMBAR",
-      chequeo: "Cobertura",
-      titulo: `${sinRespaldoMigradas.length} cuotas sin comprobante (historial migrado)`,
-      detalle:
-        primeraConComprobante === 0
-          ? `La ficha cuenta ${cuotasContadas} cuotas pagadas y no tiene ningún comprobante de cuota: viene entera de la planilla. Hay que cargar los respaldos o dejar constancia de que no existen.`
-          : `Cuotas ${resumirNumeros(
-              sinRespaldoMigradas
-            )}: son anteriores al primer comprobante de la ficha (cuota ${primeraConComprobante}), o sea de antes de que el cliente entrara al portal. No se contradice nada; faltan los papeles de esa etapa.`,
-    });
-  }
+  // Las cuotas ANTERIORES a la frontera ya no generan hallazgo.
+  //
+  // Eran ambar y decian la verdad -falta el papel de la etapa de la planilla-,
+  // pero no es una contradiccion que esta pantalla tenga que resolver: es el
+  // estado conocido de toda la cartera migrada, y repetirlo ficha por ficha
+  // tapaba los hallazgos que si hay que mirar. El dato no se pierde: sigue en
+  // `cuotasSinRespaldo` y en la columna "Con respaldo" de la tabla, que es
+  // donde se ve cuanto historial falta sin gritar.
 
   // ------------------------------------------------- 2. DESFASE DEL FINAL
   // Solo interesa UNA dirección: que algún comprobante hable de una cuota que la
@@ -288,21 +281,27 @@ export function auditarFicha(opts: {
   const cuotasCubiertas = [...porCuota.keys()];
   const pactadoDeCuotasCubiertas = cuotasCubiertas.reduce((a, n) => a + valorDeCuota(n), 0);
   const diferencia = recibidoEnCuotas - pactadoDeCuotasCubiertas;
-
-  // El umbral es una cuota: por debajo de eso la diferencia suele ser mora
-  // cobrada junto con la cuota, y marcarla sería ruido.
   const umbral = valorDeCuota(1) || 1;
-  if (deCuotas.length > 0 && Math.abs(diferencia) >= umbral) {
-    const sobra = diferencia > 0;
+
+  // SOLO se reclama cuando FALTA plata. Que SOBRE no prueba nada.
+  //
+  // Un comprobante de cuota casi nunca trae la cuota pelada: viene con la mora
+  // y los intereses del mes encima, y el comprobante guarda el total. Medir ese
+  // total contra el valor pactado de las cuotas y llamar "sobrante" a la
+  // diferencia era comparar dos cosas distintas -la mora se lleva aparte, en el
+  // chequeo de Caja y en la ficha del cliente- y le inventaba un descuadre a
+  // todo cliente que alguna vez pago junto. La regla es la que pidio postventa:
+  // si la cuota esta pagada, se contabiliza el valor de la cuota y listo.
+  //
+  // Lo que motivo este chequeo -Luis Donoso, $3.500.000 para $2.000.000 en
+  // rangos pisados- lo sigue agarrando TRASLAPE, que es donde de verdad se ve:
+  // dos comprobantes cobrando la misma cuota.
+  if (deCuotas.length > 0 && diferencia <= -umbral) {
     hallazgos.push({
       severidad: "ROJO",
       chequeo: "Plata",
-      titulo: sobra
-        ? `Entró ${clp(diferencia)} más de lo que las cuotas declaran`
-        : `Faltan ${clp(-diferencia)} para las cuotas declaradas`,
-      detalle: sobra
-        ? `Los comprobantes suman ${clp(recibidoEnCuotas)}, pero las ${cuotasCubiertas.length} cuotas que dicen cubrir valen ${clp(pactadoDeCuotasCubiertas)}. Sobran ${clp(diferencia)}, que son ${(diferencia / umbral).toFixed(1)} cuotas: puede ser mora cobrada aparte, o cuotas que se pagaron y quedaron sin declarar.`
-        : `Los comprobantes suman ${clp(recibidoEnCuotas)} y las ${cuotasCubiertas.length} cuotas que dicen cubrir valen ${clp(pactadoDeCuotasCubiertas)}. El cliente figura con cuotas que no alcanzó a pagar.`,
+      titulo: `Faltan ${clp(-diferencia)} para las cuotas declaradas`,
+      detalle: `Los comprobantes suman ${clp(recibidoEnCuotas)} y las ${cuotasCubiertas.length} cuotas que dicen cubrir valen ${clp(pactadoDeCuotasCubiertas)}. El cliente figura con cuotas que no alcanzó a pagar.`,
     });
   }
 
