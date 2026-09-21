@@ -1358,6 +1358,20 @@ export async function approveReceiptAsInterestPayment(
           processed_at: new Date(),
           paid_at: paymentDate,
           amount_clp: montoReal,
+          // Este pago se fue a MORA, no a una cuota: hay que soltarle la cuota
+          // que traia rotulada.
+          //
+          // El cliente sube el comprobante eligiendo "Cuota 5" y postventa
+          // decide aprobarlo como abono de intereses. Si el numero se queda
+          // pegado, el sistema sigue leyendo el comprobante como si pagara esa
+          // cuota (`esAbonoDeIntereses` distingue justamente por NO tener
+          // cuota asociada) y de ahi salen tres mentiras: la cuota 5 aparece
+          // cubierta por dos comprobantes -el de verdad y este-, su plata se
+          // suma a lo recibido por cuotas, y el recibo sale rotulado "Cuota 5"
+          // cuando el cliente pago intereses. Es lo que reporto postventa en la
+          // ficha de Maria Jose Vergara.
+          nominal_installment_number: null,
+          nominal_installment_range: null,
         },
       });
       await tx.reservation.update({
