@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { corregirRotuloComprobante } from "@/actions/postventa";
 import {
   AlertTriangle,
   Upload,
@@ -12,6 +14,9 @@ import {
   ExternalLink,
   FileText,
   Search,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { downloadCsv, formatCLP } from "@/lib/utils";
 import ModalDocumentosCliente from "@/components/admin/ModalDocumentosCliente";
@@ -82,6 +87,24 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
   // Cliente cuyo modal de documentos esta abierto. Desde ahi se adjuntan los
   // comprobantes que esta misma pantalla acaba de senalar como faltantes.
   const [enModal, setEnModal] = useState<Fila | null>(null);
+  // Comprobante cuyo rotulo se esta corrigiendo, y lo tecleado.
+  const [editando, setEditando] = useState<string | null>(null);
+  const [rotulo, setRotulo] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  const guardarRotulo = async (id: string) => {
+    setGuardando(true);
+    const r = await corregirRotuloComprobante(id, rotulo);
+    setGuardando(false);
+    if (r?.error) {
+      toast.error(r.error);
+      return;
+    }
+    toast.success(`Corregido: de "${r.antes}" a "${r.despues}"`);
+    setEditando(null);
+    // La fila se arma en el servidor, asi que hay que volver a pedirla.
+    window.location.reload();
+  };
 
   const proyectos = useMemo(
     () => [...new Set(filas.map((f) => f.proyecto))].sort(),
@@ -452,6 +475,7 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                                       <th className="px-3 py-2 text-right">Monto</th>
                                       <th className="px-3 py-2">Fecha</th>
                                       <th className="px-3 py-2">Archivos</th>
+                                      <th className="px-3 py-2">Cuota</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-slate-50">
@@ -460,7 +484,25 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                                         <td className="px-3 py-2 font-semibold text-slate-700">
                                           {c.concepto}
                                         </td>
-                                        <td className="px-3 py-2 text-slate-600">{c.cubre}</td>
+                                        <td className="px-3 py-2 text-slate-600">
+                                          {editando === c.id ? (
+                                            <input
+                                              autoFocus
+                                              value={rotulo}
+                                              onChange={(e) => setRotulo(e.target.value)}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onKeyDown={(e) => {
+                                                e.stopPropagation();
+                                                if (e.key === "Enter") guardarRotulo(c.id);
+                                                if (e.key === "Escape") setEditando(null);
+                                              }}
+                                              placeholder="47 o 47-49"
+                                              className="w-24 px-2 py-1 rounded-lg border border-brand-400 text-xs font-bold text-slate-800 outline-none"
+                                            />
+                                          ) : (
+                                            c.cubre
+                                          )}
+                                        </td>
                                         <td className="px-3 py-2">
                                           <span
                                             className={`font-bold ${
@@ -504,11 +546,50 @@ export default function RevisionComprobantes({ filas }: { filas: Fila[] }) {
                                             </a>
                                           </div>
                                         </td>
+                                        {/* Corregir a qué cuota apunta.
+                                            Solo el rótulo: no mueve cuotas
+                                            pagadas, ni caja, ni mora. */}
+                                        <td className="px-3 py-2">
+                                          {editando === c.id ? (
+                                            <div className="flex items-center gap-1">
+                                              <button
+                                                onClick={(e) => { e.stopPropagation(); guardarRotulo(c.id); }}
+                                                disabled={guardando}
+                                                title="Guardar"
+                                                className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 cursor-pointer"
+                                              >
+                                                <Check className="w-3 h-3" />
+                                              </button>
+                                              <button
+                                                onClick={(e) => { e.stopPropagation(); setEditando(null); }}
+                                                title="Cancelar"
+                                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditando(c.id);
+                                                // Se precarga lo que dice hoy: "Cuotas 47-56" -> "47-56".
+                                                const m = c.cubre.match(/(\d+(?:\s*-\s*\d+)?)/);
+                                                setRotulo(m ? m[1].replace(/\s/g, "") : "");
+                                              }}
+                                              title="Corregir a qué cuota apunta este comprobante"
+                                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-brand-600 font-bold cursor-pointer"
+                                            >
+                                              <Pencil className="w-3 h-3" />
+                                              Corregir
+                                            </button>
+                                          )}
+                                        </td>
                                       </tr>
                                     ))}
                                     {f.comprobantes.length === 0 && (
                                       <tr>
-                                        <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
+                                        <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
                                           Esta ficha no tiene ningún comprobante cargado.
                                         </td>
                                       </tr>

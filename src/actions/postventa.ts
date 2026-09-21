@@ -1446,6 +1446,136 @@ export async function approveReceiptAsInterestPayment(
 }
 
 /**
+ * Corrige a qué cuota apunta un comprobante. SOLO EL RÓTULO.
+ *
+ * Nace de Erika Valenzuela (L19): un comprobante de $200.000 -una cuota-
+ * rotulado "Cuotas 47-56". Es el bug de `installments_count`: la carga inicial
+ * escribió el número de cuota en la columna de "cuántas cubre", y al aprobar se
+ * estampó el rango `47` a `47 + 10 - 1`. La plata y el contador estaban bien;
+ * lo que mentía era el papel. En SU portal las cuotas 52 a 56 figuraban con
+ * comprobante, y tenía descargable un "Recibo_Oficial_Cuotas_47-56.pdf" que
+ * afirma que pagó $1.000.000 en cuotas.
+ *
+ * Hasta acá eso solo se arreglaba tocando la base a mano: el número de cuota se
+ * escribía al crear o al aprobar y nunca más.
+ *
+ * Toca TRES columnas y ninguna más: nominal_installment_number,
+ * nominal_installment_range e installments_count. No mueve installments_paid,
+ * ni montos, ni la caja, ni la mora. El saldo del cliente se calcula desde el
+ * contador de cuotas, así que esto no le cambia un peso a nadie.
+ *
+ * `destino` se escribe como lo diría postventa:
+ *   "47"      -> una cuota
+ *   "47-49"   -> un rango de tres
+ *   ""        -> ninguna: queda como abono de intereses (ver esAbonoDeIntereses)
+ */
+export async function corregirRotuloComprobante(receiptId: string, destino: string) {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") {
+    return { error: "No autorizado" };
+  }
+
+  try {
+    const receipt = await prisma.paymentReceipt.findUnique({
+      where: { id: receiptId },
+      select: {
+        id: true,
+        scope: true,
+        amount_clp: true,
+        reservation_id: true,
+        nominal_installment_number: true,
+        nominal_installment_range: true,
+        reservation: {
+          select: {
+            name: true,
+            last_name: true,
+            lot: { select: { number: true, cuotas: true } },
+          },
+        },
+      },
+    });
+    if (!receipt) return { error: "Comprobante no encontrado" };
+    if (receipt.scope !== "INSTALLMENT") {
+      return { error: "Solo los comprobantes de cuota llevan número de cuota" };
+    }
+
+    const totalCuotas = receipt.reservation.lot?.cuotas || 0;
+    const texto = (destino || "").trim();
+
+    let numero: number | null = null;
+    let rango: string | null = null;
+    let cuenta = 1;
+
+    if (texto !== "") {
+      const m = texto.match(/^(\d{1,4})(?:\s*-\s*(\d{1,4}))?$/);
+      if (!m) {
+        return { error: 'Escribí una cuota ("47") o un rango ("47-49"), o dejalo vacío' };
+      }
+      const desde = Number(m[1]);
+      const hasta = m[2] ? Number(m[2]) : desde;
+      if (hasta < desde) return { error: "El rango termina antes de empezar" };
+      if (desde < 1) return { error: "La primera cuota es la 1" };
+      // El tope es el plan pactado: es justo el error que se está arreglando.
+      if (totalCuotas > 0 && hasta > totalCuotas) {
+        return { error: `El lote tiene ${totalCuotas} cuotas; la ${hasta} no existe` };
+      }
+      numero = desde;
+      cuenta = hasta - desde + 1;
+      rango = cuenta > 1 ? `${desde}-${hasta}` : null;
+    }
+
+    const antes = receipt.nominal_installment_range
+      ? `cuotas ${receipt.nominal_installment_range}`
+      : receipt.nominal_installment_number
+        ? `cuota ${receipt.nominal_installment_number}`
+        : "sin cuota (abono de intereses)";
+    const despues = rango ? `cuotas ${rango}` : numero ? `cuota ${numero}` : "sin cuota (abono de intereses)";
+    if (antes === despues) return { error: "El comprobante ya dice eso" };
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.postventa_authorized = 'true'`);
+      await tx.paymentReceipt.update({
+        where: { id: receiptId },
+        data: {
+          nominal_installment_number: numero,
+          nominal_installment_range: rango,
+          installments_count: cuenta,
+        },
+      });
+    });
+
+    const quien = `${receipt.reservation.name || ""} ${receipt.reservation.last_name || ""}`.trim();
+    const detalle =
+      `Rotulo de comprobante corregido: ${receipt.id.slice(0, 8)} pasa de "${antes}" a "${despues}". ` +
+      `Cliente: ${quien} - Lote ${receipt.reservation.lot?.number}. Monto del comprobante: ` +
+      `${receipt.amount_clp.toLocaleString("es-CL")} (sin tocar). Solo rotulo: no mueve cuotas pagadas, ni caja, ni mora.`;
+
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "PaymentReceipt",
+        entity_id: receipt.id,
+        details: detalle,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+    await logSystemNote(receipt.reservation_id, detalle, "PaymentReceipt");
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    memoryCache.deleteByPrefix("receipts_");
+    revalidatePath("/admin");
+
+    return { success: true, antes, despues };
+  } catch (error) {
+    console.error("Error corrigiendo el rotulo del comprobante:", error);
+    return { error: "Error al corregir el comprobante" };
+  }
+}
+
+/**
  * Rejects a payment receipt.
  */
 export async function rejectReceipt(receiptId: string, reason: string) {

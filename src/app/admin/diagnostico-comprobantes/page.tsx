@@ -12,6 +12,10 @@ import RevisionComprobantes from "@/components/admin/RevisionComprobantes";
  * vive en `lib/auditoriaComprobantes` para poder probarla sin base de datos;
  * acá solo se juntan los datos y se dibuja.
  *
+ * La única escritura que sale de esta pantalla es `corregirRotuloComprobante`,
+ * que cambia a qué cuota apunta un comprobante. Toca tres columnas de rótulo y
+ * ninguna más: nada de lo que se ve acá afecta el saldo del cliente.
+ *
  * Se acota a los proyectos de la cuenta que entra (allowedProjects): cada equipo
  * de postventa ve su propia cartera y nunca la de otro proyecto.
  *
@@ -169,8 +173,9 @@ export default async function DiagnosticoComprobantesPage() {
         <p className="text-sm text-slate-500 mt-1 max-w-3xl">
           A quién le faltan comprobantes: por cada cliente se mira si cada cuota que
           figura pagada tiene su respaldo cargado. Lo que falta es el papel, no el pago —
-          el saldo y el historial financiero del cliente no dependen de esto. Es solo
-          lectura: acá no se modifica nada.
+          el saldo y el historial financiero del cliente no dependen de esto. Lo único
+          que se puede cambiar acá es a qué cuota apunta un comprobante: es un rótulo, no
+          mueve cuotas pagadas, ni caja, ni mora.
         </p>
       </div>
 
