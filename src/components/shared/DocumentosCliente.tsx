@@ -497,7 +497,9 @@ El recibo no es un archivo guardado: se emite al vuelo desde el pago. Se descart
               </div>
               <p className="text-[10px] text-slate-400">
                 Se propone el vencimiento pactado y el monto de una cuota. Corregilos con
-                lo que diga la transferencia: es lo que va a ver el cliente.
+                lo que diga la transferencia: es lo que va a ver el cliente. Si esas cuotas
+                ya tienen su pago cargado y lo que falta es el papel, cada una conserva su
+                monto y el archivo se cuelga de todas.
               </p>
             </div>
 

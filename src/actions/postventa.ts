@@ -4228,37 +4228,49 @@ export async function adjuntarComprobanteACuotaPagada(
       };
     }
 
-    // Los pagos sin papel que quedan dentro del grupo. Si hay mas de uno, son
-    // pagos distintos y fusionarlos es otra operacion: no se adivina.
+    // Los pagos sin papel del tramo. En Lomas esto NO es una rareza: la
+    // migracion dejo un pago por cuota, todos sin archivo, asi que un tramo de
+    // seis cuotas toca seis pagos. La version anterior se plantaba acá con
+    // "ese tramo tiene N pagos distintos sin archivo" y bloqueaba justo el caso
+    // mas comun (Alan y Eduardo Arroyo, Lomas del Mar).
+    //
+    // Lo que se hace es lo unico que no inventa nada: el MISMO archivo se
+    // cuelga de cada uno de esos pagos, cada cual con su cuota y su monto. Las
+    // seis filas del portal pasan a mostrar la transferencia con su fecha, y no
+    // se borra ni se fusiona ningun pago. Juntarlos en uno solo con el rango
+    // "1-6" se veria mas prolijo, pero obligaria a ELIMINAR cinco registros de
+    // pago para que no quedaran cuotas cubiertas dos veces, y eso no se hace a
+    // ciegas.
     const sinPapel = cubriendo;
-    if (sinPapel.length > 1) {
-      return {
-        error: `Ese tramo tiene ${sinPapel.length} pagos distintos sin archivo. Adjuntá el comprobante a cada uno por separado.`,
-      };
-    }
-    const aRellenar = sinPapel[0] || null;
-    // Solo se puede extender un pago cuyas cuotas caen TODAS dentro del grupo;
-    // si cubre ademas cuotas de afuera, moverlo desacomodaria esas.
-    if (aRellenar) {
-      // Las cuotas salen del propio pago, no de un barrido 1..pagadas: un rango
-      // mal escrito puede apuntar mas alla del plan (el caso Erika, "47-56" en
-      // una ficha de 51) y ese barrido no lo veria.
+
+    // Ninguno puede abarcar cuotas de AFUERA del tramo: ponerle este archivo le
+    // colgaria la transferencia equivocada a una cuota que nadie eligio. Las
+    // cuotas salen del propio pago y no de un barrido 1..pagadas, porque un
+    // rango mal escrito puede apuntar mas alla del plan (el caso Erika,
+    // "47-56" en una ficha de 51).
+    for (const r of sinPapel) {
       const cubreDe: number[] = [];
-      if (aRellenar.nominal_installment_range) {
-        const [d, h] = String(aRellenar.nominal_installment_range).split("-").map(Number);
+      if (r.nominal_installment_range) {
+        const [d, h] = String(r.nominal_installment_range).split("-").map(Number);
         if (Number.isFinite(d) && Number.isFinite(h)) {
           for (let n = d; n <= h; n++) cubreDe.push(n);
         }
-      } else if (aRellenar.nominal_installment_number) {
-        cubreDe.push(aRellenar.nominal_installment_number);
+      } else if (r.nominal_installment_number) {
+        cubreDe.push(r.nominal_installment_number);
       }
       const fuera = cubreDe.filter((n) => !delGrupo.includes(n));
       if (fuera.length > 0) {
         return {
-          error: `El pago que cubre esta cuota abarca también la(s) ${fuera.join(", ")}. Ampliá el tramo para incluirla(s) o corregí primero a qué cuotas apunta.`,
+          error: `Uno de los pagos de este tramo abarca también la(s) cuota(s) ${fuera.join(", ")}. Ampliá el tramo para incluirla(s), o corregí primero a qué cuotas apunta.`,
         };
       }
     }
+
+    // Las cuotas del tramo que no tienen NINGUN pago detras: esas si necesitan
+    // un comprobante nuevo.
+    const huerfanas = delGrupo.filter(
+      (n) => !sinPapel.some((r) => comprobanteYaCubreCuota(r, n))
+    );
 
     if (!receiptHasFile(data.receiptBase64)) {
       return { error: "Falta el archivo del comprobante" };
@@ -4272,42 +4284,83 @@ export async function adjuntarComprobanteACuotaPagada(
       return { error: "Fecha de pago inválida" };
     }
 
-    const comunes = {
-      amount_clp: data.amount,
-      receipt_url: data.receiptBase64,
-      scope: "INSTALLMENT",
-      installments_count: delGrupo.length,
-      status: "APPROVED",
-      // paid_at es la fecha de la transferencia — la que el cliente ve como
-      // Fecha de Pago; processed_at, el momento en que postventa la adjuntó.
-      paid_at: paymentDate,
-      processed_at: new Date(),
-      nominal_installment_number: cuota,
-      nominal_installment_range: delGrupo.length > 1 ? `${cuota}-${hasta}` : null,
-    };
+    // Cuanto vale cada cuota segun el plan. Hace falta para las huerfanas: el
+    // monto que tecleo postventa es el TOTAL de la transferencia, y repetirlo
+    // en cada comprobante multiplicaria la plata.
+    const valorDe = (n: number) =>
+      getNominalInstallmentAmount(res.installment_ranges, n, res.lot?.valor_cuota || 0);
 
-    const receiptId = aRellenar?.id ?? crypto.randomUUID();
-    if (aRellenar) {
-      // El pago ya existia sin papel: se le pone el archivo y se lo deja
-      // apuntando al tramo. No se crea otro, que duplicaria la cobertura.
-      await prisma.paymentReceipt.update({ where: { id: aRellenar.id }, data: comunes });
-    } else {
-      await prisma.paymentReceipt.create({
-        data: {
-          id: receiptId,
-          reservation_id: reservationId,
-          lot_id: res.lot_id,
-          created_at: paymentDate,
-          ...comunes,
-        },
-      });
-    }
+    let rellenados = 0;
+    let creados = 0;
+    let receiptId = "";
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe("SET LOCAL app.postventa_authorized = 'true'");
+
+      // 1. Los pagos que ya estaban reciben el archivo y la fecha real de la
+      //    transferencia. Su cuota y su monto NO se tocan: cada uno ya
+      //    representa lo suyo.
+      for (const r of sinPapel) {
+        await tx.paymentReceipt.update({
+          where: { id: r.id },
+          data: {
+            receipt_url: data.receiptBase64,
+            paid_at: paymentDate,
+            processed_at: new Date(),
+          },
+        });
+        rellenados++;
+        if (!receiptId) receiptId = r.id;
+      }
+
+      // 2. Las cuotas sin ningun pago detras necesitan su comprobante. Las que
+      //    van seguidas entran juntas en un rango.
+      if (huerfanas.length > 0) {
+        const tramos: number[][] = [];
+        for (const n of huerfanas) {
+          const ultimo = tramos[tramos.length - 1];
+          if (ultimo && n === ultimo[ultimo.length - 1] + 1) ultimo.push(n);
+          else tramos.push([n]);
+        }
+        for (const t of tramos) {
+          const id = crypto.randomUUID();
+          if (!receiptId) receiptId = id;
+          await tx.paymentReceipt.create({
+            data: {
+              id,
+              reservation_id: reservationId,
+              lot_id: res.lot_id,
+              // Si este tramo es TODO el grupo, el monto tecleado es justo lo
+              // que corresponde. Si es solo una parte, se usa lo pactado de
+              // esas cuotas para no repetir el total de la transferencia.
+              amount_clp:
+                t.length === delGrupo.length
+                  ? data.amount
+                  : t.reduce((a, n) => a + valorDe(n), 0),
+              receipt_url: data.receiptBase64,
+              scope: "INSTALLMENT",
+              installments_count: t.length,
+              status: "APPROVED",
+              created_at: paymentDate,
+              paid_at: paymentDate,
+              processed_at: new Date(),
+              nominal_installment_number: t[0],
+              nominal_installment_range: t.length > 1 ? `${t[0]}-${t[t.length - 1]}` : null,
+            },
+          });
+          creados++;
+        }
+      }
+    });
 
     const lote = `#${res.lot.number}${res.lot.stage ? `(e${res.lot.stage})` : ""}`;
     const queCubre = delGrupo.length > 1 ? `las cuotas ${cuota}-${hasta}` : `la cuota ${cuota}`;
-    const comoEntro = aRellenar
-      ? "Se completó el pago que ya estaba sin archivo."
-      : "Se creó el respaldo.";
+    const comoEntro = [
+      rellenados > 0 ? `Se completó ${rellenados} pago(s) que ya figuraban sin archivo.` : "",
+      creados > 0 ? `Se creó ${creados} respaldo(s) para cuotas que no tenían pago detrás.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
     const detalle = `Comprobante adjuntado a ${queCubre}, que ya figuraba(n) pagada(s). Cliente: ${res.name} ${res.last_name || ""} - Lote ${lote}. Monto del comprobante: $${data.amount.toLocaleString("es-CL")}, pagado el ${paymentDate.toLocaleDateString("es-CL")}. ${comoEntro} Solo respaldo documental: no suma cuotas, no mueve caja ni mora.`;
 
     await logSystemNote(reservationId, detalle, "PaymentReceipt");
