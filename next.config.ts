@@ -38,6 +38,13 @@ const nextConfig: NextConfig = {
       // reventaba entero (0 entregados) sin importar el destinatario.
       bodySizeLimit: "30mb",
     },
+    // src/middleware.ts intercepta practicamente todas las rutas (ver su
+    // matcher), incluida /admin/whatsapp: el proxy le aplica su PROPIO limite
+    // de tamano de cuerpo, separado del de serverActions de arriba, y por
+    // defecto son 10MB (ver server/config-shared.js). Ese es el que se topaba
+    // primero, antes de que la peticion llegara al Server Action, y truncaba
+    // el JSON a la mitad ("Unterminated string in JSON").
+    proxyClientMaxBodySize: "30mb",
   },
 };
 
