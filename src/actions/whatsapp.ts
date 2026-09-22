@@ -906,10 +906,14 @@ export async function sendWhatsappTest(data: {
 // ---------------------------------------------------------------------------
 
 function matchesMassAudience(client: any, audience: WhatsappMassAudience, todayKey: string): boolean {
-  if (client.status === "COMPLETED" || client.status === "FROZEN") return false;
+  if (client.status === "FROZEN") return false;
+  // "Todos" es la base completa, incluidos los clientes Al Contado (status
+  // COMPLETED): son clientes activos, solo que sin cuotas pendientes. Las demas
+  // audiencias siguen excluyendolos porque estan atadas a un estado de cobranza
+  // (mora, gracia, proximo, vencimiento) que un cliente al contado no puede tener.
+  if (audience === "TODOS") return true;
+  if (client.status === "COMPLETED") return false;
   switch (audience) {
-    case "TODOS":
-      return true;
     case "MORA":
       return client.status === "LATE";
     case "GRACIA":
