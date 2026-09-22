@@ -31,7 +31,12 @@ const nextConfig: NextConfig = {
 
   experimental: {
     serverActions: {
-      bodySizeLimit: "10mb",
+      // La difusion masiva de WhatsApp adjunta el archivo en base64 (~33% mas
+      // pesado que el original) y el composer permite hasta 20MB de documento:
+      // 20MB * 1.33 ~= 26.6MB. Con 10mb el limite quedaba por debajo de lo que
+      // la propia pantalla decia permitir, y cada tramo con adjunto grande
+      // reventaba entero (0 entregados) sin importar el destinatario.
+      bodySizeLimit: "30mb",
     },
   },
 };
