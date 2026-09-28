@@ -111,6 +111,7 @@ export default function CuadreCaja({ filas }: { filas: Fila[] }) {
   const [pagina, setPagina] = useState(1);
   const [porPagina, setPorPagina] = useState(50);
   const [verImpacto, setVerImpacto] = useState(false);
+  const [verPies, setVerPies] = useState(false);
 
   const proyectos = useMemo(() => [...new Set(filas.map((f) => f.proyecto))].sort(), [filas]);
 
@@ -175,6 +176,31 @@ export default function CuadreCaja({ filas }: { filas: Fila[] }) {
     [filas]
   );
   const impactoNetos = impactoLomas.filter((f) => f.resultado.lectura === "NETO").length;
+
+  // Pies que cerrarían el plan si las cuotas están bien cargadas. Es SOLO una
+  // lista: cada uno se corrige abriendo su ficha, con su vista previa. Subir el
+  // pie es dar esa plata por recibida, así que no hay arreglo masivo.
+  const piesParaRevisar = useMemo(
+    () =>
+      delProyecto
+        .filter((f) => f.resultado.correccionPie)
+        .map((f) => ({ ...f, baja: f.resultado.correccionPie!.pieNuevo - f.resultado.pie }))
+        .sort((a, b) =>
+          a.resultado.correccionPie!.tipo === b.resultado.correccionPie!.tipo
+            ? Math.abs(a.baja) - Math.abs(b.baja)
+            : a.resultado.correccionPie!.tipo === "RESERVA_AFUERA"
+              ? -1
+              : 1
+        ),
+    [delProyecto]
+  );
+
+  const abrirFicha = (f: Fila) => {
+    setEstado("TODOS");
+    setQuery(f.rut !== "Sin RUT" ? f.rut : f.cliente);
+    setPagina(1);
+    setAbierta(f.id);
+  };
 
   const exportar = async () => {
     const headers = [
@@ -373,6 +399,97 @@ export default function CuadreCaja({ filas }: { filas: Fila[] }) {
                       <td className={`${td} text-right text-slate-500`}>{clp(f.resultado.saldoPortal)}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pies para revisar */}
+      {piesParaRevisar.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <button
+            onClick={() => setVerPies(!verPies)}
+            className="w-full text-left px-5 py-4 flex items-start gap-3 cursor-pointer hover:bg-slate-50/60"
+          >
+            <Lightbulb className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-slate-900">
+                Pies para revisar ({piesParaRevisar.length}): el plan cierra si las cuotas están bien y el pie se corrige
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pie calculado = valor total − cuotas pactadas, con la reserva adentro. Subir el pie es dar esa plata por
+                recibida: antes de corregir, confirma con el contrato y los pagos que el cliente pagó ese pie. Se corrigen de a
+                uno desde su ficha, con vista previa.
+              </p>
+            </div>
+            {verPies ? (
+              <ChevronDown className="w-4 h-4 text-slate-400 mt-0.5" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-slate-400 mt-0.5" />
+            )}
+          </button>
+          {verPies && (
+            <div className="overflow-x-auto border-t border-slate-100">
+              <table className="w-full text-left border-collapse min-w-[900px]">
+                <thead>
+                  <tr className="bg-slate-50/60 border-b border-slate-100">
+                    <th className={th}>Cliente</th>
+                    <th className={th}>Lote</th>
+                    <th className={th}>Por qué</th>
+                    <th className={`${th} text-right`}>Pie hoy</th>
+                    <th className={`${th} text-right`}>Pie calculado</th>
+                    <th className={`${th} text-right`}>Paga aparte</th>
+                    <th className={`${th} text-right`}>Saldo del cliente</th>
+                    <th className={th}>Comprobante de pie</th>
+                    <th className={th}></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {piesParaRevisar.map((f) => {
+                    const c = f.resultado.correccionPie!;
+                    return (
+                      <tr key={f.id}>
+                        <td className={`${td} font-bold text-slate-900`}>
+                          {f.cliente}
+                          <span className="block text-[10px] font-bold text-slate-400">
+                            {f.rut} · {f.proyecto}
+                          </span>
+                        </td>
+                        <td className={td}>{f.lote}</td>
+                        <td className={`${td} text-xs`}>
+                          {c.tipo === "RESERVA_AFUERA" ? (
+                            <span className="text-amber-700 font-semibold">Pie anotado sin la reserva</span>
+                          ) : (
+                            <span className="text-slate-600">Total − cuotas</span>
+                          )}
+                        </td>
+                        <td className={`${td} text-right`}>{clp(f.resultado.pie)}</td>
+                        <td className={`${td} text-right font-bold text-slate-900`}>{clp(c.pieNuevo)}</td>
+                        <td className={`${td} text-right`}>{clp(c.pieNetoNuevo)}</td>
+                        <td className={`${td} text-right font-bold ${f.baja > 0 ? "text-red-600" : "text-slate-700"}`}>
+                          {f.baja > 0 ? "baja " : "sube "}
+                          {clp(Math.abs(f.baja))}
+                        </td>
+                        <td className={`${td} text-xs`}>
+                          {f.resultado.pieConComprobantes !== null ? (
+                            clp(f.resultado.pieConComprobantes)
+                          ) : (
+                            <span className="text-slate-400">sin comprobante</span>
+                          )}
+                        </td>
+                        <td className={`${td} text-right`}>
+                          <button
+                            onClick={() => abrirFicha(f)}
+                            className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                          >
+                            Abrir
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -210,6 +210,15 @@ export type ResultadoCuadre = {
   /** Con cuánto tendría que cerrar la última cuota para que el saldo dé exacto. */
   ultimaCuotaQueCierra: number | null;
 
+  /**
+   * Corrección de pie candidata para el arreglo en lote, suponiendo que las
+   * cuotas (tramos, valor cuota, última) están bien cargadas:
+   *   RESERVA_AFUERA      el pie está guardado sin la reserva: pie + reserva.
+   *   TOTAL_MENOS_CUOTAS  el pie es lo que falta para el valor total.
+   * null = no hay una corrección de pie que tenga sentido.
+   */
+  correccionPie: { tipo: "RESERVA_AFUERA" | "TOTAL_MENOS_CUOTAS"; pieNuevo: number; pieNetoNuevo: number } | null;
+
   /** El saldo que ve el cliente en su portal hoy (actions/user.ts). */
   saldoPortal: number;
   /** El saldo que muestra el panel de postventa hoy (getFullPostventaData). */
@@ -486,6 +495,18 @@ export function cuadrarPlan(f: FichaPlan): ResultadoCuadre {
     }
   }
 
+  // Qué pie cerraría el plan si las cuotas están bien. No se corrige solo:
+  // alimenta la lista del arreglo en lote, donde postventa marca cuáles sí.
+  let correccionPie: ResultadoCuadre["correccionPie"] = null;
+  const pieQueCierra = f.valorTotal - sumaCuotas;
+  if (f.valorTotal > 0 && f.cuotas > 0 && f.installmentsPaid <= f.cuotas) {
+    if (lectura === "NETO") {
+      correccionPie = { tipo: "RESERVA_AFUERA", pieNuevo: pie + reserva.usada, pieNetoNuevo: pie };
+    } else if (lectura === "NO_CIERRA" && pieQueCierra > 0 && pieQueCierra >= reserva.usada) {
+      correccionPie = { tipo: "TOTAL_MENOS_CUOTAS", pieNuevo: pieQueCierra, pieNetoNuevo: pieQueCierra - reserva.usada };
+    }
+  }
+
   const estado: EstadoCuadre = hallazgos.some((h) => h.tipo === "DESCUADRA")
     ? "DESCUADRA"
     : hallazgos.length > 0
@@ -515,6 +536,7 @@ export function cuadrarPlan(f: FichaPlan): ResultadoCuadre {
     saldoSegunRegla,
     cuotasPendientesSuman,
     ultimaCuotaQueCierra,
+    correccionPie,
     saldoPortal,
     saldoPanel,
   };
@@ -539,6 +561,16 @@ function sugerir(
       motivo: `Sobra justo la reserva (${clp(c.reserva)}): el pie parece tenerla sumada dos veces.`,
     });
   }
+  // Si los tramos de cuotas están bien, el pie es lo que falta para el total.
+  if (c.pie + d > 0 && c.pie + d >= c.reserva) {
+    out.push({
+      campo: "pie",
+      valor: c.pie + d,
+      motivo: `Si las cuotas están bien, el pie es el valor total menos las cuotas: ${clp(f.valorTotal)} - ${clp(
+        f.valorTotal - (c.pie + d)
+      )}${c.reserva > 0 ? `. Con la reserva adentro, el cliente paga ${clp(c.pie + d - c.reserva)} de pie aparte` : ""}. Ojo: subir el pie es dar esa plata por recibida.`,
+    });
+  }
   // Una última cuota que cierre el total.
   if (f.cuotas > 0 && c.ultima + d > 0) {
     out.push({
@@ -554,9 +586,6 @@ function sugerir(
       valor: f.valorCuota + d / f.cuotas,
       motivo: `Repartida en las ${f.cuotas} cuotas, la diferencia es ${clp(d / f.cuotas)} por cuota.`,
     });
-  }
-  if (c.pie + d > 0) {
-    out.push({ campo: "pie", valor: c.pie + d, motivo: `Que el pie absorba la diferencia.` });
   }
   out.push({
     campo: "valor_total",
