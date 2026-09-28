@@ -26,7 +26,8 @@ import {
   History,
   MessageSquare,
   MessageCircle,
-  FileSearch
+  FileSearch,
+  Scale
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { SearchProvider, useSearch } from "@/context/SearchContext";
@@ -50,7 +51,8 @@ const menuItems = [
       { href: "/admin/receipts/reservas", label: "Reservas", icon: BookOpen },
       // Estaba escondida: existia desde antes pero sin entrada en el menu, asi
       // que solo llegaba quien se supiera la URL de memoria.
-      { href: "/admin/diagnostico-comprobantes", label: "Revisión de Comprobantes", icon: FileSearch }
+      { href: "/admin/diagnostico-comprobantes", label: "Revisión de Comprobantes", icon: FileSearch },
+      { href: "/admin/cuadre-caja", label: "Cuadre de Caja", icon: Scale }
     ]
   },
   { href: "/admin/lots", label: "Lotes", icon: Map },
