@@ -16,7 +16,12 @@ import {
   Search,
 } from "lucide-react";
 import { downloadCsv } from "@/lib/utils";
-import { previsualizarCorreccionCuadre, aplicarCorreccionCuadre } from "@/actions/cuadre";
+import {
+  previsualizarCorreccionCuadre,
+  aplicarCorreccionCuadre,
+  previsualizarPiesSinReserva,
+  corregirPiesSinReserva,
+} from "@/actions/cuadre";
 import type { CampoCorregible, EstadoCuadre, ResultadoCuadre } from "@/lib/cuadrePlan";
 
 /**
@@ -59,6 +64,8 @@ const ESTILO: Record<EstadoCuadre, { punto: string; chip: string; etiqueta: stri
     ayuda: "Cierra exacto y todo coincide",
   },
 };
+
+type ListaMasiva = Extract<Awaited<ReturnType<typeof previsualizarPiesSinReserva>>, { ok: true }>["filas"];
 
 type Previa = Extract<Awaited<ReturnType<typeof previsualizarCorreccionCuadre>>, { ok: true }>;
 
@@ -112,6 +119,38 @@ export default function CuadreCaja({ filas }: { filas: Fila[] }) {
   const [porPagina, setPorPagina] = useState(50);
   const [verImpacto, setVerImpacto] = useState(false);
   const [verPies, setVerPies] = useState(false);
+  const [masiva, setMasiva] = useState<ListaMasiva | null>(null);
+  const [trabajando, setTrabajando] = useState(false);
+
+  const verMasiva = async () => {
+    setTrabajando(true);
+    const res = await previsualizarPiesSinReserva();
+    setTrabajando(false);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    if (res.filas.length === 0) {
+      toast.info("No hay fichas que cumplan las tres condiciones.");
+      return;
+    }
+    setMasiva(res.filas);
+  };
+
+  const confirmarMasiva = async () => {
+    if (!masiva) return;
+    setTrabajando(true);
+    const res = await corregirPiesSinReserva(masiva.map((f) => f.id));
+    setTrabajando(false);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success(
+      `${res.corregidas} fichas corregidas${res.saltadas.length ? `; ${res.saltadas.length} saltadas porque cambiaron: ${res.saltadas.join(", ")}` : ""}`
+    );
+    window.location.reload();
+  };
 
   const proyectos = useMemo(() => [...new Set(filas.map((f) => f.proyecto))].sort(), [filas]);
 
@@ -430,6 +469,88 @@ export default function CuadreCaja({ filas }: { filas: Fila[] }) {
               <ChevronRight className="w-4 h-4 text-slate-400 mt-0.5" />
             )}
           </button>
+          {verPies && (
+            <div className="border-t border-slate-100 px-5 py-4 bg-amber-50/30 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <p className="text-xs text-slate-600 flex-1">
+                  <span className="font-bold text-slate-900">Corrección automática de los pies anotados sin la reserva.</span>{" "}
+                  Solo entra la ficha donde al pie le falta exactamente la reserva, el plan cierra exacto con el pie corregido y lo
+                  que le falta pagar coincide al peso con sus cuotas pendientes. Quedan fuera los lotes con dos fichas. Cada
+                  corrección queda en la ficha y en Auditoría.
+                </p>
+                {!masiva && (
+                  <button
+                    onClick={verMasiva}
+                    disabled={trabajando}
+                    className="h-9 px-4 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 disabled:opacity-50 cursor-pointer shrink-0"
+                  >
+                    {trabajando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
+                    Ver cuáles se corrigen
+                  </button>
+                )}
+              </div>
+              {masiva && (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto max-h-[420px]">
+                    <table className="w-full text-left border-collapse min-w-[860px]">
+                      <thead className="sticky top-0 bg-slate-50">
+                        <tr className="border-b border-slate-100">
+                          <th className={th}>Cliente</th>
+                          <th className={th}>Lote</th>
+                          <th className={`${th} text-right`}>Pie</th>
+                          <th className={`${th} text-right`}>Reserva</th>
+                          <th className={`${th} text-right`}>Saldo que ve el cliente</th>
+                          <th className={`${th} text-right`}>Saldo en el panel</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {masiva.map((f) => (
+                          <tr key={f.id}>
+                            <td className={`${td} font-bold text-slate-900`}>
+                              {f.cliente}
+                              <span className="block text-[10px] font-bold text-slate-400">{f.proyecto}</span>
+                            </td>
+                            <td className={td}>{f.lote}</td>
+                            <td className={`${td} text-right`}>
+                              {clp(f.pieAntes)} → <span className="font-bold">{clp(f.pieDespues)}</span>
+                            </td>
+                            <td className={`${td} text-right`}>{clp(f.reserva)}</td>
+                            <td className={`${td} text-right`}>
+                              {clp(f.portalAntes)} → <span className="font-bold">{clp(f.portalDespues)}</span>
+                            </td>
+                            <td className={`${td} text-right`}>
+                              {clp(f.panelAntes)} → <span className="font-bold">{clp(f.panelDespues)}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 border-t border-slate-100">
+                    <p className="text-xs text-slate-600 flex-1">
+                      {masiva.length} fichas. El saldo que ven los clientes baja en total{" "}
+                      <span className="font-bold">{clp(masiva.reduce((s, f) => s + f.portalAntes - f.portalDespues, 0))}</span>
+                      : es la reserva que ya pagaron y su portal no contaba. La mora no cambia.
+                    </p>
+                    <button
+                      onClick={() => setMasiva(null)}
+                      className="h-9 px-4 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={confirmarMasiva}
+                      disabled={trabajando}
+                      className="h-9 px-4 rounded-xl bg-brand-700 text-white text-xs font-bold hover:bg-brand-800 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {trabajando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Corregir {masiva.length} fichas
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {verPies && (
             <div className="overflow-x-auto border-t border-slate-100">
               <table className="w-full text-left border-collapse min-w-[900px]">

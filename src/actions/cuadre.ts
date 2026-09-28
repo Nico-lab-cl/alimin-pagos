@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { memoryCache } from "@/lib/cache";
 import { revalidatePath } from "next/cache";
+import { detectarFichasFantasma } from "@/lib/fichasDuplicadas";
 import {
   aplicarCambios,
   cuadrarPlan,
@@ -244,5 +245,139 @@ export async function aplicarCorreccionCuadre(reservationId: string, cambios: Ca
   } catch (e) {
     console.error("aplicarCorreccionCuadre:", e);
     return { error: "No se pudo guardar la corrección" };
+  }
+}
+
+/**
+ * Pie anotado sin la reserva, corregido de una vez (pedido de postventa,
+ * 27-09-2026). Solo entra la ficha que cumple las TRES condiciones, revisadas
+ * en el servidor al momento de guardar y no en el navegador:
+ *
+ *   1. Al pie le falta exactamente la reserva: reserva + pie + cuotas = total.
+ *   2. Con pie + reserva el plan cierra exacto con el valor total.
+ *   3. Lo que le queda por pagar al cliente coincide al peso con la suma de sus
+ *      cuotas pendientes (para un terminado, que quede en cero).
+ *
+ * La que no cumple queda fuera y se revisa a mano. Cada ficha se guarda por el
+ * mismo camino que la corrección individual: nota en la ficha y Auditoría.
+ */
+function correccionSinReservaSegura(ficha: FichaPlan) {
+  const antes = cuadrarPlan(ficha);
+  const c = antes.correccionPie;
+  if (!c || c.tipo !== "RESERVA_AFUERA") return null;
+  if (c.pieNuevo !== antes.pie + antes.reserva.usada) return null;
+
+  const despues = cuadrarPlan(aplicarCambios(ficha, { pie: c.pieNuevo }));
+  if (despues.diferencia !== 0 || despues.lectura === "NO_CIERRA") return null;
+  const terminada = ficha.status === "COMPLETED";
+  const calza = terminada
+    ? despues.saldoSegunRegla === 0
+    : despues.saldoSegunRegla === despues.cuotasPendientesSuman && despues.saldoPortal === despues.saldoSegunRegla;
+  if (!calza) return null;
+
+  return { pieNuevo: c.pieNuevo, antes, despues };
+}
+
+async function fichasDeLaCuenta(user: any, soloIds?: string[]) {
+  const whereProyecto: any = { status: "ACTIVE" };
+  if (Array.isArray(user.allowedProjects)) whereProyecto.slug = { in: user.allowedProjects };
+  const proyectos = await prisma.project.findMany({ where: whereProyecto, select: { id: true, slug: true } });
+  const slug = new Map(proyectos.map((p) => [p.id, p.slug]));
+
+  const reservas = await prisma.reservation.findMany({
+    where: {
+      project_id: { in: proyectos.map((p) => p.id) },
+      status: { in: ["active", "COMPLETED"] },
+      ...(soloIds ? { id: { in: soloIds } } : {}),
+    },
+    include: {
+      lot: true,
+      receipts: { where: { status: "APPROVED" }, select: { scope: true, amount_clp: true, status: true } },
+    },
+  });
+  // Fuera las fichas fantasma del puente Lomas y los lotes con más de una
+  // ficha: el pie también se escribe en el lote, y ahí le llegaría a la otra.
+  // Esos se corrigen a mano, de a uno.
+  const porLote = await prisma.reservation.groupBy({
+    by: ["lot_id"],
+    where: { lot_id: { in: reservas.map((r) => r.lot_id) }, status: { in: ["active", "COMPLETED"] } },
+    _count: { _all: true },
+  });
+  const compartido = new Set(porLote.filter((g) => g._count._all > 1).map((g) => g.lot_id));
+  const fantasmas = detectarFichasFantasma(
+    reservas.map((r) => ({
+      id: r.id,
+      lotId: r.lot_id,
+      rut: r.rut,
+      clientEmail: r.email,
+      buyer: { id: r.user_id },
+      paidCuotas: r.installments_paid,
+      internalStatus: r.status,
+    }))
+  );
+
+  return reservas
+    .filter((r) => (r.lot?.cuotas || 0) > 0 && !compartido.has(r.lot_id) && !fantasmas.has(r.id))
+    .map((r) => ({ res: r, ficha: fichaPlanDesdeReserva(r as any, slug.get(r.project_id) || "") }));
+}
+
+export async function previsualizarPiesSinReserva() {
+  try {
+    const session = await auth();
+    const user = session?.user as any;
+    if (!session?.user || user?.role !== "ADMIN") return { ok: false as const, error: "No autorizado" };
+
+    const filas = [];
+    for (const { res, ficha } of await fichasDeLaCuenta(user)) {
+      const ok = correccionSinReservaSegura(ficha);
+      if (!ok) continue;
+      filas.push({
+        id: res.id,
+        cliente: `${res.name || ""} ${res.last_name || ""}`.trim(),
+        lote: `${res.lot.number}${res.lot.stage ? ` · ${res.lot.stage}` : ""}`,
+        proyecto: ficha.projectSlug,
+        pieAntes: ok.antes.pie,
+        pieDespues: ok.pieNuevo,
+        reserva: ok.antes.reserva.usada,
+        portalAntes: ok.antes.saldoPortal,
+        portalDespues: ok.despues.saldoPortal,
+        panelAntes: ok.antes.saldoPanel,
+        panelDespues: ok.despues.saldoPanel,
+      });
+    }
+    filas.sort((a, b) => a.proyecto.localeCompare(b.proyecto) || a.cliente.localeCompare(b.cliente, "es"));
+    return { ok: true as const, filas };
+  } catch (e) {
+    console.error("previsualizarPiesSinReserva:", e);
+    return { ok: false as const, error: "No se pudo armar la lista" };
+  }
+}
+
+/** Corrige las fichas de la lista que postventa vio, re-verificando cada una. */
+export async function corregirPiesSinReserva(ids: string[]) {
+  try {
+    const session = await auth();
+    const user = session?.user as any;
+    if (!session?.user || user?.role !== "ADMIN") return { ok: false as const, error: "No autorizado" };
+    if (!Array.isArray(ids) || ids.length === 0) return { ok: false as const, error: "No hay fichas para corregir." };
+
+    let corregidas = 0;
+    const saltadas: string[] = [];
+    for (const { res, ficha } of await fichasDeLaCuenta(user, ids)) {
+      // Se vuelve a verificar: si la ficha cambió desde la vista previa y ya no
+      // cumple las tres condiciones, no se toca.
+      const ok = correccionSinReservaSegura(ficha);
+      if (!ok) {
+        saltadas.push(`${res.name} ${res.last_name || ""}`.trim());
+        continue;
+      }
+      const r = await aplicarCorreccionCuadre(res.id, { pie: ok.pieNuevo });
+      if ("ok" in r) corregidas++;
+      else saltadas.push(`${res.name} ${res.last_name || ""}`.trim());
+    }
+    return { ok: true as const, corregidas, saltadas };
+  } catch (e) {
+    console.error("corregirPiesSinReserva:", e);
+    return { ok: false as const, error: "No se pudo completar la corrección" };
   }
 }
