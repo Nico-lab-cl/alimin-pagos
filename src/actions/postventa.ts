@@ -130,11 +130,19 @@ export async function getFullPostventaData({
       let pendingBalance: number;
 
       if (projectSlug === "lomas-del-mar") {
-        // Replica EXACTA de la formula de Total Invertido / Saldo Pendiente que usa
-        // aliminlomasdelmar.com, para que los saldos coincidan al peso:
-        //   1) Suma el pago de RESERVA inicial (lot.reservation_amount_clp).
-        //   2) Cuenta el PIE solo si esta efectivamente pagado (monto pactado o recibos),
-        //      no lo asume pagado como hace el resto de los proyectos.
+        // Total Invertido de Lomas del Mar. Cuenta el PIE solo si esta
+        // efectivamente pagado (monto pactado o recibos), no lo asume pagado
+        // como el resto de los proyectos.
+        //
+        // La reserva NO se suma aparte: es parte de pago del pie (regla de
+        // postventa, 27-09-2026, igual para todos los proyectos). Antes se
+        // sumaba lot.reservation_amount_clp -o $500.000 si venia vacio- encima
+        // del pie, replicando aliminlomasdelmar.com, y a las fichas con el pie
+        // guardado bruto la reserva se les contaba dos veces. El portal del
+        // cliente (actions/user.ts) ya contaba pie + cuotas: ahora el panel, y
+        // el {saldo} de WhatsApp y correo que sale de aca, dicen lo mismo.
+        // Las fichas con el pie guardado SIN la reserva se corrigen desde
+        // /admin/cuadre-caja, que las marca como "pie guardado sin la reserva".
         // Es solo el calculo del monto mostrado; no toca ningun dato del cliente.
         const manualPie = res.pie || 0;
         const targetGrossPie = manualPie || lot.pie || 0;
@@ -143,20 +151,9 @@ export async function getFullPostventaData({
         else if (piePaidFromReceipts > 0) actualPieComponent = piePaidFromReceipts;
         else if ((res.pie_status || "").toUpperCase() === "PAID") actualPieComponent = targetGrossPie;
 
-        // La reserva se contaba SIEMPRE con el valor del lote (o 500.000 por
-        // defecto), aunque no existiera ningún comprobante que la respaldara: el
-        // cliente veía la plata sumada en su Total Invertido y ningún documento
-        // detrás. Si ahora hay comprobantes de RESERVA registrados, manda lo que
-        // efectivamente se pagó; si no hay ninguno, se mantiene el supuesto
-        // anterior para no mover saldos ya publicados.
-        const reservaFromReceipts = res.receipts
-          ?.filter((r) => r.scope === "RESERVA")
-          .reduce((acc, r) => acc + (r.amount_clp || 0), 0) || 0;
-        const reservationAmountPaid = reservaFromReceipts || (lot.reservation_amount_clp ?? 500000);
-
         totalPaid = totalCuotas === 0
           ? totalToPay + extraPaid
-          : reservationAmountPaid + actualPieComponent + calculatedCuotasTotal + extraPaid;
+          : actualPieComponent + calculatedCuotasTotal + extraPaid;
         pendingBalance = Math.max(0, totalToPay - totalPaid + (res.pending_amount || 0));
       } else {
         // Resto de proyectos (Arena y Sol, Libertad y Alegria): sin cambios.

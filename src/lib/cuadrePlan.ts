@@ -278,16 +278,16 @@ export function saldoPortalCliente(f: FichaPlan): number {
 
 /**
  * Réplica del saldo del panel de postventa (getFullPostventaData). En Lomas del
- * Mar suma la reserva aparte del pie, igual que aliminlomasdelmar.com.
+ * Mar ya no suma la reserva aparte del pie; sí cuenta el pie solo si está pagado.
  */
 export function saldoPanelPostventa(f: FichaPlan): number {
-  return saldoPanel(f, true);
+  return saldoPanel(f, false);
 }
 
 /**
- * El saldo que mostraría el panel de Lomas si dejara de sumar la reserva aparte
- * del pie (la regla: la reserva va adentro del pie). Todo lo demás de la fórmula
- * de Lomas queda igual. Sirve para medir el cambio ANTES de hacerlo.
+ * El saldo del panel de Lomas sin la reserva aparte. Desde que el panel dejó de
+ * sumarla es igual a saldoPanelPostventa; se conserva para el bloque de impacto,
+ * que así queda vacío en vez de romperse.
  */
 export function saldoPanelLomasSinReservaAparte(f: FichaPlan): number {
   return saldoPanel(f, false);
@@ -488,9 +488,7 @@ export function cuadrarPlan(f: FichaPlan): ResultadoCuadre {
       hallazgos.push({
         tipo: "REVISAR",
         titulo: `El panel de postventa muestra un saldo de ${clp(saldoPanel)}`,
-        detalle: `Según la regla son ${clp(saldoSegunRegla)}. El panel de Lomas suma la reserva aparte del pie${
-          lectura === "BRUTO" ? ", y en esta ficha el pie ya la trae: la cuenta dos veces" : ""
-        }.`,
+        detalle: `Según la regla son ${clp(saldoSegunRegla)}. El panel de Lomas cuenta el pie solo si figura pagado, y suma el monto pendiente de la ficha.`,
       });
     }
   }
