@@ -13,7 +13,9 @@ import {
   Info,
   Lightbulb,
   Loader2,
+  Pencil,
   Search,
+  X,
 } from "lucide-react";
 import { downloadCsv } from "@/lib/utils";
 import {
@@ -22,7 +24,8 @@ import {
   previsualizarPiesSinReserva,
   corregirPiesSinReserva,
 } from "@/actions/cuadre";
-import type { CampoCorregible, EstadoCuadre, ResultadoCuadre } from "@/lib/cuadrePlan";
+import { aplicarCambios, cuadrarPlan, leerTramos, ETIQUETA_CAMPO } from "@/lib/cuadrePlan";
+import type { CambiosPlan, EstadoCuadre, FichaPlan, ResultadoCuadre } from "@/lib/cuadrePlan";
 
 /**
  * Cuadre de Caja: la cartera completa, un semáforo por lote.
@@ -41,6 +44,7 @@ type Fila = {
   terminado: boolean;
   multilote: boolean;
   resultado: ResultadoCuadre;
+  ficha: FichaPlan;
   panelSinReservaAparte: number | null;
 };
 
@@ -78,37 +82,12 @@ const LECTURA: Record<ResultadoCuadre["lectura"], string> = {
   NO_CIERRA: "No cierra de ninguna forma",
 };
 
-const CAMPOS: { campo: CampoCorregible; etiqueta: string; ayuda: string }[] = [
-  { campo: "pie", etiqueta: "Pie", ayuda: "Con la reserva adentro. Se guarda en la ficha y en el lote." },
-  { campo: "reserva_ficha", etiqueta: "Reserva (ficha)", ayuda: "La que se ve en la ficha del cliente." },
-  { campo: "reserva_lote", etiqueta: "Reserva (lote)", ayuda: "La que usa el saldo del panel de Lomas." },
-  { campo: "ultima_cuota", etiqueta: "Última cuota", ayuda: "Solo manda si ningún tramo cubre la última cuota." },
-  { campo: "valor_total", etiqueta: "Valor total", ayuda: "Precio del lote. Es del lote, no de la ficha." },
-  { campo: "valor_cuota", etiqueta: "Valor cuota", ayuda: "El de las cuotas que no caen en un tramo." },
-];
-
 function clp(n: number | null | undefined): string {
   if (n == null) return "—";
   const signo = n < 0 ? "-" : "";
   return `${signo}$${Math.abs(Math.round(n)).toLocaleString("es-CL")}`;
 }
 
-function valorActual(r: ResultadoCuadre, campo: CampoCorregible): number {
-  switch (campo) {
-    case "pie":
-      return r.pie;
-    case "reserva_ficha":
-      return r.reserva.ficha;
-    case "reserva_lote":
-      return r.reserva.lote;
-    case "ultima_cuota":
-      return r.ultimaCuota;
-    case "valor_total":
-      return r.valorTotal;
-    case "valor_cuota":
-      return r.valorCuota;
-  }
-}
 
 export default function CuadreCaja({ filas }: { filas: Fila[] }) {
   const [proyecto, setProyecto] = useState("todos");
@@ -804,36 +783,149 @@ export default function CuadreCaja({ filas }: { filas: Fila[] }) {
   );
 }
 
-function Renglon({ etiqueta, valor, fuerte, nota }: { etiqueta: string; valor: string; fuerte?: boolean; nota?: string }) {
+function Linea({ signo, etiqueta, nota, valor, fuerte }: { signo?: string; etiqueta: string; nota?: string; valor: number; fuerte?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1">
-      <span className="text-xs text-slate-500">
+    <div className="flex items-baseline gap-3 py-1.5">
+      <span className="w-4 text-sm font-bold text-slate-400 text-center">{signo}</span>
+      <span className="flex-1 text-sm text-slate-600">
         {etiqueta}
-        {nota && <span className="block text-[10px] text-slate-400">{nota}</span>}
+        {nota && <span className="ml-2 text-[11px] text-slate-400">{nota}</span>}
       </span>
       <span className={`text-sm tabular-nums ${fuerte ? "font-extrabold text-slate-900" : "font-semibold text-slate-700"}`}>
-        {valor}
+        {clp(valor)}
       </span>
     </div>
   );
 }
 
+/**
+ * El desplegable: una sola cuenta, pie + cuotas pagadas + cuotas restantes +
+ * última cuota = valor del lote, y un aviso si no da. Todo lo demás (reserva en
+ * sus tres fuentes, saldos) se ve al editar.
+ */
 function Detalle({ fila }: { fila: Fila }) {
   const r = fila.resultado;
-  const [campo, setCampo] = useState<CampoCorregible>(r.sugerencias[0]?.campo || "pie");
-  const [valor, setValor] = useState<string>(String(r.sugerencias[0]?.valor ?? valorActual(r, r.sugerencias[0]?.campo || "pie")));
+  const d = r.desglose;
+  const [editando, setEditando] = useState(false);
+  const cuadra = d.suma === r.valorTotal;
+  const diferencia = r.valorTotal - d.suma;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 whitespace-normal">
+      <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <Linea etiqueta="Pie" nota={r.reserva.usada > 0 ? `reserva ${clp(r.reserva.usada)} incluida` : undefined} valor={d.pie} />
+        <Linea signo="+" etiqueta={`${d.pagadas.cantidad} cuotas pagadas`} valor={d.pagadas.monto} />
+        <Linea signo="+" etiqueta={`${d.restantes.cantidad} cuotas restantes`} valor={d.restantes.monto} />
+        <Linea
+          signo="+"
+          etiqueta={`Última cuota (N° ${d.ultima.numero})`}
+          nota={d.ultima.pagada ? "pagada" : undefined}
+          valor={d.ultima.monto}
+        />
+        <div className="border-t border-slate-200 my-1.5" />
+        <Linea signo="=" etiqueta="Suma" valor={d.suma} fuerte />
+        <Linea etiqueta="Valor del lote" valor={r.valorTotal} fuerte />
+      </div>
+
+      <div className="space-y-3">
+        {cuadra ? (
+          <div className="p-3 rounded-xl border bg-emerald-50/60 border-emerald-100 text-emerald-800 text-sm font-bold flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" /> Cuadra: la suma da exacto el valor del lote.
+          </div>
+        ) : (
+          <div className="p-3 rounded-xl border bg-red-50/60 border-red-100 text-red-800 text-sm">
+            <p className="font-bold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              {diferencia > 0 ? `Faltan ${clp(diferencia)}` : `Sobran ${clp(-diferencia)}`} para el valor del lote
+            </p>
+            {r.lectura === "NETO" && <p className="text-xs mt-1">Es exactamente la reserva: el pie está anotado sin ella.</p>}
+          </div>
+        )}
+        {/* Otros avisos, una línea cada uno. El de la suma ya está arriba. */}
+        {r.hallazgos
+          .filter((h) => !/^(Faltan|Sobran) /.test(h.titulo) && h.titulo !== "El pie está guardado sin la reserva")
+          .map((h, i) => (
+            <p key={i} className="text-xs text-amber-800 bg-amber-50/60 border border-amber-100 rounded-lg px-3 py-2 flex gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              {h.titulo}
+            </p>
+          ))}
+        <button
+          onClick={() => setEditando(true)}
+          className="h-10 px-4 rounded-xl bg-brand-700 text-white text-xs font-bold hover:bg-brand-800 flex items-center gap-2 cursor-pointer"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+          Editar valores
+        </button>
+      </div>
+
+      {editando && <EditarValores fila={fila} cerrar={() => setEditando(false)} />}
+    </div>
+  );
+}
+
+/**
+ * Ventana para editar pie, reserva, valor del lote y cuotas. La cuenta se rehace
+ * mientras se escribe, con la misma lógica que la tabla; el guardado pasa por la
+ * vista previa del servidor (saldos antes y después) y se confirma aparte.
+ */
+function EditarValores({ fila, cerrar }: { fila: Fila; cerrar: () => void }) {
+  const f = fila.ficha;
+  const r = fila.resultado;
+  const tramos = useMemo(() => leerTramos(f.tramos), [f.tramos]);
+  const ultimaEnTramo = tramos.some((t) => f.cuotas >= t.desde && f.cuotas <= t.hasta);
+  let hayCuotasSinTramo = false;
+  for (let k = 1; k <= f.cuotas; k++) {
+    if (!tramos.some((t) => k >= t.desde && k <= t.hasta)) {
+      hayCuotasSinTramo = true;
+      break;
+    }
+  }
+
+  const [inicial] = useState(() => ({
+    pie: String(r.pie),
+    reserva: String(r.reserva.ficha || r.reserva.lote || 0),
+    valor_total: String(r.valorTotal),
+    valor_cuota: String(f.valorCuota),
+    ultima_cuota: String(r.ultimaCuota),
+    tramos: tramos.map((t) => String(t.monto)),
+  }));
+  const [v, setV] = useState(inicial);
   const [previa, setPrevia] = useState<Previa | null>(null);
   const [cargando, setCargando] = useState(false);
 
-  const elegir = (c: CampoCorregible, v: number) => {
-    setCampo(c);
-    setValor(String(v));
+  const n = (x: string) => Math.round(Number(x || 0));
+
+  // Solo lo que cambió viaja al servidor.
+  const cambios = useMemo(() => {
+    const c: CambiosPlan = {};
+    if (n(v.pie) !== n(inicial.pie)) c.pie = n(v.pie);
+    if (n(v.reserva) !== n(inicial.reserva)) {
+      // Una sola reserva: se escribe en la ficha y en el lote para que dejen
+      // de decir cosas distintas.
+      c.reserva_ficha = n(v.reserva);
+      c.reserva_lote = n(v.reserva);
+    }
+    if (n(v.valor_total) !== n(inicial.valor_total)) c.valor_total = n(v.valor_total);
+    if (hayCuotasSinTramo && n(v.valor_cuota) !== n(inicial.valor_cuota)) c.valor_cuota = n(v.valor_cuota);
+    if (!ultimaEnTramo && n(v.ultima_cuota) !== n(inicial.ultima_cuota)) c.ultima_cuota = n(v.ultima_cuota);
+    if (v.tramos.some((m, i) => n(m) !== n(inicial.tramos[i]))) c.tramos = v.tramos.map(n);
+    return c;
+  }, [v, inicial, hayCuotasSinTramo, ultimaEnTramo]);
+  const hayCambios = Object.keys(cambios).length > 0;
+  const tocaCuotas = cambios.valor_cuota !== undefined || cambios.ultima_cuota !== undefined || cambios.tramos !== undefined;
+
+  const vivo = useMemo(() => cuadrarPlan(aplicarCambios(f, cambios)), [f, cambios]);
+  const vivoDif = vivo.valorTotal - vivo.desglose.suma;
+
+  const set = (campo: "pie" | "reserva" | "valor_total" | "valor_cuota" | "ultima_cuota", valor: string) => {
+    setV((x) => ({ ...x, [campo]: valor }));
     setPrevia(null);
   };
 
-  const verPrevia = async () => {
+  const revisar = async () => {
     setCargando(true);
-    const res = await previsualizarCorreccionCuadre(fila.id, { [campo]: Number(valor) });
+    const res = await previsualizarCorreccionCuadre(fila.id, cambios);
     setCargando(false);
     if (!("ok" in res)) {
       toast.error(res.error);
@@ -844,251 +936,209 @@ function Detalle({ fila }: { fila: Fila }) {
 
   const guardar = async () => {
     setCargando(true);
-    const res = await aplicarCorreccionCuadre(fila.id, { [campo]: Number(valor) });
+    const res = await aplicarCorreccionCuadre(fila.id, cambios);
     setCargando(false);
     if ("error" in res && res.error) {
       toast.error(res.error);
       return;
     }
-    toast.success("Corrección guardada y registrada en Auditoría");
-    // La fila se arma en el servidor, así que hay que volver a pedirla.
+    toast.success("Valores guardados y registrados en Auditoría");
     window.location.reload();
   };
 
-  const tarjeta = "bg-white border border-slate-200 rounded-xl p-4";
-  const titulo = "text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2";
+  const input =
+    "w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 tabular-nums outline-none focus:border-brand-400";
+  const etiqueta = "text-[11px] font-bold text-slate-500";
 
   return (
-    <div className="space-y-4 whitespace-normal">
-      {r.hallazgos.length > 0 && (
-        <div className="space-y-2">
-          {r.hallazgos.map((h, i) => (
-            <div
-              key={i}
-              className={`p-3 rounded-xl border text-xs leading-relaxed ${
-                h.tipo === "DESCUADRA" ? "bg-red-50/60 border-red-100 text-red-800" : "bg-amber-50/60 border-amber-100 text-amber-800"
-              }`}
-            >
-              <p className="font-bold flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                {h.titulo}
-              </p>
-              <p className="mt-1 opacity-90">{h.detalle}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* El plan */}
-        <div className={tarjeta}>
-          <p className={titulo}>El plan</p>
-          <Renglon etiqueta="Pie guardado" valor={clp(r.pie)} nota={LECTURA[r.lectura]} />
-          {r.lectura === "NETO" && <Renglon etiqueta="+ Reserva (va dentro del pie)" valor={clp(r.reserva.usada)} />}
-          <Renglon
-            etiqueta={`${r.cuotas} cuotas pactadas`}
-            valor={clp(r.sumaCuotas)}
-            nota={r.tieneTramos ? "según sus tramos" : `${clp(r.valorCuota)} c/u`}
-          />
-          {r.ultimaCuota !== r.valorCuota && !r.tieneTramos && (
-            <Renglon etiqueta="Última cuota" valor={clp(r.ultimaCuota)} nota="distinta al valor cuota" />
-          )}
-          <div className="border-t border-slate-100 my-1" />
-          <Renglon etiqueta="Suma del plan" valor={clp(r.lectura === "NO_CIERRA" ? r.pie + r.sumaCuotas : r.sumaPlan)} fuerte />
-          <Renglon etiqueta="Valor total del lote" valor={clp(r.valorTotal)} fuerte />
-          <Renglon
-            etiqueta="Diferencia"
-            valor={r.diferencia === 0 || r.lectura === "NETO" ? "$0" : clp(r.diferencia)}
-            fuerte
-            nota={r.lectura === "NETO" ? "cierra solo sumando la reserva aparte" : undefined}
-          />
-        </div>
-
-        {/* Pie y reserva */}
-        <div className={tarjeta}>
-          <p className={titulo}>Pie y reserva</p>
-          <Renglon etiqueta="Reserva en la ficha" valor={r.reserva.ficha > 0 ? clp(r.reserva.ficha) : "—"} />
-          <Renglon etiqueta="Reserva en el lote" valor={r.reserva.lote > 0 ? clp(r.reserva.lote) : "—"} />
-          <Renglon
-            etiqueta="Reserva con comprobante"
-            valor={r.reserva.comprobante !== null ? clp(r.reserva.comprobante) : "sin comprobante"}
-          />
-          <p className="text-[10px] text-slate-400 py-1">
-            {r.reserva.usadaDe === "ninguna"
-              ? "No hay reserva cargada"
-              : `Se cuadra con ${r.reserva.usadaDe === "ficha" ? "la de la ficha" : `la del ${r.reserva.usadaDe}`}`}
-            {r.reserva.noCoinciden && <span className="font-bold text-amber-600"> · no coinciden</span>}
-          </p>
-          <div className="border-t border-slate-100 my-1" />
-          <Renglon etiqueta="Pie con la reserva adentro" valor={clp(r.pieBruto)} />
-          <Renglon etiqueta="Pie que paga aparte (neto)" valor={clp(r.pieNeto)} fuerte />
-          <Renglon
-            etiqueta="Comprobantes de pie"
-            valor={r.pieConComprobantes !== null ? clp(r.pieConComprobantes) : "sin comprobante"}
-          />
-        </div>
-
-        {/* Lo pagado y lo que falta */}
-        <div className={tarjeta}>
-          <p className={titulo}>Lo pagado y lo que falta</p>
-          <Renglon etiqueta="Pagado según la regla" valor={clp(r.pagadoSegunRegla)} nota={`pie + ${r.cuotasPagadas} cuotas + extras`} />
-          <Renglon etiqueta="Le falta según la regla" valor={clp(r.saldoSegunRegla)} fuerte />
-          <Renglon etiqueta="Suman sus cuotas pendientes" valor={clp(r.cuotasPendientesSuman)} />
-          {r.ultimaCuotaQueCierra !== null && (
-            <Renglon
-              etiqueta="Última cuota que cierra el total"
-              valor={clp(r.ultimaCuotaQueCierra)}
-              nota={r.ultimaCuotaQueCierra === r.ultimaCuota ? "coincide con la pactada" : `la pactada es ${clp(r.ultimaCuota)}`}
-            />
-          )}
-          <div className="border-t border-slate-100 my-1" />
-          <Renglon etiqueta="Saldo que ve el cliente" valor={clp(r.saldoPortal)} nota="en su portal" />
-          <Renglon etiqueta="Saldo en el panel" valor={clp(r.saldoPanel)} nota="y en WhatsApp / correo" />
-        </div>
-      </div>
-
-      {/* Corregir */}
-      <div className={tarjeta}>
-        <p className={titulo}>Corregir</p>
-
-        {r.sugerencias.length > 0 && (
-          <div className="space-y-1.5 mb-4">
-            {r.sugerencias.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => elegir(s.campo, s.valor)}
-                className={`w-full text-left p-2.5 rounded-lg border text-xs flex items-start gap-2 cursor-pointer transition-colors ${
-                  campo === s.campo && Number(valor) === s.valor
-                    ? "border-brand-400 bg-brand-50/60"
-                    : "border-slate-200 hover:border-slate-300"
-                }`}
-              >
-                <Lightbulb className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${s.probable ? "text-amber-500" : "text-slate-300"}`} />
-                <span className="flex-1">
-                  <span className="font-bold text-slate-900">
-                    {CAMPOS.find((c) => c.campo === s.campo)?.etiqueta} → {clp(s.valor)}
-                  </span>
-                  {s.probable && (
-                    <span className="ml-2 text-[9px] font-black uppercase tracking-wider text-amber-600">más probable</span>
-                  )}
-                  <span className="block text-slate-500 mt-0.5">{s.motivo}</span>
-                </span>
-              </button>
-            ))}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40" onClick={cerrar}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 px-6 pt-5">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Editar valores</p>
+            <p className="text-lg font-extrabold text-slate-900">{fila.cliente}</p>
+            <p className="text-xs text-slate-500">
+              {fila.proyecto} · Lote {fila.lote} · {f.cuotas} cuotas, {f.installmentsPaid} pagadas
+            </p>
           </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-          <label className="flex-1">
-            <span className="text-[10px] font-bold text-slate-500">Campo</span>
-            <select
-              value={campo}
-              onChange={(e) => {
-                const c = e.target.value as CampoCorregible;
-                elegir(c, valorActual(r, c));
-              }}
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-700"
-            >
-              {CAMPOS.map((c) => (
-                <option key={c.campo} value={c.campo}>
-                  {c.etiqueta} (hoy {clp(valorActual(r, c.campo))})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex-1">
-            <span className="text-[10px] font-bold text-slate-500">Nuevo monto</span>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={valor}
-              onChange={(e) => {
-                setValor(e.target.value);
-                setPrevia(null);
-              }}
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 tabular-nums"
-            />
-          </label>
-          <button
-            onClick={verPrevia}
-            disabled={cargando || valor === "" || Number(valor) === valorActual(r, campo)}
-            className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer"
-          >
-            {cargando && !previa ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
-            Ver cómo queda
+          <button onClick={cerrar} className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer" aria-label="Cerrar">
+            <X className="w-4 h-4 text-slate-500" />
           </button>
         </div>
-        <p className="text-[10px] text-slate-400 mt-1">{CAMPOS.find((c) => c.campo === campo)?.ayuda}</p>
 
-        {previa && (
-          <div className="mt-4 p-4 rounded-xl border border-brand-200 bg-brand-50/40 space-y-3">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  <th className="text-left py-1"></th>
-                  <th className="text-right py-1">Antes</th>
-                  <th className="text-right py-1">Después</th>
-                </tr>
-              </thead>
-              <tbody className="tabular-nums">
-                {previa.lineas.map((l) => (
-                  <tr key={l.campo}>
-                    <td className="py-1 text-slate-600">{l.etiqueta}</td>
-                    <td className="py-1 text-right text-slate-500">{clp(l.antes)}</td>
-                    <td className="py-1 text-right font-bold text-slate-900">{clp(l.despues)}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td className="py-1 text-slate-600">Cuadre</td>
-                  <td className="py-1 text-right text-slate-500">
-                    {ESTILO[previa.antes.estado].etiqueta} ({clp(previa.antes.diferencia)})
-                  </td>
-                  <td className="py-1 text-right font-bold text-slate-900">
-                    {ESTILO[previa.despues.estado].etiqueta} ({clp(previa.despues.diferencia)})
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-1 text-slate-600">Saldo que ve el cliente</td>
-                  <td className="py-1 text-right text-slate-500">{clp(previa.antes.saldoPortal)}</td>
-                  <td className="py-1 text-right font-bold text-slate-900">{clp(previa.despues.saldoPortal)}</td>
-                </tr>
-                <tr>
-                  <td className="py-1 text-slate-600">Saldo en el panel</td>
-                  <td className="py-1 text-right text-slate-500">{clp(previa.antes.saldoPanel)}</td>
-                  <td className="py-1 text-right font-bold text-slate-900">{clp(previa.despues.saldoPanel)}</td>
-                </tr>
-              </tbody>
-            </table>
-            {previa.despues.hallazgos.length > 0 && (
-              <p className="text-xs text-amber-700">Después del cambio sigue pendiente: {previa.despues.hallazgos.join(" · ")}</p>
-            )}
-            <ul className="text-xs text-slate-600 space-y-1">
-              {previa.avisos.map((a, i) => (
-                <li key={i} className="flex gap-1.5">
-                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
-                  {a}
-                </li>
+        <div className="px-6 py-5 space-y-4">
+          {r.sugerencias.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {r.sugerencias.map((s, i) => (
+                <button
+                  key={i}
+                  title={s.motivo}
+                  onClick={() => {
+                    const campo = s.campo === "reserva_ficha" || s.campo === "reserva_lote" ? "reserva" : s.campo;
+                    set(campo, String(s.valor));
+                  }}
+                  className="text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50/50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Lightbulb className={`w-3 h-3 ${s.probable ? "text-amber-500" : "text-slate-300"}`} />
+                  {ETIQUETA_CAMPO[s.campo]} → {clp(s.valor)}
+                </button>
               ))}
-            </ul>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setPrevia(null)}
-                className="h-9 px-4 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={guardar}
-                disabled={cargando}
-                className="h-9 px-4 rounded-xl bg-brand-700 text-white text-xs font-bold hover:bg-brand-800 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-              >
-                {cargando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Confirmar y guardar
-              </button>
             </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label>
+              <span className={etiqueta}>Pie (con la reserva adentro)</span>
+              <input type="number" min={0} step={1} value={v.pie} onChange={(e) => set("pie", e.target.value)} className={input} />
+            </label>
+            <label>
+              <span className={etiqueta}>Reserva</span>
+              <input type="number" min={0} step={1} value={v.reserva} onChange={(e) => set("reserva", e.target.value)} className={input} />
+            </label>
+            <label>
+              <span className={etiqueta}>Valor del lote</span>
+              <input type="number" min={1} step={1} value={v.valor_total} onChange={(e) => set("valor_total", e.target.value)} className={input} />
+            </label>
           </div>
-        )}
+          {r.reserva.usadaDe === "comprobante" && (
+            <p className="text-[11px] text-slate-500">
+              Esta reserva tiene comprobante por {clp(r.reserva.comprobante)}: el cuadre usa ese monto. Lo que escribas acá se
+              guarda en la ficha y en el lote.
+            </p>
+          )}
+
+          <div className="space-y-2">
+            <p className={etiqueta}>Cuotas</p>
+            {tramos.map((t, i) => (
+              <label key={i} className="flex items-center gap-3">
+                <span className="w-36 shrink-0 text-sm text-slate-600">
+                  {t.desde === t.hasta ? `Cuota ${t.desde}` : `Cuotas ${t.desde}-${t.hasta}`}
+                  {t.hasta > t.desde && <span className="block text-[10px] text-slate-400">{t.hasta - t.desde + 1} cuotas</span>}
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={v.tramos[i]}
+                  onChange={(e) => {
+                    const tr = [...v.tramos];
+                    tr[i] = e.target.value;
+                    setV((x) => ({ ...x, tramos: tr }));
+                    setPrevia(null);
+                  }}
+                  className={input}
+                />
+              </label>
+            ))}
+            {hayCuotasSinTramo && (
+              <label className="flex items-center gap-3">
+                <span className="w-36 shrink-0 text-sm text-slate-600">
+                  {tramos.length > 0 ? "Cuotas sin tramo" : "Valor cuota"}
+                  <span className="block text-[10px] text-slate-400">es del lote</span>
+                </span>
+                <input type="number" min={1} step={1} value={v.valor_cuota} onChange={(e) => set("valor_cuota", e.target.value)} className={input} />
+              </label>
+            )}
+            {!ultimaEnTramo && (
+              <label className="flex items-center gap-3">
+                <span className="w-36 shrink-0 text-sm text-slate-600">Última cuota (N° {f.cuotas})</span>
+                <input type="number" min={1} step={1} value={v.ultima_cuota} onChange={(e) => set("ultima_cuota", e.target.value)} className={input} />
+              </label>
+            )}
+          </div>
+
+          <div
+            className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
+              tocaCuotas ? "bg-amber-50 border-amber-200 text-amber-900" : "bg-slate-50 border-slate-200 text-slate-600"
+            }`}
+          >
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>
+              <span className="font-bold">Ojo:</span> un valor modificado en las cuotas altera el comprobante emitido de las cuotas
+              ya pagadas. El recibo oficial de esas cuotas va a salir con el valor nuevo.
+            </span>
+          </div>
+
+          {/* La cuenta en vivo */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
+            <Linea etiqueta="Pie" valor={vivo.desglose.pie} />
+            <Linea signo="+" etiqueta={`${vivo.desglose.pagadas.cantidad} cuotas pagadas`} valor={vivo.desglose.pagadas.monto} />
+            <Linea signo="+" etiqueta={`${vivo.desglose.restantes.cantidad} cuotas restantes`} valor={vivo.desglose.restantes.monto} />
+            <Linea signo="+" etiqueta="Última cuota" valor={vivo.desglose.ultima.monto} />
+            <div className="border-t border-slate-200 my-1" />
+            <Linea signo="=" etiqueta="Suma" valor={vivo.desglose.suma} fuerte />
+            <Linea etiqueta="Valor del lote" valor={vivo.valorTotal} fuerte />
+            <p className={`text-sm font-bold py-1.5 ${vivoDif === 0 ? "text-emerald-600" : "text-red-600"}`}>
+              {vivoDif === 0 ? "Cuadra" : vivoDif > 0 ? `Faltan ${clp(vivoDif)}` : `Sobran ${clp(-vivoDif)}`}
+            </p>
+          </div>
+
+          {previa && (
+            <div className="p-4 rounded-xl border border-brand-200 bg-brand-50/40 space-y-3">
+              <table className="w-full text-sm tabular-nums">
+                <thead>
+                  <tr className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    <th className="text-left py-1"></th>
+                    <th className="text-right py-1">Antes</th>
+                    <th className="text-right py-1">Después</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previa.lineas.map((l) => (
+                    <tr key={l.campo}>
+                      <td className="py-1 text-slate-600">{l.etiqueta}</td>
+                      <td className="py-1 text-right text-slate-500">{clp(l.antes)}</td>
+                      <td className="py-1 text-right font-bold text-slate-900">{clp(l.despues)}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className="py-1 text-slate-600">Saldo que ve el cliente</td>
+                    <td className="py-1 text-right text-slate-500">{clp(previa.antes.saldoPortal)}</td>
+                    <td className="py-1 text-right font-bold text-slate-900">{clp(previa.despues.saldoPortal)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 text-slate-600">Saldo en el panel</td>
+                    <td className="py-1 text-right text-slate-500">{clp(previa.antes.saldoPanel)}</td>
+                    <td className="py-1 text-right font-bold text-slate-900">{clp(previa.despues.saldoPanel)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <ul className="text-xs text-slate-600 space-y-1">
+                {previa.avisos.map((a, i) => (
+                  <li key={i} className="flex gap-1.5">
+                    <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
+                    {a}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 px-6 pb-5">
+          <button onClick={cerrar} className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 cursor-pointer">
+            Cancelar
+          </button>
+          {!previa ? (
+            <button
+              onClick={revisar}
+              disabled={!hayCambios || cargando}
+              className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 disabled:opacity-40 cursor-pointer"
+            >
+              {cargando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
+              Revisar cambios
+            </button>
+          ) : (
+            <button
+              onClick={guardar}
+              disabled={cargando}
+              className="h-10 px-4 rounded-xl bg-brand-700 text-white text-xs font-bold hover:bg-brand-800 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              {cargando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Confirmar y guardar
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -217,6 +217,19 @@ export type ResultadoCuadre = {
    *   TOTAL_MENOS_CUOTAS  el pie es lo que falta para el valor total.
    * null = no hay una corrección de pie que tenga sentido.
    */
+  /**
+   * La cuenta en cuatro partes, como la lee postventa:
+   * pie + cuotas pagadas + cuotas restantes + última cuota = valor total.
+   * La última va aparte aunque esté pagada.
+   */
+  desglose: {
+    pie: number;
+    pagadas: { cantidad: number; monto: number };
+    restantes: { cantidad: number; monto: number };
+    ultima: { numero: number; monto: number; pagada: boolean };
+    suma: number;
+  };
+
   correccionPie: { tipo: "RESERVA_AFUERA" | "TOTAL_MENOS_CUOTAS"; pieNuevo: number; pieNetoNuevo: number } | null;
 
   /** El saldo que ve el cliente en su portal hoy (actions/user.ts). */
@@ -243,9 +256,46 @@ export const ETIQUETA_CAMPO: Record<CampoCorregible, string> = {
   valor_cuota: "Valor cuota",
 };
 
+/**
+ * Lo que se puede corregir. `tramos` son los montos nuevos de cada tramo, en el
+ * mismo orden que devuelve leerTramos: se cambia el monto, nunca desde/hasta,
+ * porque los límites mueven qué cuota vence cuándo.
+ */
+export type CambiosPlan = Partial<Record<CampoCorregible, number>> & { tramos?: number[] };
+
+/**
+ * Los tramos crudos de la base con los montos reemplazados, conservando el
+ * nombre de campo con que vinieron (amount o value). null si no calzan.
+ */
+export function reemplazarMontosTramos(tramosCrudos: unknown, montos: number[]): unknown[] | null {
+  let lista: unknown = tramosCrudos;
+  if (typeof lista === "string") {
+    try {
+      lista = JSON.parse(lista);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(lista)) return null;
+  let i = 0;
+  const out = lista.map((t: Record<string, unknown>) => {
+    const desde = Number(t?.from ?? t?.start ?? 0);
+    const hasta = Number(t?.to ?? t?.end ?? 0);
+    if (!(desde > 0 && hasta >= desde)) return t;
+    const monto = montos[i++];
+    if ("value" in (t || {}) && !("amount" in (t || {}))) return { ...t, value: monto };
+    return { ...t, amount: monto };
+  });
+  return i === montos.length ? out : null;
+}
+
 /** Aplica una corrección sobre una copia de la ficha, para simularla. */
-export function aplicarCambios(f: FichaPlan, cambios: Partial<Record<CampoCorregible, number>>): FichaPlan {
+export function aplicarCambios(f: FichaPlan, cambios: CambiosPlan): FichaPlan {
   const g: FichaPlan = { ...f };
+  if (cambios.tramos) {
+    const nuevos = reemplazarMontosTramos(f.tramos, cambios.tramos);
+    if (nuevos) g.tramos = nuevos;
+  }
   if (cambios.pie !== undefined) {
     // updateClientFinancials escribe el pie en la ficha y en el lote.
     g.pieFicha = cambios.pie;
@@ -505,6 +555,19 @@ export function cuadrarPlan(f: FichaPlan): ResultadoCuadre {
     }
   }
 
+  const nPagadas = Math.min(f.installmentsPaid, Math.max(0, f.cuotas - 1));
+  const desglose: ResultadoCuadre["desglose"] = {
+    pie,
+    pagadas: { cantidad: nPagadas, monto: sumaCuotasPactadas(f, 1, nPagadas) },
+    restantes: {
+      cantidad: Math.max(0, f.cuotas - 1 - nPagadas),
+      monto: sumaCuotasPactadas(f, nPagadas + 1, f.cuotas - 1),
+    },
+    ultima: { numero: f.cuotas, monto: ultima, pagada: f.installmentsPaid >= f.cuotas },
+    suma: 0,
+  };
+  desglose.suma = desglose.pie + desglose.pagadas.monto + desglose.restantes.monto + desglose.ultima.monto;
+
   const estado: EstadoCuadre = hallazgos.some((h) => h.tipo === "DESCUADRA")
     ? "DESCUADRA"
     : hallazgos.length > 0
@@ -535,6 +598,7 @@ export function cuadrarPlan(f: FichaPlan): ResultadoCuadre {
     cuotasPendientesSuman,
     ultimaCuotaQueCierra,
     correccionPie,
+    desglose,
     saldoPortal,
     saldoPanel,
   };

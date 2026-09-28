@@ -124,6 +124,7 @@ export default async function CuadreCajaPage() {
         terminado: r.status === "COMPLETED",
         multilote: !!r.is_multilote,
         resultado,
+        ficha,
         // Solo Lomas: cuánto le cambiaría el saldo del panel si deja de sumar la
         // reserva aparte del pie. Se mide acá, antes de tocar la fórmula.
         panelSinReservaAparte: slug === LOMAS_SLUG ? saldoPanelLomasSinReservaAparte(ficha) : null,

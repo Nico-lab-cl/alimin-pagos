@@ -11,6 +11,10 @@ import {
   fichaPlanDesdeReserva,
   ETIQUETA_CAMPO,
   LOMAS_SLUG,
+  leerTramos,
+  montoPactado,
+  reemplazarMontosTramos,
+  type CambiosPlan,
   type CampoCorregible,
   type FichaPlan,
 } from "@/lib/cuadrePlan";
@@ -23,11 +27,12 @@ import {
  * por días de atraso y cuotas pendientes, así que la mora no se mueve. Lo que SÍ
  * se mueve es el saldo, y por eso todo pasa primero por la vista previa.
  *
- * La cantidad de cuotas, las cuotas pagadas y los tramos quedan fuera a
- * propósito: esos sí mueven la mora y se siguen editando desde la ficha.
+ * De los tramos solo se corrige el MONTO. La cantidad de cuotas, las cuotas
+ * pagadas y los límites de cada tramo quedan fuera a propósito: esos sí mueven
+ * la mora y se siguen editando desde la ficha.
  */
 
-type Cambios = Partial<Record<CampoCorregible, number>>;
+type Cambios = CambiosPlan;
 
 const CAMPOS: CampoCorregible[] = ["pie", "reserva_ficha", "reserva_lote", "ultima_cuota", "valor_total", "valor_cuota"];
 
@@ -41,7 +46,14 @@ function clp(n: number): string {
 
 function limpiar(cambios: Cambios): Cambios | string {
   const out: Cambios = {};
+  if (cambios?.tramos !== undefined) {
+    if (!Array.isArray(cambios.tramos) || cambios.tramos.some((m) => !Number.isInteger(Number(m)) || Number(m) <= 0)) {
+      return "Tramos: cada monto tiene que ser un entero en pesos, mayor que cero.";
+    }
+    out.tramos = cambios.tramos.map(Number);
+  }
   for (const [k, v] of Object.entries(cambios || {})) {
+    if (k === "tramos") continue;
     if (!CAMPOS.includes(k as CampoCorregible)) return `Campo no permitido: ${k}`;
     const n = Number(v);
     if (!Number.isInteger(n) || n < 0) return `${ETIQUETA_CAMPO[k as CampoCorregible]}: el monto tiene que ser un entero en pesos, sin decimales.`;
@@ -98,27 +110,49 @@ function valorActual(f: FichaPlan, campo: CampoCorregible): number {
 
 function comparar(ficha: FichaPlan, cambios: Cambios, otrasDelLote: number) {
   const antes = cuadrarPlan(ficha);
-  const despues = cuadrarPlan(aplicarCambios(ficha, cambios));
+  const modificada = aplicarCambios(ficha, cambios);
+  const despues = cuadrarPlan(modificada);
 
-  const lineas = (Object.keys(cambios) as CampoCorregible[]).map((campo) => ({
+  const lineas: { campo: string; etiqueta: string; antes: number; despues: number }[] = (
+    Object.keys(cambios).filter((k) => k !== "tramos") as CampoCorregible[]
+  ).map((campo) => ({
     campo,
     etiqueta: ETIQUETA_CAMPO[campo],
     antes: valorActual(ficha, campo),
     despues: cambios[campo]!,
   }));
+  if (cambios.tramos) {
+    const tramos = leerTramos(ficha.tramos);
+    tramos.forEach((t, i) => {
+      if (cambios.tramos![i] !== undefined && cambios.tramos![i] !== t.monto) {
+        lineas.push({ campo: `tramo_${i}`, etiqueta: `Cuotas ${t.desde}-${t.hasta}`, antes: t.monto, despues: cambios.tramos![i] });
+      }
+    });
+  }
 
   const avisos: string[] = [];
-  const tocaLote = lineas.some((l) => DEL_LOTE.includes(l.campo));
+  // Una cuota pagada sin comprobante propio se imprime en el recibo oficial con
+  // su monto pactado: si ese monto cambia, cambia el comprobante emitido.
+  const pagadasQueCambian: number[] = [];
+  for (let n = 1; n <= Math.min(ficha.installmentsPaid, ficha.cuotas); n++) {
+    if (montoPactado(ficha, n) !== montoPactado(modificada, n)) pagadasQueCambian.push(n);
+  }
+  if (pagadasQueCambian.length > 0) {
+    avisos.push(
+      `Cambia el valor de ${pagadasQueCambian.length} cuota(s) ya pagada(s): el comprobante emitido de esas cuotas va a salir con el valor nuevo.`
+    );
+  }
+  const tocaLote = lineas.some((l) => (DEL_LOTE as string[]).includes(l.campo));
   if (tocaLote && otrasDelLote > 0) {
     avisos.push(
       `El lote tiene ${otrasDelLote} ficha(s) más. Valor total, valor cuota y reserva del lote son del lote: el cambio les llega a todas.`
     );
   }
-  if (ficha.projectSlug === LOMAS_SLUG && antes.saldoPanel !== despues.saldoPanel && despues.saldoPanel !== despues.saldoPortal) {
+  if (ficha.projectSlug === LOMAS_SLUG && despues.saldoPanel !== despues.saldoPortal) {
     avisos.push(
-      `En Lomas el panel suma la reserva aparte del pie, así que el saldo del panel (y el {saldo} de WhatsApp y correo) queda en ${clp(
+      `En Lomas el panel cuenta el pie solo si figura pagado, así que el saldo del panel (y el {saldo} de WhatsApp y correo) queda en ${clp(
         despues.saldoPanel
-      )} mientras no se corrija esa fórmula. El cliente en su portal ve ${clp(despues.saldoPortal)}.`
+      )}. El cliente en su portal ve ${clp(despues.saldoPortal)}.`
     );
   }
   avisos.push("La mora no cambia: se calcula por días de atraso, no por estos montos.");
@@ -165,8 +199,13 @@ export async function aplicarCorreccionCuadre(reservationId: string, cambios: Ca
 
     const lotData: Record<string, number> = {};
     const resData: Record<string, unknown> = {};
+    if (lineas.some((l) => l.campo.startsWith("tramo_"))) {
+      const nuevos = reemplazarMontosTramos(res.installment_ranges, limpios.tramos!);
+      if (!nuevos) return { error: "Los tramos cambiaron desde que abriste la ficha. Vuelve a cargar la página." };
+      resData.installment_ranges = nuevos;
+    }
     for (const l of lineas) {
-      switch (l.campo) {
+      switch (l.campo as CampoCorregible) {
         case "pie":
           // Igual que updateClientFinancials: el pie va en la ficha y en el lote.
           resData.pie = l.despues;
