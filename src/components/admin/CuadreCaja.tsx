@@ -24,7 +24,7 @@ import {
   previsualizarPiesSinReserva,
   corregirPiesSinReserva,
 } from "@/actions/cuadre";
-import { aplicarCambios, cuadrarPlan, leerTramos, ETIQUETA_CAMPO } from "@/lib/cuadrePlan";
+import { aplicarCambios, cuadrarPlan, leerTramos } from "@/lib/cuadrePlan";
 import type { CambiosPlan, EstadoCuadre, FichaPlan, ResultadoCuadre } from "@/lib/cuadrePlan";
 
 /**
@@ -865,7 +865,7 @@ function Detalle({ fila }: { fila: Fila }) {
 }
 
 /**
- * Ventana para editar pie, reserva, valor del lote y cuotas. La cuenta se rehace
+ * Ventana para editar pie, reserva y cuotas (pedido de postventa: nada más). La cuenta se rehace
  * mientras se escribe, con la misma lógica que la tabla; el guardado pasa por la
  * vista previa del servidor (saldos antes y después) y se confirma aparte.
  */
@@ -874,18 +874,13 @@ function EditarValores({ fila, cerrar }: { fila: Fila; cerrar: () => void }) {
   const r = fila.resultado;
   const tramos = useMemo(() => leerTramos(f.tramos), [f.tramos]);
   const ultimaEnTramo = tramos.some((t) => f.cuotas >= t.desde && f.cuotas <= t.hasta);
-  let hayCuotasSinTramo = false;
-  for (let k = 1; k <= f.cuotas; k++) {
-    if (!tramos.some((t) => k >= t.desde && k <= t.hasta)) {
-      hayCuotasSinTramo = true;
-      break;
-    }
-  }
+  const sinTramo = (k: number) => !tramos.some((t) => k >= t.desde && k <= t.hasta);
+  let hayCuotasSinTramo = !ultimaEnTramo && !(f.ultimaCuotaFicha || f.ultimaCuotaLote);
+  for (let k = 1; k < f.cuotas && !hayCuotasSinTramo; k++) if (sinTramo(k)) hayCuotasSinTramo = true;
 
   const [inicial] = useState(() => ({
     pie: String(r.pie),
     reserva: String(r.reserva.ficha || r.reserva.lote || 0),
-    valor_total: String(r.valorTotal),
     valor_cuota: String(f.valorCuota),
     ultima_cuota: String(r.ultimaCuota),
     tramos: tramos.map((t) => String(t.monto)),
@@ -906,7 +901,6 @@ function EditarValores({ fila, cerrar }: { fila: Fila; cerrar: () => void }) {
       c.reserva_ficha = n(v.reserva);
       c.reserva_lote = n(v.reserva);
     }
-    if (n(v.valor_total) !== n(inicial.valor_total)) c.valor_total = n(v.valor_total);
     if (hayCuotasSinTramo && n(v.valor_cuota) !== n(inicial.valor_cuota)) c.valor_cuota = n(v.valor_cuota);
     if (!ultimaEnTramo && n(v.ultima_cuota) !== n(inicial.ultima_cuota)) c.ultima_cuota = n(v.ultima_cuota);
     if (v.tramos.some((m, i) => n(m) !== n(inicial.tramos[i]))) c.tramos = v.tramos.map(n);
@@ -918,7 +912,7 @@ function EditarValores({ fila, cerrar }: { fila: Fila; cerrar: () => void }) {
   const vivo = useMemo(() => cuadrarPlan(aplicarCambios(f, cambios)), [f, cambios]);
   const vivoDif = vivo.valorTotal - vivo.desglose.suma;
 
-  const set = (campo: "pie" | "reserva" | "valor_total" | "valor_cuota" | "ultima_cuota", valor: string) => {
+  const set = (campo: "pie" | "reserva" | "valor_cuota" | "ultima_cuota", valor: string) => {
     setV((x) => ({ ...x, [campo]: valor }));
     setPrevia(null);
   };
@@ -967,26 +961,7 @@ function EditarValores({ fila, cerrar }: { fila: Fila; cerrar: () => void }) {
         </div>
 
         <div className="px-6 py-5 space-y-4">
-          {r.sugerencias.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {r.sugerencias.map((s, i) => (
-                <button
-                  key={i}
-                  title={s.motivo}
-                  onClick={() => {
-                    const campo = s.campo === "reserva_ficha" || s.campo === "reserva_lote" ? "reserva" : s.campo;
-                    set(campo, String(s.valor));
-                  }}
-                  className="text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-brand-300 hover:bg-brand-50/50 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Lightbulb className={`w-3 h-3 ${s.probable ? "text-amber-500" : "text-slate-300"}`} />
-                  {ETIQUETA_CAMPO[s.campo]} → {clp(s.valor)}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label>
               <span className={etiqueta}>Pie (con la reserva adentro)</span>
               <input type="number" min={0} step={1} value={v.pie} onChange={(e) => set("pie", e.target.value)} className={input} />
@@ -994,10 +969,6 @@ function EditarValores({ fila, cerrar }: { fila: Fila; cerrar: () => void }) {
             <label>
               <span className={etiqueta}>Reserva</span>
               <input type="number" min={0} step={1} value={v.reserva} onChange={(e) => set("reserva", e.target.value)} className={input} />
-            </label>
-            <label>
-              <span className={etiqueta}>Valor del lote</span>
-              <input type="number" min={1} step={1} value={v.valor_total} onChange={(e) => set("valor_total", e.target.value)} className={input} />
             </label>
           </div>
           {r.reserva.usadaDe === "comprobante" && (
