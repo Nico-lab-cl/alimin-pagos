@@ -350,7 +350,7 @@ export function cuadrarPlan(f: FichaPlan): ResultadoCuadre {
       titulo: diferencia > 0 ? `Faltan ${clp(diferencia)} para el valor total` : `Sobran ${clp(-diferencia)} sobre el valor total`,
       detalle: `Pie ${clp(pie)} + ${f.cuotas} cuotas por ${clp(sumaCuotas)} = ${clp(pie + sumaCuotas)}, y el lote vale ${clp(
         f.valorTotal
-      )}.${reserva.usada > 0 ? ` Tampoco cierra sumando la reserva por fuera (${clp(pie + reserva.usada + sumaCuotas)}).` : ""}${
+      )}.${reserva.usada > 0 ? ` La diferencia no es la reserva (${clp(reserva.usada)}): no es un pie mal anotado.` : ""}${
         f.valorCuota > 0 && Math.abs(diferencia) === f.valorCuota
           ? ` La diferencia es exactamente una cuota: revisa si el plan es de ${
               diferencia > 0 ? f.cuotas + 1 : f.cuotas - 1
