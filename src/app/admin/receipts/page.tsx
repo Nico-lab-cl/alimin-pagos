@@ -115,7 +115,12 @@ export default function ReceiptsPage() {
   // Orden y rango de fechas. La bandeja crecía solo hacia abajo y con el orden
   // fijo por fecha de creación: para encontrar los pagos de un cliente, o los de
   // un mes, había que paginar a mano.
-  const [sortKey, setSortKey] = useState<"CLIENTE" | "FECHA" | "CONCEPTO" | "MONTO">("FECHA");
+  //
+  // El orden por defecto es el del último movimiento (cuándo se aprobó o se
+  // subió), no el de la fecha de pago: hay comprobantes con fecha de pago
+  // futura (cuotas adelantadas o una fecha mal tecleada al aprobar) que quedaban
+  // siempre arriba y empujaban lo recién aprobado a la tercera o cuarta página.
+  const [sortKey, setSortKey] = useState<"RECIENTE" | "CLIENTE" | "FECHA" | "CONCEPTO" | "MONTO">("RECIENTE");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
@@ -313,6 +318,10 @@ export default function ReceiptsPage() {
   const nombreCliente = (r: any) =>
     `${r.reservation?.name || ""} ${r.reservation?.last_name || ""}`.trim().toLowerCase();
 
+  /** Cuándo se tocó el comprobante por última vez: aprobado/rechazado, o subido. */
+  const ultimoMovimiento = (r: any) =>
+    new Date(r.processed_at || r.created_at || 0).getTime() || 0;
+
   const filteredReceipts = useMemo(() => {
     // El rango se compara contra la fecha de PAGO, que es la que busca
     // postventa ("los de marzo"), no contra la de creación del registro.
@@ -354,6 +363,8 @@ export default function ReceiptsPage() {
           return signo * ((a.amount_clp || 0) - (b.amount_clp || 0));
         case "CONCEPTO":
           return signo * (conceptSortKey(a) - conceptSortKey(b));
+        case "RECIENTE":
+          return signo * (ultimoMovimiento(a) - ultimoMovimiento(b));
         default: {
           const fa = fechaDePagoComprobante(a)?.getTime() || 0;
           const fb = fechaDePagoComprobante(b)?.getTime() || 0;
@@ -583,6 +594,22 @@ export default function ReceiptsPage() {
               className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:border-brand-500 outline-none transition-all shadow-sm"
             />
           </div>
+          <button
+            onClick={() => {
+              setSortKey("RECIENTE");
+              setSortDir("desc");
+              setCurrentPage(1);
+            }}
+            title="Lo último que se aprobó, rechazó o subió, arriba"
+            className={cn(
+              "px-3 py-2 rounded-xl text-xs font-bold border transition-all shadow-sm whitespace-nowrap cursor-pointer",
+              sortKey === "RECIENTE"
+                ? "bg-brand-50 text-brand-700 border-brand-200"
+                : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+            )}
+          >
+            Últimos movimientos
+          </button>
           <div className="flex items-center gap-1.5">
             <input
               type="date"
@@ -733,7 +760,19 @@ export default function ReceiptsPage() {
                   {/* Column 5: Fecha de Pago */}
                   <div className="col-span-1.5 text-slate-500 text-xs font-semibold">
                     <span className="md:hidden block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha de Pago:</span>
-                    {formatReceiptDateSimple(receipt.paid_at || receipt.created_at)}
+                    {(() => {
+                      const fechaPago = fechaDePagoComprobante(receipt);
+                      const futura = !!fechaPago && fechaPago.getTime() > Date.now();
+                      return (
+                        <span
+                          className={cn(futura && "text-amber-700")}
+                          title={futura ? "Fecha de pago en el futuro: revisa si se tecleó mal al aprobar" : undefined}
+                        >
+                          {formatReceiptDateSimple(fechaPago)}
+                          {futura && <AlertCircle className="inline w-3 h-3 ml-1 -mt-0.5" />}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* Column 6: Estado */}
