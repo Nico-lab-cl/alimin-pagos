@@ -58,6 +58,22 @@ function getLotLabel(receipt: any): string {
   return `Lote ${number} · ${stageLabel}`;
 }
 
+/**
+ * Valor de la próxima cuota que amortizaría el comprobante: el tramo de
+ * installment_ranges que le corresponde, o el valor_cuota del lote.
+ */
+function valorProximaCuota(receipt: any): number {
+  const siguiente = (receipt?.reservation?.installments_paid || 0) + 1;
+  let ranges: any = receipt?.reservation?.installment_ranges;
+  if (typeof ranges === "string") {
+    try { ranges = JSON.parse(ranges); } catch { ranges = []; }
+  }
+  const tramo = Array.isArray(ranges)
+    ? ranges.find((r: any) => siguiente >= Number(r.from) && siguiente <= Number(r.to))
+    : null;
+  return tramo ? Number(tramo.amount) : receipt?.lot?.valor_cuota || 0;
+}
+
 function getInstallmentMonthStr(receipt: any): string {
   // Solo las cuotas tienen mes asociado. Pie, reserva y gastos operacionales no.
   if (!receipt || receipt.scope !== "INSTALLMENT") return "";
@@ -156,6 +172,9 @@ export default function ReceiptsPage() {
   const [approveMode, setApproveMode] = useState<"PAGO" | "INTERES">("PAGO");
   const [approveDate, setApproveDate] = useState("");
   const [approveAmount, setApproveAmount] = useState(0);
+  // Cuántas cuotas cubre la transferencia. Viene con lo que marcó el cliente al
+  // subirla, que muchas veces es 1 aunque haya pagado 2.
+  const [approveCount, setApproveCount] = useState(1);
 
   // Load Projects on mount
   useEffect(() => {
@@ -195,6 +214,7 @@ export default function ReceiptsPage() {
       `${subida.getFullYear()}-${String(subida.getMonth() + 1).padStart(2, "0")}-${String(subida.getDate()).padStart(2, "0")}`
     );
     setApproveAmount(receipt.amount_clp || 0);
+    setApproveCount(receipt.installments_count || 1);
     setShowApproveForm(true);
   };
 
@@ -208,7 +228,11 @@ export default function ReceiptsPage() {
       return;
     }
     setProcessing(id);
-    const result = await approveReceipt(id, { paidAt: approveDate, amount: approveAmount });
+    const result = await approveReceipt(id, {
+      paidAt: approveDate,
+      amount: approveAmount,
+      installmentsCount: selectedReceipt?.scope === "INSTALLMENT" ? approveCount : undefined,
+    });
     if (result.success) {
       toast.success("Pago Aprobado", {
         description: "El saldo del cliente ha sido actualizado.",
@@ -1191,6 +1215,75 @@ export default function ReceiptsPage() {
                       />
                     </div>
                   </div>
+
+                  {approveMode === "PAGO" && selectedReceipt.scope === "INSTALLMENT" && (() => {
+                    const valorCuota = valorProximaCuota(selectedReceipt);
+                    const total = selectedReceipt.lot?.cuotas || 0;
+                    const pendientes = total > 0
+                      ? Math.max(1, total - (selectedReceipt.reservation?.installments_paid || 0))
+                      : 12;
+                    const opciones = Array.from({ length: Math.min(pendientes, 6) }, (_, i) => i + 1);
+                    // Cuántas cuotas completas alcanza a pagar lo transferido.
+                    const alcanza = valorCuota > 0 ? Math.min(pendientes, Math.floor(approveAmount / valorCuota)) : 0;
+                    return (
+                      <div className="space-y-1.5">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          Cuotas que paga
+                          {(selectedReceipt.installments_count || 1) !== approveCount && (
+                            <span className="ml-1 normal-case text-slate-400">
+                              (el cliente marcó {selectedReceipt.installments_count || 1})
+                            </span>
+                          )}
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          {opciones.map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setApproveCount(n)}
+                              className={cn(
+                                "w-9 h-9 rounded-lg text-xs font-black border transition-all cursor-pointer",
+                                approveCount === n
+                                  ? "bg-brand-600 text-white border-brand-600 shadow-sm"
+                                  : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-white"
+                              )}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                          {pendientes > 6 && (
+                            <input
+                              type="number"
+                              min={1}
+                              max={pendientes}
+                              value={approveCount}
+                              onChange={(e) => setApproveCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+                              className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold text-slate-700 focus:border-brand-500 focus:bg-white outline-none"
+                              title="Más de 6 cuotas"
+                            />
+                          )}
+                        </div>
+                        {valorCuota > 0 && (
+                          <p className="text-[11px] font-semibold text-slate-500">
+                            {approveCount} × {formatCLP(valorCuota)} = {formatCLP(valorCuota * approveCount)}
+                            {approveAmount > valorCuota * approveCount && " (lo que sobra va a la mora)"}
+                          </p>
+                        )}
+                        {alcanza > approveCount && (
+                          <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2.5 leading-relaxed">
+                            El monto alcanza para {alcanza} cuotas.{" "}
+                            <button
+                              type="button"
+                              onClick={() => setApproveCount(alcanza)}
+                              className="underline font-black cursor-pointer"
+                            >
+                              Marcar {alcanza}
+                            </button>
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {approveAmount !== selectedReceipt.amount_clp && (
                     <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2.5 leading-relaxed">

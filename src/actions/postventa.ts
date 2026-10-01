@@ -986,7 +986,12 @@ export async function approveReceipt(
   //
   // Si no se declaran, el comportamiento es el de siempre: fecha de subida del
   // comprobante y monto estampado por el portal.
-  datosReales?: { paidAt?: string; amount?: number }
+  //
+  // `installmentsCount` es cuántas cuotas cubre la transferencia. El cliente lo
+  // elige al subir, y muchos suben el pago de dos cuotas marcando una: se les
+  // sumaba una sola y el resto quedaba como abono a mora. Quien aprueba lo
+  // corrige acá.
+  datosReales?: { paidAt?: string; amount?: number; installmentsCount?: number }
 ) {
   const session = await auth();
   const user = session?.user as any;
@@ -1052,7 +1057,16 @@ export async function approveReceipt(
     // dos quedan marcados como la misma cuota, y después de aprobar ambos el
     // segundo sigue diciendo "Cuota 1" en la bandeja y en su PDF aunque haya
     // pagado la 2. Por eso manda el conteo vivo y no el estampado al subir.
-    const installmentsInReceipt = receipt.installments_count || 1;
+    const installmentsInReceipt = datosReales?.installmentsCount ?? (receipt.installments_count || 1);
+    if (!Number.isInteger(installmentsInReceipt) || installmentsInReceipt < 1) {
+      return { error: "La cantidad de cuotas debe ser un número entero mayor a cero" };
+    }
+    const totalCuotas = receipt.reservation?.lot?.cuotas || 0;
+    const cuotasPendientes = totalCuotas - (receipt.reservation?.installments_paid || 0);
+    if (receipt.scope === "INSTALLMENT" && totalCuotas > 0 && installmentsInReceipt > cuotasPendientes) {
+      return { error: `Al cliente le quedan ${Math.max(0, cuotasPendientes)} cuotas por pagar` };
+    }
+    const cuentaCorregida = installmentsInReceipt !== (receipt.installments_count || 1);
     const approvedInstNum = (receipt.reservation?.installments_paid || 0) + 1;
     const approvedInstRange = installmentsInReceipt > 1
       ? `${approvedInstNum}-${approvedInstNum + installmentsInReceipt - 1}`
@@ -1101,7 +1115,7 @@ export async function approveReceipt(
         const range = (ranges as any[]).find((r: any) => nextInstNum >= Number(r.from) && nextInstNum <= Number(r.to));
         if (range) expectedCuotaBase = Number(range.amount);
 
-        const totalExpectedPerCuota = expectedCuotaBase * (receipt.installments_count || 1);
+        const totalExpectedPerCuota = expectedCuotaBase * (installmentsInReceipt);
         // Mora REAL que debía A LA FECHA DEL PAGO (automática + fija, menos los
         // abonos de mora ya hechos). Lo único que cambia respecto de antes es la
         // fecha de corte: sigue siendo el mismo cálculo, así que una multa
@@ -1137,13 +1151,16 @@ export async function approveReceipt(
               // Se re-estampa con la cuota real que amortiza (ver arriba).
               nominal_installment_number: approvedInstNum,
               nominal_installment_range: approvedInstRange,
+              // Lo que se suma a installments_paid: eliminar el comprobante
+              // descuenta este mismo número.
+              installments_count: installmentsInReceipt,
             },
           });
           await tx.reservation.update({
             where: { id: receipt.reservation_id },
             data: {
               installments_paid: {
-                increment: receipt.installments_count || 1,
+                increment: installmentsInReceipt,
               },
               next_payment_date: null,
               manual_penalty: shortfall > 0 ? shortfall : null,
@@ -1161,7 +1178,7 @@ export async function approveReceipt(
                 reservation_id: receipt.reservation_id,
                 amount_clp: cuotaPaidAmount,
                 category: "CUOTA",
-                description: `Pago Cuota x${receipt.installments_count || 1} Aprobado`,
+                description: `Pago Cuota x${installmentsInReceipt} Aprobado`,
                 paid_at: paymentDate,
               }
             });
@@ -1179,6 +1196,14 @@ export async function approveReceipt(
             });
           }
         });
+
+        if (cuentaCorregida) {
+          await logSystemNote(
+            receipt.reservation_id,
+            `Cuotas corregidas al aprobar: el cliente marcó ${receipt.installments_count || 1} y la transferencia cubre ${installmentsInReceipt}. Se sumaron ${installmentsInReceipt}.`,
+            "PaymentReceipt"
+          );
+        }
 
         if (montoCorregido) {
           await logSystemNote(
@@ -1203,13 +1228,14 @@ export async function approveReceipt(
               processed_at: new Date(),
               nominal_installment_number: approvedInstNum,
               nominal_installment_range: approvedInstRange,
+              installments_count: installmentsInReceipt,
             },
           });
           await tx.reservation.update({
             where: { id: receipt.reservation_id },
             data: {
               installments_paid: {
-                increment: receipt.installments_count || 1,
+                increment: installmentsInReceipt,
               },
               next_payment_date: null,
               manual_penalty: null,
@@ -1266,7 +1292,7 @@ export async function approveReceipt(
         amount: montoReal,
         paidAt: paymentDate,
         firstInstallmentNumber: approvedInstNum,
-        installmentsCount: receipt.installments_count || 1,
+        installmentsCount: installmentsInReceipt,
         sentBy: user.email,
       });
     }
@@ -1723,6 +1749,9 @@ export async function getAllReceipts(projectSlug: string) {
             rut: true,
             installment_start_date: true,
             due_day: true,
+            // Para el selector de cuotas al aprobar: el tope y el valor sugerido.
+            installments_paid: true,
+            installment_ranges: true,
             documents: {
               select: {
                 id: true,
@@ -1739,7 +1768,7 @@ export async function getAllReceipts(projectSlug: string) {
           },
         },
         lot: {
-          select: { number: true, stage: true, cuotas: true },
+          select: { number: true, stage: true, cuotas: true, valor_cuota: true },
         },
       },
     });
