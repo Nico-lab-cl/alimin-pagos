@@ -18,6 +18,7 @@ import {
 //   ?to=569XXXXXXXX      PRUEBA: manda los tres resumenes a ese numero, cada uno
 //                        desde la instancia de su proyecto. No marca la semana
 //                        como enviada.
+//   ?proyecto=<slug>     solo ese proyecto.
 //   ?semana=AAAA-MM-DD   resume la semana que empieza ese lunes.
 //   ?force=true          a los grupos fuera del lunes 11:00 o repitiendo semana.
 //
@@ -57,6 +58,12 @@ async function handle(req: NextRequest) {
   const force = params.get("force") === "true";
   const to = (params.get("to") || "").replace(/\D/g, "");
   const semana = semanaAResumir(params.get("semana"));
+  // ?proyecto=arena-y-sol limita la corrida a ese proyecto (para probar de a uno).
+  const soloProyecto = params.get("proyecto");
+  const proyectos = Object.keys(GRUPO_RESUMEN).filter((s) => !soloProyecto || s === soloProyecto);
+  if (proyectos.length === 0) {
+    return NextResponse.json({ error: `Proyecto desconocido. Usa uno de: ${Object.keys(GRUPO_RESUMEN).join(", ")}` }, { status: 400 });
+  }
 
   if (!dryRun && !to && !force && !esLunesOnceEnChile()) {
     return NextResponse.json({ skipped: "Fuera del lunes 11:00 de Chile; no se envia nada.", semana: semana.clave });
@@ -64,7 +71,7 @@ async function handle(req: NextRequest) {
 
   const resultados: any[] = [];
 
-  for (const slug of Object.keys(GRUPO_RESUMEN)) {
+  for (const slug of proyectos) {
     const entityId = `${slug}:${semana.clave}`;
     try {
       if (!dryRun && !to && !force) {
