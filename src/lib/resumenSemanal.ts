@@ -131,8 +131,6 @@ export type ResumenProyecto = {
   pagosPortal: number;
   pagosManuales: number;
   montoCuotas: number;
-  /** Comprobantes subidos que siguen sin aprobar ni rechazar al momento del envio. */
-  porAprobar: number;
   clientesBase: number;
   alDia: number;
   enMora: number;
@@ -163,19 +161,6 @@ export async function calcularResumen(slug: string, semana: Semana): Promise<Res
     else pagosPortal++;
   }
 
-  // Lo que el cliente ya subio pero postventa no ha revisado. No entra en los
-  // montos de esta semana (cuenta la fecha de aprobacion): aparece en el
-  // resumen de la semana en que se apruebe.
-  const porAprobar = await prisma.paymentReceipt.count({
-    where: {
-      status: "PENDING",
-      reservation: {
-        project_id: project.id,
-        NOT: [{ email: TEST_EMAIL }, { user: { is: { email: TEST_EMAIL } } }],
-      },
-    },
-  });
-
   const cartera: any = await computePostventaData(slug);
   if (cartera?.error) throw new Error(`No se pudo calcular la cartera de ${slug}: ${cartera.error}`);
 
@@ -194,7 +179,6 @@ export async function calcularResumen(slug: string, semana: Semana): Promise<Res
     pagosPortal,
     pagosManuales,
     montoCuotas,
-    porAprobar,
     clientesBase: base.length,
     alDia: base.length - enMora,
     enMora,
@@ -233,7 +217,6 @@ export function textoResumen(r: ResumenProyecto, semana: Semana, ahora = new Dat
     `💳 Pagos subidos al portal y aprobados: *${r.pagosPortal}*`,
     `✍️ Pagos registrados manualmente: *${r.pagosManuales}*`,
     `💰 Entraron *${clp(r.montoCuotas)}* en cuotas (${totalPagos} ${totalPagos === 1 ? "pago" : "pagos"})`,
-    `⏳ Comprobantes por aprobar: *${r.porAprobar}*${r.porAprobar > 0 ? " (se suman al resumen de la semana en que se aprueben)" : ""}`,
     ``,
     `👥 Clientes en cuotas al ${fechaLarga({ y: hoy.y, m: hoy.m, d: hoy.d }, false)}: ${r.clientesBase}`,
     `✅ Al día: *${pAlDia}%* (${r.alDia})`,
