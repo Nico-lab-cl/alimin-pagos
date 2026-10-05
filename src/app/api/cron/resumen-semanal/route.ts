@@ -14,6 +14,7 @@ import {
 //
 // Parametros:
 //   ?dryRun=true         arma los mensajes y los devuelve, sin enviar nada.
+//                        Con &formato=texto los muestra tal cual saldrian.
 //   ?to=569XXXXXXXX      PRUEBA: manda los tres resumenes a ese numero, cada uno
 //                        desde la instancia de su proyecto. No marca la semana
 //                        como enviada.
@@ -114,6 +115,15 @@ async function handle(req: NextRequest) {
       resultados.push({ slug, error: e?.message || "Error interno" });
       await logRun("OTHER", entityId, `Resumen fallo: ${e?.message || "error interno"}`);
     }
+  }
+
+  if (dryRun && params.get("formato") === "texto") {
+    const cuerpo = resultados
+      .map((r) => r.texto
+        ? `===== ${r.slug} -> ${r.destino}\n\n${r.texto}`
+        : `===== ${r.slug}\n\nERROR: ${r.error || r.skipped}`)
+      .join("\n\n\n");
+    return new NextResponse(cuerpo, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
 
   return NextResponse.json({ semana: semana.clave, dryRun, prueba: Boolean(to), resultados });
