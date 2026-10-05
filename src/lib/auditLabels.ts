@@ -4,7 +4,7 @@
  * para que la traducción de "entidad" y "origen" quede en un solo lugar.
  */
 
-export type EntityGroupKey = "RESERVA" | "LOTE" | "CAJA" | "DOCUMENTO" | "COMPROBANTE" | "PROYECTO" | "SINCRONIZACION";
+export type EntityGroupKey = "RESERVA" | "LOTE" | "CAJA" | "DOCUMENTO" | "COMPROBANTE" | "PROYECTO" | "SINCRONIZACION" | "RESUMEN_SEMANAL";
 
 export const ENTITY_GROUPS: { key: EntityGroupKey; label: string; matches: string[] }[] = [
   { key: "RESERVA", label: "Cliente / Reserva", matches: ["Reservation", "RESERVATION"] },
@@ -14,6 +14,7 @@ export const ENTITY_GROUPS: { key: EntityGroupKey; label: string; matches: strin
   { key: "COMPROBANTE", label: "Comprobante de pago", matches: ["PaymentReceipt", "PAYMENTRECEIPT"] },
   { key: "PROYECTO", label: "Proyecto", matches: ["Project", "PROJECT"] },
   { key: "SINCRONIZACION", label: "Sincronización Lomas", matches: ["SyncLomas", "SYNCLOMAS"] },
+  { key: "RESUMEN_SEMANAL", label: "Resumen semanal WhatsApp", matches: ["ResumenSemanal", "RESUMENSEMANAL"] },
 ];
 
 /**
