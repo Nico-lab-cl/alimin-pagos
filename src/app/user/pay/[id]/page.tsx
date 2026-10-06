@@ -87,6 +87,12 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   };
 
   const processFile = (file: File) => {
+    // Un archivo de 0 bytes llega cuando el PDF sigue en la nube del celular
+    // sin descargar: se subía igual y postventa no tenía nada que abrir.
+    if (file.size === 0) {
+      toast.error("El archivo está vacío. Descárgalo primero en tu teléfono y vuelve a adjuntarlo.");
+      return;
+    }
     if (file.size > 10 * 1024 * 1024) {
       toast.error("El archivo es demasiado grande (máximo 10MB)");
       return;

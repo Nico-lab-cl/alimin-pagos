@@ -13,7 +13,7 @@ import {
   getNominalInstallmentAmount,
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
-import { fechaDePagoComprobante } from "@/lib/receiptDocs";
+import { fechaDePagoComprobante, receiptHasFile } from "@/lib/receiptDocs";
 import { construirDocumentosCliente } from "@/lib/documentosCliente";
 
 const CACHE_TTL = 300;
@@ -542,6 +542,10 @@ export async function uploadPaymentReceipt({
 
   const userId = (session.user as any).id;
   const isAdmin = (session.user as any).role === "ADMIN";
+
+  if (!receiptHasFile(receiptBase64)) {
+    return { error: "El archivo del comprobante llegó vacío. Descárgalo en tu teléfono y vuelve a adjuntarlo." };
+  }
 
   try {
     const reservation = await prisma.reservation.findFirst({

@@ -311,10 +311,19 @@ export function fechaDePagoComprobante(
  * recibo oficial que emite Alimin, no este archivo.
  */
 export function receiptHasFile(receiptUrl?: string | null): boolean {
-  return (
-    !!receiptUrl &&
-    !["LEGACY_SYNC", "CONDONACION_ADMIN", "SIN_RESPALDO"].includes(receiptUrl)
-  );
+  if (!receiptUrl || ["LEGACY_SYNC", "CONDONACION_ADMIN", "SIN_RESPALDO"].includes(receiptUrl)) {
+    return false;
+  }
+  // Una data-URL sin nada después de la coma es un archivo de 0 bytes: el
+  // celular entregó el nombre pero no el contenido (pasa con PDFs que siguen
+  // en iCloud/Drive sin descargar). No hay papel que mostrar (caso Bernardita
+  // Herrera, Lomas L-39, cuota 7).
+  const raw = receiptUrl.trim();
+  if (raw.startsWith("data:")) {
+    const commaAt = raw.indexOf(",");
+    if (commaAt === -1 || raw.slice(commaAt + 1).trim() === "") return false;
+  }
+  return true;
 }
 
 
