@@ -1668,6 +1668,7 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                       <option value="AUTO">AUTOMÁTICO</option>
                       <option value="FIXED">FIJO</option>
                       <option value="MIXED">MIXTO</option>
+                      <option value="PACTADO">PACTADO</option>
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -1786,18 +1787,24 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                     </div>
 
 
-                    {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED") && selectedClient.manual_penalty > 0 && (
+                    {(selectedClient.penalty_mode === "FIXED" || selectedClient.penalty_mode === "MIXED" || selectedClient.penalty_mode === "PACTADO") && selectedClient.manual_penalty > 0 && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-amber-700">
                           <ShieldAlert className="w-4 h-4" />
-                          <h4 className="text-[10px] font-bold uppercase tracking-wider">Mora Histórica (Acuerdo Fijo)</h4>
+                          <h4 className="text-[10px] font-bold uppercase tracking-wider">
+                            {selectedClient.penalty_mode === "PACTADO" ? "Monto Pactado (Acuerdo de Intereses)" : "Mora Histórica (Acuerdo Fijo)"}
+                          </h4>
                         </div>
                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                           <p className="text-[10px] font-medium text-amber-700/80 mb-3 leading-relaxed">
-                            El cliente tiene un monto fijo de penalización pactado. Este monto se suma al total de la deuda.
+                            {selectedClient.penalty_mode === "PACTADO"
+                              ? "Total de intereses acordado con el cliente. No crece día a día y cubre el interés de las cuotas vencidas antes de la fecha del acuerdo."
+                              : "El cliente tiene un monto fijo de penalización pactado. Este monto se suma al total de la deuda."}
                           </p>
                           <div className="flex items-center justify-between bg-amber-100/60 rounded-lg px-4 py-3 border border-amber-200">
-                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Monto Fijo Pactado</span>
+                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+                              {selectedClient.penalty_mode === "PACTADO" ? "Monto Pactado" : "Monto Fijo Pactado"}
+                            </span>
                             <span className="text-sm font-bold text-amber-800">{formatCLP(selectedClient.manual_penalty)}</span>
                           </div>
                         </div>
@@ -2669,24 +2676,25 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                         onClick={() => setMoraForm({...moraForm, penalty_mode: "MIXED"})} 
                         className={cn(
                           "flex-1 py-2.5 px-3 rounded-xl text-[9px] font-bold tracking-wider uppercase transition-all border cursor-pointer",
-                          moraForm.penalty_mode === "MIXED" 
-                            ? "bg-slate-100 border-slate-300 text-slate-800 shadow-inner font-black" 
+                          // FIXED calcula igual que MIXED (fijo que crece + automático), así que se muestra acá.
+                          (moraForm.penalty_mode === "MIXED" || moraForm.penalty_mode === "FIXED")
+                            ? "bg-slate-100 border-slate-300 text-slate-800 shadow-inner font-black"
                             : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
                         )}
                       >
                         Mixto (Fijo+Auto)
                       </button>
-                      <button 
+                      <button
                         type="button"
-                        onClick={() => setMoraForm({...moraForm, penalty_mode: "FIXED"})} 
+                        onClick={() => setMoraForm({...moraForm, penalty_mode: "PACTADO"})}
                         className={cn(
                           "flex-1 py-2.5 px-3 rounded-xl text-[9px] font-bold tracking-wider uppercase transition-all border cursor-pointer",
-                          moraForm.penalty_mode === "FIXED" 
-                            ? "bg-slate-100 border-slate-300 text-slate-800 shadow-inner font-black" 
+                          moraForm.penalty_mode === "PACTADO"
+                            ? "bg-slate-100 border-slate-300 text-slate-800 shadow-inner font-black"
                             : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
                         )}
                       >
-                        Monto Fijo
+                        Monto Pactado
                       </button>
                     </div>
                   </div>
@@ -2694,14 +2702,16 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                   {/* Mode explanation banner */}
                   <div className="bg-brand-50 border border-brand-100 rounded-xl p-3 text-[11px] text-brand-800 font-medium leading-relaxed">
                     {moraForm.penalty_mode === "AUTO" && "La multa se calcula automáticamente multiplicando los días de atraso por el interés diario configurado."}
-                    {moraForm.penalty_mode === "MIXED" && "Se cobra un monto fijo histórico, más el cálculo automático para cuotas nuevas que vayan venciendo."}
-                    {moraForm.penalty_mode === "FIXED" && "Solo se cobra el monto fijo definido manualmente, ignorando fechas de atraso y días."}
+                    {(moraForm.penalty_mode === "MIXED" || moraForm.penalty_mode === "FIXED") && "Monto fijo que suma el interés diario mientras no se pague, más el interés automático de cada cuota vencida."}
+                    {moraForm.penalty_mode === "PACTADO" && "Monto total de intereses acordado con el cliente hasta la fecha del acuerdo. No crece. Las cuotas que vencieron antes de esa fecha no suman interés aparte; las que vencen desde esa fecha generan su interés normal."}
                   </div>
 
                   {/* Manual Penalty Input */}
-                  {(moraForm.penalty_mode === "FIXED" || moraForm.penalty_mode === "MIXED") && (
+                  {(moraForm.penalty_mode === "FIXED" || moraForm.penalty_mode === "MIXED" || moraForm.penalty_mode === "PACTADO") && (
                     <div className="space-y-1.5 animate-fade-in">
-                      <label className="block text-[9px] uppercase tracking-wider text-red-500 font-bold">Monto de Multa Fijo ($)</label>
+                      <label className="block text-[9px] uppercase tracking-wider text-red-500 font-bold">
+                        {moraForm.penalty_mode === "PACTADO" ? "Monto Pactado: total de intereses ($)" : "Monto de Multa Fijo ($)"}
+                      </label>
                       <input 
                         type="number" 
                         value={moraForm.manual_penalty || 0}
@@ -2717,7 +2727,9 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
               {/* Debt Date Ranges */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Inicio Deuda (Fuerza Mora)</label>
+                  <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                    {moraForm.mora_status === "ACTIVO" && moraForm.penalty_mode === "PACTADO" ? "Fecha del Acuerdo" : "Inicio Deuda (Fuerza Mora)"}
+                  </label>
                   <input 
                     type="date" 
                     value={moraForm.debt_start_date}

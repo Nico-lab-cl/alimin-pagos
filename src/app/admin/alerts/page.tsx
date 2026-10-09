@@ -177,7 +177,7 @@ export default function AlertsPage() {
                   {/* Overdue Installments Breakdown Row */}
                   {client.penaltyAmount > 0 && client.overdueInstallments?.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2.5">
-                      {(client.penalty_mode === "FIXED" || client.penalty_mode === "MIXED") && client.manual_penalty > 0 && (
+                      {(client.penalty_mode === "FIXED" || client.penalty_mode === "MIXED" || client.penalty_mode === "PACTADO") && client.manual_penalty > 0 && (
                         <span className="text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md border border-amber-200">
                           Fija: {formatCLP(client.manual_penalty)}
                         </span>
@@ -310,7 +310,7 @@ export default function AlertsPage() {
               </div>
 
               {/* Mora Histórica Fija */}
-              {(selectedAlertClient.penalty_mode === "FIXED" || selectedAlertClient.penalty_mode === "MIXED") && selectedAlertClient.manual_penalty > 0 && (
+              {(selectedAlertClient.penalty_mode === "FIXED" || selectedAlertClient.penalty_mode === "MIXED" || selectedAlertClient.penalty_mode === "PACTADO") && selectedAlertClient.manual_penalty > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-amber-700">
                     <ShieldAlert className="w-4 h-4" />

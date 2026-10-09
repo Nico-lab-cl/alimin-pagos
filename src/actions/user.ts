@@ -7,7 +7,10 @@ import {
   calculateTotalInterest,
   calculateLomasInterest,
   calculateAggregatedAutoPenalty,
-  calculateGrowingFixedPenalty,
+  tieneMultaFija,
+  multaFijaVigente,
+  cuotaCubiertaPorAcuerdo,
+  MODO_PACTADO,
   crearAplicadorDeAbonosMora,
   getChileToday,
   getNominalInstallmentAmount,
@@ -183,7 +186,7 @@ export async function getUserLots() {
         }
 
         // Determine penalty: FIXED (manual + auto), MIXED (manual + auto) or AUTO (date-based)
-        if (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") {
+        if (tieneMultaFija(res.penalty_mode)) {
           // Both FIXED and MIXED: fixed penalty + auto penalty for currently-late installments
           // IMPORTANT: pass null for debt_start_date so auto calc uses normal grace period,
           // because the fixed amount already covers historical debt.
@@ -199,10 +202,13 @@ export async function getUserLots() {
             null, // Don't use debt_start_date — fixed penalty covers historical debt
             project.penalty_start_date,
             res.debt_end_date,
-            res.next_payment_date
+            res.next_payment_date,
+            // PACTADO: las cuotas vencidas antes del acuerdo las cubre el monto pactado.
+            res.penalty_mode === MODO_PACTADO ? res.debt_start_date : null
           );
           // La multa fija/pactada crece día a día desde debt_start_date, igual que en el panel admin.
-          const { amount: fixedPenalty, growthDays: fixedGrowthDays } = calculateGrowingFixedPenalty(
+          const { amount: fixedPenalty, growthDays: fixedGrowthDays } = multaFijaVigente(
+            res.penalty_mode,
             res.manual_penalty,
             res.debt_start_date,
             activeDailyPenalty,
@@ -270,8 +276,9 @@ export async function getUserLots() {
         );
 
         // 1. Add historical penalty as a separate item if in FIXED or MIXED mode
-        if ((res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") && res.manual_penalty != null && res.manual_penalty > 0) {
-          const { amount: growingFixedAmount, growthDays: fixedGrowthDaysForItem } = calculateGrowingFixedPenalty(
+        if (tieneMultaFija(res.penalty_mode) && res.manual_penalty != null && res.manual_penalty > 0) {
+          const { amount: growingFixedAmount, growthDays: fixedGrowthDaysForItem } = multaFijaVigente(
+            res.penalty_mode,
             res.manual_penalty,
             res.debt_start_date,
             activeDailyPenalty,
@@ -335,7 +342,7 @@ export async function getUserLots() {
                 res.mora_frozen || false,
                 res.grace_days ?? project.grace_period_days ?? 5,
                 activeDailyPenalty,
-                (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
+                tieneMultaFija(res.penalty_mode) ? null : res.debt_start_date,
                 project.penalty_start_date,
                 res.debt_end_date
               );
@@ -347,12 +354,15 @@ export async function getUserLots() {
                 res.grace_days ?? project.grace_period_days ?? 5,
                 activeDailyPenalty,
                 // For FIXED/MIXED, don't use debt_start_date (fixed penalty covers history)
-                (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+                tieneMultaFija(res.penalty_mode) ? null : (i === 0 ? res.debt_start_date : null),
                 project.penalty_start_date,
                 res.debt_end_date
               );
             }
           }
+
+          // PACTADO: el interés de las cuotas vencidas antes del acuerdo ya está en el monto pactado.
+          if (cuotaCubiertaPorAcuerdo(res.penalty_mode, res.debt_start_date, currentDue)) autoPenaltyForThis = 0;
 
           // Cuanto de la mora de ESTA cuota alcanzan a cubrir los abonos.
           const instMoraCredits = aplicadorAbonos.aplicar(
@@ -366,7 +376,7 @@ export async function getUserLots() {
                     res.mora_frozen || false,
                     res.grace_days ?? project.grace_period_days ?? 5,
                     activeDailyPenalty,
-                    (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
+                    tieneMultaFija(res.penalty_mode) ? null : res.debt_start_date,
                     project.penalty_start_date,
                     res.debt_end_date
                   )
@@ -376,7 +386,7 @@ export async function getUserLots() {
                     res.mora_frozen || false,
                     res.grace_days ?? project.grace_period_days ?? 5,
                     activeDailyPenalty,
-                    (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+                    tieneMultaFija(res.penalty_mode) ? null : (i === 0 ? res.debt_start_date : null),
                     project.penalty_start_date,
                     res.debt_end_date
                   )
@@ -403,7 +413,7 @@ export async function getUserLots() {
           let interestStartDate = new Date(currentDue);
           interestStartDate.setDate(currentDue.getDate() + graceDays + 1);
 
-          const appliedDebtStartDate = (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null);
+          const appliedDebtStartDate = tieneMultaFija(res.penalty_mode) ? null : (i === 0 ? res.debt_start_date : null);
           if (appliedDebtStartDate) {
             const dStart = new Date(appliedDebtStartDate);
             if (dStart >= currentDue) {

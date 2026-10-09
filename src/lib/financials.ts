@@ -319,6 +319,49 @@ export function calculateGrowingFixedPenalty(
   return { amount: base + dailyPenalty * growthDays, growthDays };
 }
 
+/**
+ * Modo "PACTADO" (Monto pactado): postventa acuerda con el cliente un monto
+ * TOTAL de intereses hasta una fecha (debt_start_date = fecha del acuerdo).
+ *
+ * - El monto pactado (manual_penalty) NO crece día a día: es lo acordado.
+ * - El interés de las cuotas que vencieron ANTES de la fecha del acuerdo queda
+ *   cubierto por ese monto (no se suma aparte).
+ * - Las cuotas que vencen desde la fecha del acuerdo generan su interés normal.
+ *
+ * FIXED y MIXED siguen calculando exactamente igual que antes; PACTADO es un
+ * modo nuevo que solo se usa cuando postventa lo elige.
+ */
+export const MODO_PACTADO = "PACTADO";
+
+/** ¿El modo usa una multa fija guardada en manual_penalty? (FIXED, MIXED o PACTADO) */
+export function tieneMultaFija(penaltyMode: string | null | undefined): boolean {
+  return penaltyMode === "FIXED" || penaltyMode === "MIXED" || penaltyMode === MODO_PACTADO;
+}
+
+/** Monto vigente de la multa fija: en PACTADO es exactamente lo acordado; en FIXED/MIXED crece como siempre. */
+export function multaFijaVigente(
+  penaltyMode: string | null | undefined,
+  manualPenalty: number | null | undefined,
+  debtStartDate: Date | string | null | undefined,
+  dailyPenalty: number,
+  currentDate: Date
+): { amount: number; growthDays: number } {
+  if (penaltyMode === MODO_PACTADO) {
+    return { amount: manualPenalty && manualPenalty > 0 ? manualPenalty : 0, growthDays: 0 };
+  }
+  return calculateGrowingFixedPenalty(manualPenalty, debtStartDate, dailyPenalty, currentDate);
+}
+
+/** En PACTADO, ¿el interés de esta cuota quedó cubierto por el acuerdo? (venció antes de la fecha del acuerdo) */
+export function cuotaCubiertaPorAcuerdo(
+  penaltyMode: string | null | undefined,
+  fechaAcuerdo: Date | string | null | undefined,
+  dueDate: Date | string
+): boolean {
+  if (penaltyMode !== MODO_PACTADO || !fechaAcuerdo) return false;
+  return getSantiagoUTCDate(new Date(dueDate)).getTime() < getSantiagoUTCDate(new Date(fechaAcuerdo)).getTime();
+}
+
 export type AbonoMora = {
   amount_clp: number | null;
   created_at: Date | string | null;
@@ -425,7 +468,10 @@ export function calculateAggregatedAutoPenalty(
   firstInstallmentDebtStartDate?: Date | string | null,
   penaltyStartDate?: Date | string | null,
   debtEndDate?: Date | string | null,
-  firstInstallmentOverrideDate?: Date | string | null
+  firstInstallmentOverrideDate?: Date | string | null,
+  // Solo modo PACTADO: las cuotas que vencieron antes de esta fecha no suman
+  // interés (los cubre el monto pactado). Sin este parámetro, todo igual que antes.
+  cubiertoHasta?: Date | string | null
 ): { totalPenaltyAmount: number; totalLateDays: number } {
   let totalPenaltyAmount = 0;
   let totalLateDays = 0;
@@ -446,6 +492,8 @@ export function calculateAggregatedAutoPenalty(
     } else {
       continue; // Can't calculate if no installment start date
     }
+
+    if (cubiertoHasta && cuotaCubiertaPorAcuerdo(MODO_PACTADO, cubiertoHasta, currentDue)) continue;
 
     // The manual debt_start_date override only applies to the FIRST missed installment
     const appliedDebtStartDate = i === 0 ? firstInstallmentDebtStartDate : null;

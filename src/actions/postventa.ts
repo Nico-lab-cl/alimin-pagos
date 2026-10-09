@@ -7,7 +7,10 @@ import {
   calculateTotalInterest,
   calculateLomasInterest,
   calculateAggregatedAutoPenalty,
-  calculateGrowingFixedPenalty,
+  tieneMultaFija,
+  multaFijaVigente,
+  cuotaCubiertaPorAcuerdo,
+  MODO_PACTADO,
   crearAplicadorDeAbonosMora,
   getProjectConfig,
   getChileToday,
@@ -256,13 +259,13 @@ function calculateCurrentMoraOwed(
 ): number {
   const paidCuotas = res.installments_paid || 0;
   const totalCuotas = res.lot.cuotas || 0;
-  const fixedMode = res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED";
+  const fixedMode = tieneMultaFija(res.penalty_mode);
   const currentDate = asOfDate;
   const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
   // Mora total (automatica + fija) vigente a una fecha cualquiera.
   const moraAlDia = (fecha: Date): number => {
     const { amount: fixed } = fixedMode
-      ? calculateGrowingFixedPenalty(res.manual_penalty, res.debt_start_date, activeDailyPenalty, fecha)
+      ? multaFijaVigente(res.penalty_mode, res.manual_penalty, res.debt_start_date, activeDailyPenalty, fecha)
       : { amount: 0 };
 
     if (paidCuotas >= totalCuotas || !res.installment_start_date) return fixed;
@@ -279,7 +282,9 @@ function calculateCurrentMoraOwed(
       fixedMode ? null : res.debt_start_date,
       project.penalty_start_date,
       res.debt_end_date,
-      res.next_payment_date
+      res.next_payment_date,
+      // PACTADO: las cuotas vencidas antes del acuerdo las cubre el monto pactado.
+      res.penalty_mode === MODO_PACTADO ? res.debt_start_date : null
     );
     return auto + fixed;
   };
@@ -414,7 +419,7 @@ function getMoraBreakdownText(
   const currentDate = getChileToday();
   const activeDailyPenalty = res.daily_penalty ?? project.daily_penalty_amount ?? 10000;
   const graceDays = res.grace_days ?? project.grace_period_days ?? 5;
-  const fixedMode = res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED";
+  const fixedMode = tieneMultaFija(res.penalty_mode);
   const formatMonth = new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric", timeZone: "America/Santiago" });
 
   const lines: string[] = [];
@@ -438,6 +443,9 @@ function getMoraBreakdownText(
       project.penalty_start_date,
       res.debt_end_date
     );
+
+    // PACTADO: el interés de las cuotas vencidas antes del acuerdo ya está en el monto pactado.
+    if (cuotaCubiertaPorAcuerdo(res.penalty_mode, res.debt_start_date, currentDue)) continue;
 
     if (penaltyForThis > 0) {
       const days = Math.round(penaltyForThis / activeDailyPenalty);
@@ -609,7 +617,7 @@ export async function approveReceipt(
 
         let nextPenaltyMode = "AUTO";
         if (shortfall > 0) {
-          nextPenaltyMode = res.penalty_mode === "MIXED" ? "MIXED" : "FIXED";
+          nextPenaltyMode = res.penalty_mode === "MIXED" || res.penalty_mode === MODO_PACTADO ? res.penalty_mode : "FIXED";
         }
         // Capturar el desglose ANTES de la transacción, con el estado pre-pago,
         // porque una vez guardado el shortfall como manual_penalty se pierde de qué cuota venía.
@@ -879,7 +887,7 @@ export async function approveReceiptAsInterestPayment(
         where: { id: receipt.reservation_id },
         data: {
           manual_penalty: remainingMora > 0 ? remainingMora : null,
-          penalty_mode: remainingMora > 0 ? "MIXED" : "AUTO",
+          penalty_mode: remainingMora > 0 ? (res.penalty_mode === MODO_PACTADO ? MODO_PACTADO : "MIXED") : "AUTO",
           // Re-fija la fecha desde la que la mora restante sigue creciendo día a
           // día: desde que pagó, no desde hoy.
           debt_start_date: remainingMora > 0 ? paymentDate : null,
@@ -2084,7 +2092,7 @@ export async function updateClientFinancials(reservationId: string, lotId: numbe
     
     if (data.manual_penalty !== undefined) {
       const activeMode = data.penalty_mode !== undefined ? data.penalty_mode : reservation.penalty_mode;
-      reservationUpdateData.manual_penalty = (activeMode === "FIXED" || activeMode === "MIXED") ? (Number(data.manual_penalty) || null) : null;
+      reservationUpdateData.manual_penalty = tieneMultaFija(activeMode) ? (Number(data.manual_penalty) || null) : null;
     } else if (data.penalty_mode !== undefined) {
       if (data.penalty_mode === "AUTO") {
         reservationUpdateData.manual_penalty = null;
@@ -2389,7 +2397,7 @@ export async function registerManualPayment(
             },
             next_payment_date: null,
             manual_penalty: shortfall > 0 ? shortfall : null,
-            penalty_mode: shortfall > 0 ? (res.penalty_mode === "MIXED" ? "MIXED" : "FIXED") : "AUTO",
+            penalty_mode: shortfall > 0 ? (res.penalty_mode === "MIXED" || res.penalty_mode === MODO_PACTADO ? res.penalty_mode : "FIXED") : "AUTO",
             // El faltante se calculo A LA FECHA DEL PAGO (paymentDate), asi que
             // debe empezar a crecer desde ese mismo dia, no desde hoy — sino el
             // saldo restante queda atrasado respecto a lo que realmente debe.
@@ -2517,7 +2525,7 @@ export async function registerInterestPayment(
         where: { id: reservationId },
         data: {
           manual_penalty: remainingMora > 0 ? remainingMora : null,
-          penalty_mode: remainingMora > 0 ? "MIXED" : "AUTO",
+          penalty_mode: remainingMora > 0 ? (res.penalty_mode === MODO_PACTADO ? MODO_PACTADO : "MIXED") : "AUTO",
           // Re-fija la fecha desde la que la mora restante sigue creciendo día a día.
           debt_start_date: remainingMora > 0 ? getChileToday() : null,
           debt_end_date: null,
@@ -2694,7 +2702,7 @@ export async function getClientPOV(reservationId: string) {
       }
 
       // Penalty calculation: FIXED/MIXED (manual + auto) or AUTO (date-based)
-      if (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") {
+      if (tieneMultaFija(res.penalty_mode)) {
         const { totalPenaltyAmount: autoPenalty, totalLateDays: autoLateDays } = calculateAggregatedAutoPenalty(
           totalCuotas - paidCuotas,
           paidCuotas,
@@ -2707,7 +2715,9 @@ export async function getClientPOV(reservationId: string) {
           null, // Don't use debt_start_date — fixed penalty covers historical debt
           project.penalty_start_date,
           res.debt_end_date,
-          res.next_payment_date
+          res.next_payment_date,
+          // PACTADO: las cuotas vencidas antes del acuerdo las cubre el monto pactado.
+          res.penalty_mode === MODO_PACTADO ? res.debt_start_date : null
         );
         const fixedPenalty = (res.manual_penalty != null && res.manual_penalty > 0) ? res.manual_penalty : 0;
         penaltyAmount = autoPenalty + fixedPenalty;
@@ -2773,7 +2783,7 @@ export async function getClientPOV(reservationId: string) {
       const formatMonth = new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Santiago' });
 
       // 1. Add historical penalty as a separate item if in FIXED or MIXED mode
-      if ((res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") && res.manual_penalty != null && res.manual_penalty > 0) {
+      if ((tieneMultaFija(res.penalty_mode)) && res.manual_penalty != null && res.manual_penalty > 0) {
         upcomingInstallments.push({
           number: 0,
           dueDate: null,
@@ -2829,7 +2839,7 @@ export async function getClientPOV(reservationId: string) {
               res.mora_frozen || false,
               res.grace_days ?? project.grace_period_days ?? 5,
               activeDailyPenalty,
-              (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
+              (tieneMultaFija(res.penalty_mode)) ? null : res.debt_start_date,
               project.penalty_start_date,
               res.debt_end_date
             );
@@ -2841,12 +2851,15 @@ export async function getClientPOV(reservationId: string) {
               res.grace_days ?? project.grace_period_days ?? 5,
               activeDailyPenalty,
               // For FIXED/MIXED, don't use debt_start_date (fixed penalty covers history)
-              (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+              (tieneMultaFija(res.penalty_mode)) ? null : (i === 0 ? res.debt_start_date : null),
               project.penalty_start_date,
               res.debt_end_date
             );
           }
         }
+
+        // PACTADO: el interés de las cuotas vencidas antes del acuerdo ya está en el monto pactado.
+        if (cuotaCubiertaPorAcuerdo(res.penalty_mode, res.debt_start_date, currentDue)) autoPenaltyForThis = 0;
 
         // Cuanto de la mora de ESTA cuota alcanzan a cubrir los abonos.
         const instMoraCredits = aplicadorAbonos.aplicar(
@@ -2860,7 +2873,7 @@ export async function getClientPOV(reservationId: string) {
                   res.mora_frozen || false,
                   res.grace_days ?? project.grace_period_days ?? 5,
                   activeDailyPenalty,
-                  (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : res.debt_start_date,
+                  (tieneMultaFija(res.penalty_mode)) ? null : res.debt_start_date,
                   project.penalty_start_date,
                   res.debt_end_date
                 )
@@ -2870,7 +2883,7 @@ export async function getClientPOV(reservationId: string) {
                   res.mora_frozen || false,
                   res.grace_days ?? project.grace_period_days ?? 5,
                   activeDailyPenalty,
-                  (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null),
+                  (tieneMultaFija(res.penalty_mode)) ? null : (i === 0 ? res.debt_start_date : null),
                   project.penalty_start_date,
                   res.debt_end_date
                 )
@@ -2896,7 +2909,7 @@ export async function getClientPOV(reservationId: string) {
         let interestStartDate = new Date(currentDue);
         interestStartDate.setDate(currentDue.getDate() + graceDays + 1);
 
-        const appliedDebtStartDate = (res.penalty_mode === "FIXED" || res.penalty_mode === "MIXED") ? null : (i === 0 ? res.debt_start_date : null);
+        const appliedDebtStartDate = (tieneMultaFija(res.penalty_mode)) ? null : (i === 0 ? res.debt_start_date : null);
         if (appliedDebtStartDate) {
           const dStart = new Date(appliedDebtStartDate);
           if (dStart >= currentDue) {
