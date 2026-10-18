@@ -27,7 +27,7 @@ import { esAlContado } from "@/lib/utils";
 /** Grupo de WhatsApp de cada proyecto. No es secreto: es a donde va el resumen. */
 export const GRUPO_RESUMEN: Record<string, string> = {
   "libertad-y-alegria": "120363334363201368@g.us", // Post Ventas PAGOS Alimin Libertad y Alegria (Denisse)
-  "arena-y-sol": "120363299386447333@g.us", // Proyecto Arena y Sol (Cindy)
+  "arena-y-sol": "120363408995299504@g.us", // Postventa arena y sol (Cindy)
   "lomas-del-mar": "120363421825250613@g.us", // Postventa Lomas del Mar (Cindy)
 };
 
