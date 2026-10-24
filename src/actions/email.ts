@@ -16,7 +16,30 @@ import {
   EMAIL_SUBJECT_MAX,
   EMAIL_BODY_MAX,
   EMAIL_TEMPLATE_VARIABLES,
+  EMAIL_ATTACHMENTS_MAX_FILES,
+  EMAIL_ATTACHMENTS_MAX_BYTES,
+  EMAIL_ATTACHMENT_BLOCKED_EXT,
+  EMAIL_SCHEDULE_MAX_DAYS,
 } from "@/lib/emailTemplate";
+import {
+  EMAIL_AUDIENCES as AUDIENCES,
+  AUDIENCE_LABELS,
+  santiagoDayKey,
+  matchesAudience,
+  installmentAmount,
+  buildEmailClientValues,
+  validEmails,
+  EMAIL_REGEX,
+  loadEmailAttachments,
+  sendEmailsToReservations,
+  type EmailAudience,
+  type EmailChunkResult,
+} from "@/lib/correoMasivo";
+import { chileLocalToUtc, formatoFechaHoraChile } from "@/lib/horaChile";
+
+// Solo tipos: se borran al compilar, asi que no rompen la regla de que un
+// archivo "use server" exporte unicamente funciones async.
+export type { EmailAudience, EmailChunkResult };
 
 /**
  * Modulo de correo masivo: postventa escribe asunto + cuerpo, elige a quien,
@@ -25,6 +48,8 @@ import {
  *
  * Regla de oro, igual que en whatsapp.ts: la segmentacion NO se recalcula
  * aca. Los estados de cobranza salen tal cual de getFullPostventaData.
+ * El envio en si (y las reglas de segmento) viven en lib/correoMasivo.ts,
+ * compartidas con el programador de tandas (lib/programadorCorreos.ts).
  *
  * Solo dos cuentas pueden mandar tandas: postventa@lomasdelmar.cl (buzon
  * cindy, cubre Lomas del Mar y Arena y Sol) y postventa@libertadyalegria.cl
@@ -39,140 +64,8 @@ const BULK_SENDER_ALLOWLIST = new Set([
 
 /** Cuantos correos salen como maximo en una llamada. */
 const MAX_CHUNK = 5;
-/** Pausa entre correo y correo, para no gatillar limites de envio de Gmail. */
-const DELAY_MIN_MS = 2_000;
-const DELAY_MAX_MS = 5_000;
-
-const AUDIENCES = ["TODOS", "MORA", "GRACIA", "PROXIMO", "VENCIMIENTO"] as const;
-export type EmailAudience = (typeof AUDIENCES)[number];
-
-const AUDIENCE_LABELS: Record<EmailAudience, string> = {
-  TODOS: "Todos los clientes",
-  MORA: "En mora",
-  GRACIA: "Días de gracia",
-  PROXIMO: "Próximo a pagar",
-  VENCIMIENTO: "Vence hoy",
-};
-
-function santiagoDayKey(date: Date | string | null | undefined): string | null {
-  if (!date) return null;
-  const d = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(d.getTime())) return null;
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Santiago",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-}
-
-/**
- * Misma regla que matchesCategory en actions/whatsapp.ts, duplicada a
- * proposito: ese modulo ya funciona en producción y postventa lo dio por
- * bueno, así que se prefiere repetir 15 líneas antes que arriesgar una
- * regresión ahí por compartir código con un módulo nuevo.
- */
-function matchesAudience(client: any, audience: EmailAudience, todayKey: string): boolean {
-  if (client.status === "COMPLETED" || client.status === "FROZEN") return false;
-  // Ficha fantasma del puente Lomas (ver lib/fichasDuplicadas.ts): es la copia
-  // atrasada de un cliente que ya esta en el portal, asi que su "mora" es de una
-  // cuota que en realidad esta pagada. Cobrarle por ahi seria cobrarle dos veces.
-  if (client.isGhostDuplicate) return false;
-  switch (audience) {
-    case "TODOS":
-      return true;
-    case "MORA":
-      return client.status === "LATE";
-    case "GRACIA":
-      return client.status === "GRACE";
-    case "PROXIMO":
-      return client.status === "UPCOMING";
-    case "VENCIMIENTO":
-      return client.status !== "LATE" && santiagoDayKey(client.nextDueDate) === todayKey;
-    default:
-      return false;
-  }
-}
-
-function formatCLP(amount: number | null | undefined): string {
-  return `$${Math.round(Number(amount) || 0).toLocaleString("es-CL")}`;
-}
-
-function formatDateCL(date: Date | string | null | undefined): string {
-  if (!date) return "";
-  const d = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("es-CL", {
-    timeZone: "America/Santiago",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
-}
-
-function installmentAmount(client: any): number {
-  const n = client?.nextInstallmentNumber;
-  if (!n) return Number(client?.valor_cuota) || 0;
-
-  let ranges: any[] = [];
-  try {
-    const raw = client?.installment_ranges;
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (Array.isArray(parsed)) ranges = parsed;
-  } catch {
-    ranges = [];
-  }
-
-  const range = ranges.find(
-    (r: any) => n >= Number(r.from ?? r.start ?? 0) && n <= Number(r.to ?? r.end ?? 0)
-  );
-
-  if (range) return Number(range.amount ?? range.value ?? 0) || 0;
-  return Number(client?.valor_cuota) || 0;
-}
-
-function buildEmailClientValues(client: any, projectName: string): Record<string, string> {
-  const monto = installmentAmount(client);
-  const multa = Number(client?.penaltyAmount) || 0;
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://pagos.aliminspa.cl";
-
-  return {
-    nombre: client?.clientName || "",
-    rut: client?.rut || "",
-    email: client?.clientEmail || (validEmails(client)[0] ?? ""),
-    telefono: client?.clientPhone || "",
-    proyecto: projectName || "",
-    lote: String(client?.lotNumber ?? ""),
-    etapa: String(client?.lotStage ?? ""),
-    portal: `${baseUrl.replace(/\/+$/, "")}/user`,
-    monto: formatCLP(monto),
-    cuota: client?.nextInstallmentNumber ? String(client.nextInstallmentNumber) : "",
-    mes_cuota: client?.nextInstallmentMonth || "",
-    fecha_vencimiento: formatDateCL(client?.nextDueDate),
-    saldo: formatCLP(client?.pendingBalance),
-    multa: formatCLP(multa),
-    total: formatCLP(monto + multa),
-    dias_mora: String(client?.lateDays ?? 0),
-    dias_gracia: String(client?.grace_days ?? 0),
-  };
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function validEmails(client: any): string[] {
-  const out: string[] = [];
-  if (client.clientEmail && EMAIL_REGEX.test(client.clientEmail)) out.push(client.clientEmail);
-  if (
-    client.secondaryEmail &&
-    EMAIL_REGEX.test(client.secondaryEmail) &&
-    client.secondaryEmail !== client.clientEmail
-  ) {
-    out.push(client.secondaryEmail);
-  }
-  return out;
-}
+/** Techo por tanda, igual que en la pantalla. */
+const MAX_PER_BATCH = 250;
 
 async function requireAdmin() {
   const session = await auth();
@@ -452,12 +345,20 @@ export async function startEmailBatch(data: { projectSlug: string; audience: str
   return { success: true, batchId };
 }
 
-export type EmailChunkResult = {
-  reservationId: string;
-  clientName: string;
-  ok: boolean;
-  error?: string;
-};
+/**
+ * Revisa el borrador (asunto, cuerpo, adjuntos) igual para "Enviar ahora",
+ * "Programar" y la prueba. Devuelve el mensaje de error o null.
+ */
+function validateDraft(subject: string, body: string, attachmentIds?: string[] | null): string | null {
+  if (!subject?.trim()) return "El asunto no puede quedar vacío";
+  if (subject.length > EMAIL_SUBJECT_MAX) return `El asunto supera los ${EMAIL_SUBJECT_MAX} caracteres`;
+  if (!body?.trim()) return "El mensaje no puede quedar vacío";
+  if (body.length > EMAIL_BODY_MAX) return `El mensaje supera los ${EMAIL_BODY_MAX} caracteres`;
+  if ((attachmentIds?.length ?? 0) > EMAIL_ATTACHMENTS_MAX_FILES) {
+    return `Se pueden adjuntar hasta ${EMAIL_ATTACHMENTS_MAX_FILES} archivos por correo`;
+  }
+  return null;
+}
 
 /**
  * Envia un tramo de la tanda (maximo MAX_CHUNK correos). Mismo patrón que
@@ -472,19 +373,15 @@ export async function sendEmailChunk(data: {
   /** Total de la tanda completa y cuantos ya se procesaron antes de este tramo. */
   batchTotal?: number;
   startIndex?: number;
+  /** Adjuntos ya subidos con uploadEmailAttachment. */
+  attachmentIds?: string[];
 }): Promise<{ error?: string; results?: EmailChunkResult[] }> {
   const user = await requireAdmin();
   if (!user) return { error: "No autorizado" };
   if (!canSendBulk(user)) return { error: "Tu cuenta no tiene permiso para enviar correos masivos" };
 
-  if (!data.subject?.trim()) return { error: "El asunto no puede quedar vacío" };
-  if (data.subject.length > EMAIL_SUBJECT_MAX) {
-    return { error: `El asunto supera los ${EMAIL_SUBJECT_MAX} caracteres` };
-  }
-  if (!data.body?.trim()) return { error: "El mensaje no puede quedar vacío" };
-  if (data.body.length > EMAIL_BODY_MAX) {
-    return { error: `El mensaje supera los ${EMAIL_BODY_MAX} caracteres` };
-  }
+  const draftError = validateDraft(data.subject, data.body, data.attachmentIds);
+  if (draftError) return { error: draftError };
   if (!data.reservationIds?.length) return { error: "No hay destinatarios en este tramo" };
   if (data.reservationIds.length > MAX_CHUNK) {
     return { error: `Un tramo no puede superar los ${MAX_CHUNK} correos` };
@@ -496,111 +393,27 @@ export async function sendEmailChunk(data: {
   try {
     const reservations = await prisma.reservation.findMany({
       where: { id: { in: data.reservationIds } },
-      select: { id: true, project: { select: { slug: true, name: true } } },
+      select: { project: { select: { slug: true } } },
     });
-
-    const slugs = Array.from(new Set(reservations.map((r) => r.project.slug)));
-    const dataBySlug = new Map<string, any[]>();
-    for (const slug of slugs) {
+    for (const slug of new Set(reservations.map((r) => r.project.slug))) {
       if (!canAccessProject(user, slug)) {
         return { error: `Sin acceso al proyecto ${slug}` };
       }
-      const res = await getFullPostventaData({ projectSlug: slug });
-      dataBySlug.set(slug, res.data || []);
     }
 
-    const results: EmailChunkResult[] = [];
-    let first = true;
+    const attachments = await loadEmailAttachments(data.attachmentIds);
+    if (!attachments.ok) return { error: attachments.error };
 
-    for (const reservationId of data.reservationIds) {
-      const reservation = reservations.find((r) => r.id === reservationId);
-      if (!reservation) {
-        results.push({ reservationId, clientName: "?", ok: false, error: "La reserva ya no existe" });
-        continue;
-      }
-
-      const slug = reservation.project.slug;
-      const projectName = reservation.project.name;
-      const client = (dataBySlug.get(slug) || []).find((c: any) => c.id === reservationId);
-
-      if (!client) {
-        results.push({
-          reservationId,
-          clientName: "?",
-          ok: false,
-          error: "No se pudieron leer los datos del cliente",
-        });
-        continue;
-      }
-
-      const label = client.clientName || "?";
-      const emails = validEmails(client);
-
-      if (emails.length === 0) {
-        results.push({ reservationId, clientName: label, ok: false, error: "Sin correo válido registrado" });
-        continue;
-      }
-
-      const buzon = buzonForProject(slug);
-      if (!buzon) {
-        results.push({
-          reservationId,
-          clientName: label,
-          ok: false,
-          error: `No hay una cuenta de correo asignada al proyecto ${slug}`,
-        });
-        continue;
-      }
-
-      if (!first) {
-        await sleep(DELAY_MIN_MS + Math.random() * (DELAY_MAX_MS - DELAY_MIN_MS));
-      }
-      first = false;
-
-      const values = buildEmailClientValues(client, projectName);
-      const subject = renderEmailVariables(data.subject, values);
-      const bodyText = renderEmailVariables(data.body, values);
-      const html = buildEmailHtml({ projectSlug: slug, projectName, bodyText });
-
-      const sent = await sendEmail({
-        buzon,
-        modo: "REAL",
-        to: emails.join(", "),
-        subject,
-        html,
-        texto: bodyText,
-        proyectoSlug: slug,
-        proyectoNombre: projectName,
-        clienteNombre: label,
-        clienteRut: client.rut || "",
-        clienteLote: String(client.lotNumber ?? ""),
-        clienteEtapa: String(client.lotStage ?? ""),
-        reservaId: reservationId,
-        mensajeId: crypto.randomUUID(),
-        tandaId: data.batchId,
-        indice: (data.startIndex ?? 0) + results.length + 1,
-        total: data.batchTotal ?? data.reservationIds.length,
-        enviadoPor: user.email,
-      });
-
-      await prisma.emailMessage.create({
-        data: {
-          reservation_id: reservationId,
-          project_slug: slug,
-          buzon,
-          batch_id: data.batchId,
-          client_name: label,
-          to_email: emails.join(", "),
-          subject,
-          body_html: html,
-          status: sent.ok ? "SENT" : "FAILED",
-          error: sent.ok ? null : sent.error.slice(0, 500),
-          sent_by: user.email,
-        },
-      });
-
-      results.push({ reservationId, clientName: label, ok: sent.ok, error: sent.ok ? undefined : sent.error });
-    }
+    const results = await sendEmailsToReservations({
+      batchId: data.batchId,
+      subject: data.subject,
+      body: data.body,
+      reservationIds: data.reservationIds,
+      adjuntos: attachments.adjuntos,
+      sentBy: user.email,
+      batchTotal: data.batchTotal ?? data.reservationIds.length,
+      startIndex: data.startIndex ?? 0,
+    });
 
     return { results };
   } catch (error) {
@@ -625,6 +438,8 @@ export async function sendEmailTest(data: {
    * cliente abajo y la prueba mostraba los datos de otro.
    */
   reservationId?: string | null;
+  /** Los mismos adjuntos de la tanda: la prueba sirve justamente para ver que lleguen. */
+  attachmentIds?: string[];
 }) {
   const user = await requireAdmin();
   if (!user) return { error: "No autorizado" };
@@ -632,6 +447,8 @@ export async function sendEmailTest(data: {
 
   const to = data.to?.trim();
   if (!to || !EMAIL_REGEX.test(to)) return { error: "Correo de prueba inválido" };
+  const draftError = validateDraft(data.subject, data.body, data.attachmentIds);
+  if (draftError) return { error: draftError };
   if (!emailWebhookConfigured()) {
     return { error: "Falta configurar el webhook de correo (N8N_EMAIL_WEBHOOK_*)" };
   }
@@ -643,6 +460,9 @@ export async function sendEmailTest(data: {
 
     const buzon = buzonForProject(project.slug);
     if (!buzon) return { error: `No hay una cuenta de correo asignada al proyecto ${project.slug}` };
+
+    const attachments = await loadEmailAttachments(data.attachmentIds);
+    if (!attachments.ok) return { error: attachments.error };
 
     const res = await getFullPostventaData({ projectSlug: project.slug });
     const sample = data.reservationId
@@ -673,6 +493,7 @@ export async function sendEmailTest(data: {
       indice: 1,
       total: 1,
       enviadoPor: user.email,
+      adjuntos: attachments.adjuntos,
     });
 
     await prisma.emailMessage.create({
@@ -696,6 +517,271 @@ export async function sendEmailTest(data: {
   } catch (error) {
     console.error("Error enviando correo de prueba:", error);
     return { error: "Error al enviar el correo de prueba" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Adjuntos
+// ---------------------------------------------------------------------------
+
+/** La tabla nueva todavia no existe en la base (falta correr la migracion 12). */
+function missingMigration(error: any): boolean {
+  return error?.code === "P2021" || /does not exist/i.test(String(error?.message || ""));
+}
+const MISSING_MIGRATION_MSG =
+  "Falta aplicar la migración 12 (adjuntos y envíos programados) en la base de datos";
+
+/**
+ * Sube UN archivo (la pantalla llama una vez por archivo). Se guarda en la
+ * base y se devuelve el id: los tramos y el programador lo leen de ahi.
+ */
+export async function uploadEmailAttachment(formData: FormData) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado" };
+  if (!canSendBulk(user)) return { error: "Tu cuenta no tiene permiso para enviar correos" };
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { error: "No llegó ningún archivo" };
+  if (file.size === 0) return { error: `«${file.name}» está vacío (0 bytes)` };
+  if (file.size > EMAIL_ATTACHMENTS_MAX_BYTES) {
+    return { error: `«${file.name}» supera los ${EMAIL_ATTACHMENTS_MAX_BYTES / (1024 * 1024)} MB` };
+  }
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  if (EMAIL_ATTACHMENT_BLOCKED_EXT.includes(ext)) {
+    return { error: `Gmail no permite adjuntar archivos .${ext}` };
+  }
+
+  try {
+    const data = Buffer.from(await file.arrayBuffer());
+    const row = await prisma.emailAttachment.create({
+      data: {
+        file_name: file.name.slice(0, 255),
+        mimetype: (file.type || "application/octet-stream").slice(0, 150),
+        size_bytes: file.size,
+        data,
+        uploaded_by: user.email,
+      },
+      select: { id: true, file_name: true, mimetype: true, size_bytes: true },
+    });
+    return { success: true, attachment: row };
+  } catch (error) {
+    if (missingMigration(error)) return { error: MISSING_MIGRATION_MSG };
+    console.error("Error subiendo adjunto de correo:", error);
+    return { error: "No se pudo subir el archivo" };
+  }
+}
+
+/** Quita un adjunto que postventa saco del borrador, salvo que una tanda programada lo use. */
+export async function deleteEmailAttachment(id: string) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado" };
+
+  try {
+    const inUse = await prisma.emailScheduledBatch.count({
+      where: { status: { in: ["PENDING", "SENDING"] }, attachment_ids: { has: id } },
+    });
+    if (inUse === 0) {
+      await prisma.emailAttachment.deleteMany({ where: { id } });
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("Error quitando adjunto de correo:", error);
+    // El archivo huerfano lo limpia el programador a los 7 dias; no vale la pena molestar.
+    return { success: true };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Envio programado
+// ---------------------------------------------------------------------------
+
+/**
+ * Deja una tanda programada para una fecha y hora de Chile. No manda nada:
+ * a esa hora la manda lib/programadorCorreos.ts, aunque nadie tenga el
+ * portal abierto.
+ */
+export async function scheduleEmailBatch(data: {
+  projectSlug: string;
+  audience: string;
+  subject: string;
+  body: string;
+  reservationIds: string[];
+  attachmentIds?: string[];
+  /** "AAAA-MM-DD" y "HH:MM", siempre hora de Chile. */
+  fecha: string;
+  hora: string;
+}) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado" };
+  if (!canSendBulk(user)) return { error: "Tu cuenta no tiene permiso para enviar correos masivos" };
+
+  const draftError = validateDraft(data.subject, data.body, data.attachmentIds);
+  if (draftError) return { error: draftError };
+  if (!AUDIENCES.includes(data.audience as EmailAudience)) return { error: "Segmento inválido" };
+
+  const ids = Array.from(new Set(data.reservationIds || []));
+  if (ids.length === 0) return { error: "No hay destinatarios seleccionados" };
+  if (ids.length > MAX_PER_BATCH) return { error: `El máximo por tanda es de ${MAX_PER_BATCH} correos` };
+
+  const scheduledAt = chileLocalToUtc(data.fecha, data.hora);
+  if (!scheduledAt) return { error: "Fecha u hora inválida" };
+  const now = Date.now();
+  if (scheduledAt.getTime() < now + 5 * 60_000) {
+    return { error: "Programa el envío con al menos 5 minutos de anticipación" };
+  }
+  if (scheduledAt.getTime() > now + EMAIL_SCHEDULE_MAX_DAYS * 86_400_000) {
+    return { error: `No se puede programar a más de ${EMAIL_SCHEDULE_MAX_DAYS} días` };
+  }
+
+  try {
+    const reservations = await prisma.reservation.findMany({
+      where: { id: { in: ids } },
+      select: { project: { select: { slug: true } } },
+    });
+    if (reservations.length !== ids.length) return { error: "Alguno de los clientes ya no existe" };
+    for (const slug of new Set(reservations.map((r) => r.project.slug))) {
+      if (!canAccessProject(user, slug)) return { error: `Sin acceso al proyecto ${slug}` };
+    }
+
+    const attachmentIds = Array.from(new Set(data.attachmentIds || []));
+    const attachments = await loadEmailAttachments(attachmentIds);
+    if (!attachments.ok) return { error: attachments.error };
+
+    const batch = await prisma.emailScheduledBatch.create({
+      data: {
+        project_slug: data.projectSlug,
+        audience: data.audience,
+        subject: data.subject.trim(),
+        body: data.body,
+        reservation_ids: ids,
+        attachment_ids: attachmentIds,
+        scheduled_at: scheduledAt,
+        created_by: user.email,
+      },
+      select: { id: true, scheduled_at: true },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          action: "CREATE",
+          entity: "EmailScheduledBatch",
+          entity_id: batch.id,
+          details: `Correo masivo programado para ${formatoFechaHoraChile(scheduledAt)} (hora Chile): ${
+            ids.length
+          } correos a "${AUDIENCE_LABELS[data.audience as EmailAudience]}" (proyecto: ${data.projectSlug}), ${
+            attachmentIds.length
+          } adjunto(s). Asunto: ${data.subject.trim().slice(0, 120)}`,
+          user_id: user.id,
+          user_email: user.email,
+        },
+      });
+    } catch (error) {
+      console.error("Error auditando la tanda programada:", error);
+    }
+
+    return { success: true, id: batch.id, scheduledAt: batch.scheduled_at };
+  } catch (error) {
+    if (missingMigration(error)) return { error: MISSING_MIGRATION_MSG };
+    console.error("Error programando tanda de correo:", error);
+    return { error: "No se pudo programar el envío" };
+  }
+}
+
+export async function getScheduledEmailBatches({ projectSlug = "ALL" }: { projectSlug?: string } = {}) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado", batches: [] };
+
+  try {
+    const projects = await scopedProjects(projectSlug);
+    const slugs = projects.map((p: any) => p.slug);
+    // Una tanda de "Todos los proyectos" se guarda con project_slug "ALL".
+    const visible = projectSlug === "ALL" ? [...slugs, "ALL"] : slugs;
+
+    const rows = await prisma.emailScheduledBatch.findMany({
+      where: { project_slug: { in: visible } },
+      orderBy: [{ scheduled_at: "desc" }],
+      take: 100,
+      select: {
+        id: true,
+        project_slug: true,
+        audience: true,
+        subject: true,
+        reservation_ids: true,
+        attachment_ids: true,
+        scheduled_at: true,
+        status: true,
+        sent_count: true,
+        failed_count: true,
+        skipped_count: true,
+        detail: true,
+        error: true,
+        created_by: true,
+        cancelled_by: true,
+        created_at: true,
+        finished_at: true,
+      },
+    });
+
+    const attIds = Array.from(new Set(rows.flatMap((r) => r.attachment_ids)));
+    const atts = attIds.length
+      ? await prisma.emailAttachment.findMany({
+          where: { id: { in: attIds } },
+          select: { id: true, file_name: true, size_bytes: true },
+        })
+      : [];
+    const attById = new Map(atts.map((a) => [a.id, a]));
+    const projectNames = new Map(projects.map((p: any) => [p.slug, p.name]));
+
+    return {
+      success: true,
+      canSend: canSendBulk(user),
+      batches: rows.map(({ reservation_ids, attachment_ids, ...r }) => ({
+        ...r,
+        total: reservation_ids.length,
+        projectName: r.project_slug === "ALL" ? "Todos los proyectos" : projectNames.get(r.project_slug) || r.project_slug,
+        audienceLabel: AUDIENCE_LABELS[r.audience as EmailAudience] ?? r.audience,
+        attachments: attachment_ids.map((id) => attById.get(id)).filter(Boolean),
+      })),
+    };
+  } catch (error) {
+    if (missingMigration(error)) return { error: MISSING_MIGRATION_MSG, batches: [] };
+    console.error("Error cargando tandas programadas:", error);
+    return { error: "Error al cargar los envíos programados", batches: [] };
+  }
+}
+
+/** Cancela una tanda que todavia no sale (o frena una que va saliendo). */
+export async function cancelScheduledEmailBatch(id: string) {
+  const user = await requireAdmin();
+  if (!user) return { error: "No autorizado" };
+  if (!canSendBulk(user)) return { error: "Tu cuenta no tiene permiso para enviar correos masivos" };
+
+  try {
+    const res = await prisma.emailScheduledBatch.updateMany({
+      where: { id, status: { in: ["PENDING", "SENDING"] } },
+      data: { status: "CANCELLED", cancelled_by: user.email, finished_at: new Date() },
+    });
+    if (res.count === 0) return { error: "Ese envío ya no se puede cancelar (ya salió o ya estaba cancelado)" };
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          action: "UPDATE",
+          entity: "EmailScheduledBatch",
+          entity_id: id,
+          details: "Correo masivo programado cancelado.",
+          user_id: user.id,
+          user_email: user.email,
+        },
+      });
+    } catch (error) {
+      console.error("Error auditando la cancelacion:", error);
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("Error cancelando tanda programada:", error);
+    return { error: "No se pudo cancelar el envío" };
   }
 }
 

@@ -15,6 +15,21 @@
 export const EMAIL_SUBJECT_MAX = 120;
 export const EMAIL_BODY_MAX = 4000;
 
+/**
+ * Limites de adjuntos. El techo real lo pone n8n, que por defecto no acepta
+ * webhooks de mas de 16 MB: los archivos viajan en base64 (~37% mas pesados),
+ * asi que 10 MB de archivos son ~13,7 MB de JSON y queda margen para el HTML.
+ */
+export const EMAIL_ATTACHMENTS_MAX_FILES = 10;
+export const EMAIL_ATTACHMENTS_MAX_BYTES = 10 * 1024 * 1024;
+/** Extensiones que Gmail rechaza igual; mejor cortarlas al subir. */
+export const EMAIL_ATTACHMENT_BLOCKED_EXT = [
+  "exe", "bat", "cmd", "com", "js", "jse", "msi", "msc", "ps1", "scr", "vbs", "vbe", "jar", "sh", "apk", "dll", "lnk",
+];
+
+/** Tope de anticipacion para programar una tanda. */
+export const EMAIL_SCHEDULE_MAX_DAYS = 90;
+
 export type EmailVariableCategory = "CLIENTE" | "TERRENO" | "FINANCIERO";
 
 export type EmailTemplateVariable = {

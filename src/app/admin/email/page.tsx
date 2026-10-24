@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Mail, Send, FileText, BarChart3, RefreshCw, AlertTriangle, History } from "lucide-react";
+import { Loader2, Mail, Send, FileText, BarChart3, RefreshCw, AlertTriangle, History, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { getEmailOverview } from "@/actions/email";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import EmailPanel from "@/components/admin/email/EmailPanel";
 import EmailComposer from "@/components/admin/email/EmailComposer";
 import EmailTemplateManager from "@/components/admin/email/EmailTemplateManager";
 import EmailHistory from "@/components/admin/email/EmailHistory";
+import EmailScheduled from "@/components/admin/email/EmailScheduled";
 
 /**
  * Modulo de correo masivo. Postventa escribe asunto + cuerpo, elige a quien,
@@ -19,11 +20,12 @@ import EmailHistory from "@/components/admin/email/EmailHistory";
  * Plantillas / Historial.
  */
 
-type Tab = "panel" | "redactar" | "plantillas" | "historial";
+type Tab = "panel" | "redactar" | "programados" | "plantillas" | "historial";
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "panel", label: "Panel", icon: BarChart3 },
   { id: "redactar", label: "Redactar y enviar", icon: Send },
+  { id: "programados", label: "Programados", icon: CalendarClock },
   { id: "plantillas", label: "Plantillas", icon: FileText },
   { id: "historial", label: "Historial", icon: History },
 ];
@@ -150,8 +152,11 @@ export default function EmailPage() {
                 loadOverview();
                 toast.success("Tanda finalizada. El panel se actualizó.");
               }}
+              onScheduled={() => setTab("programados")}
             />
           )}
+
+          {tab === "programados" && <EmailScheduled projectSlug={selectedProject} />}
 
           {tab === "plantillas" && <EmailTemplateManager />}
 

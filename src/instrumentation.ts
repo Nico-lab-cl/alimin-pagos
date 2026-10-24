@@ -3,5 +3,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { iniciarProgramadorResumen } = await import("./lib/programadorResumen");
     iniciarProgramadorResumen();
+    const { iniciarProgramadorCorreos } = await import("./lib/programadorCorreos");
+    iniciarProgramadorCorreos();
   }
 }

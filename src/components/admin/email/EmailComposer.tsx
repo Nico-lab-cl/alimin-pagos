@@ -12,6 +12,8 @@ import {
   FileText,
   Users,
   Eye,
+  Paperclip,
+  CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +22,9 @@ import {
   startEmailBatch,
   sendEmailChunk,
   sendEmailTest,
+  uploadEmailAttachment,
+  deleteEmailAttachment,
+  scheduleEmailBatch,
   type EmailAudience,
 } from "@/actions/email";
 import {
@@ -29,7 +34,11 @@ import {
   buildEmailHtml,
   renderEmailVariables,
   getEmailVariableSampleValues,
+  EMAIL_ATTACHMENTS_MAX_FILES,
+  EMAIL_ATTACHMENTS_MAX_BYTES,
+  EMAIL_ATTACHMENT_BLOCKED_EXT,
 } from "@/lib/emailTemplate";
+import { ahoraEnChile, sumarDiasFecha, chileLocalToUtc, formatoFechaHoraChile } from "@/lib/horaChile";
 import EmailVariableSelector from "./EmailVariableSelector";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +58,10 @@ const AUDIENCE_OPTIONS: { id: EmailAudience; label: string }[] = [
 
 type Progress = { done: number; total: number; ok: number; failed: number };
 type Failure = { clientName: string; error: string };
+type Attachment = { id: string; fileName: string; size: number };
+
+const formatMB = (bytes: number) =>
+  bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
 /**
  * Pantalla de redacción y envío. Postventa escribe asunto + cuerpo en texto
@@ -62,12 +75,15 @@ export default function EmailComposer({
   canSend,
   configured,
   onSent,
+  onScheduled,
 }: {
   projectSlug: string;
   projects: any[];
   canSend: boolean;
   configured: boolean;
   onSent: () => void;
+  /** Despues de programar una tanda (la pagina salta a la pestaña Programados). */
+  onScheduled?: () => void;
 }) {
   const [audience, setAudience] = useState<EmailAudience>("TODOS");
   const [loading, setLoading] = useState(true);
@@ -92,6 +108,36 @@ export default function EmailComposer({
 
   const [testEmail, setTestEmail] = useState("");
   const [testing, setTesting] = useState(false);
+
+  // Adjuntos: cada archivo se sube apenas se elige y queda por id; el envio
+  // (ahora o programado) solo manda los ids.
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentIds = attachments.map((a) => a.id);
+  const attachmentsBytes = attachments.reduce((acc, a) => acc + a.size, 0);
+
+  // Programacion: fecha y hora SIEMPRE en hora de Chile, sin importar la
+  // zona horaria del computador desde donde se programe.
+  const [sendMode, setSendMode] = useState<"now" | "schedule">("now");
+  const [schedDate, setSchedDate] = useState(() => sumarDiasFecha(ahoraEnChile().fecha, 1));
+  const [schedTime, setSchedTime] = useState("09:00");
+  const [scheduling, setScheduling] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const chileNow = ahoraEnChile(new Date(nowMs));
+  const scheduledAt = sendMode === "schedule" ? chileLocalToUtc(schedDate, schedTime) : null;
+  const scheduleError =
+    sendMode !== "schedule"
+      ? null
+      : !scheduledAt
+        ? "Elige una fecha y hora válidas"
+        : scheduledAt.getTime() < nowMs + 5 * 60_000
+          ? "Tiene que ser al menos 5 minutos más tarde que la hora actual de Chile"
+          : null;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -236,6 +282,63 @@ export default function EmailComposer({
     toast.success(`Plantilla «${t.name}» cargada`);
   };
 
+  const addFiles = async (fileList: FileList | null) => {
+    const files = Array.from(fileList || []);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (files.length === 0) return;
+
+    if (attachments.length + files.length > EMAIL_ATTACHMENTS_MAX_FILES) {
+      toast.error(`Se pueden adjuntar hasta ${EMAIL_ATTACHMENTS_MAX_FILES} archivos por correo`);
+      return;
+    }
+    let total = attachmentsBytes;
+    for (const f of files) {
+      const ext = (f.name.split(".").pop() || "").toLowerCase();
+      if (EMAIL_ATTACHMENT_BLOCKED_EXT.includes(ext)) {
+        toast.error(`Gmail no permite adjuntar archivos .${ext} («${f.name}»)`);
+        return;
+      }
+      if (f.size === 0) {
+        toast.error(`«${f.name}» está vacío`);
+        return;
+      }
+      total += f.size;
+    }
+    if (total > EMAIL_ATTACHMENTS_MAX_BYTES) {
+      toast.error(
+        `Entre todos los adjuntos no pueden pasar de ${formatMB(EMAIL_ATTACHMENTS_MAX_BYTES)} (quedarían en ${formatMB(total)})`
+      );
+      return;
+    }
+
+    setUploading(true);
+    try {
+      for (const f of files) {
+        const fd = new FormData();
+        fd.append("file", f);
+        const res: any = await uploadEmailAttachment(fd);
+        if (res.error) {
+          toast.error(res.error);
+          break;
+        }
+        setAttachments((prev) => [
+          ...prev,
+          { id: res.attachment.id, fileName: res.attachment.file_name, size: res.attachment.size_bytes },
+        ]);
+      }
+    } catch (err) {
+      console.error("Error subiendo adjunto:", err);
+      toast.error("No se pudo subir el archivo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+    deleteEmailAttachment(id).catch(() => {});
+  };
+
   const validateDraft = (): string | null => {
     if (!subject.trim()) return "Escribe un asunto";
     if (subject.length > EMAIL_SUBJECT_MAX) return `El asunto supera los ${EMAIL_SUBJECT_MAX} caracteres`;
@@ -286,6 +389,7 @@ export default function EmailComposer({
           reservationIds: chunk,
           batchTotal: targets.length,
           startIndex: i,
+          attachmentIds,
         });
 
         if (res.error) {
@@ -331,6 +435,41 @@ export default function EmailComposer({
     onSent();
   };
 
+  const runSchedule = async () => {
+    const err = validateDraft() || scheduleError;
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    setConfirmOpen(false);
+    setScheduling(true);
+    try {
+      const res: any = await scheduleEmailBatch({
+        projectSlug,
+        audience,
+        subject,
+        body,
+        reservationIds: selectedList.map((r) => r.id),
+        attachmentIds,
+        fecha: schedDate,
+        hora: schedTime,
+      });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(
+        `Envío programado para el ${formatoFechaHoraChile(res.scheduledAt)} (hora de Chile). Puedes cancelarlo en «Programados».`
+      );
+      onScheduled?.();
+    } catch (err) {
+      console.error("Error programando el envío:", err);
+      toast.error("No se pudo programar el envío");
+    } finally {
+      setScheduling(false);
+    }
+  };
+
   const runTest = async () => {
     const err = validateDraft();
     if (err) {
@@ -360,6 +499,7 @@ export default function EmailComposer({
         body,
         to: testEmail,
         reservationId: previewClient?.id ?? null,
+        attachmentIds,
       });
       if ((res as any).error) {
         toast.error((res as any).error);
@@ -482,6 +622,67 @@ export default function EmailComposer({
         {/* Selector interactivo de metacampos con categorías y ayuda (?) */}
         <EmailVariableSelector onInsert={insertVariable} disabled={sending} />
 
+        {/* Adjuntos: van los mismos archivos a todos los destinatarios */}
+        <div className="pt-4 border-t border-slate-100 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <Paperclip className="w-3.5 h-3.5" />
+              Archivos adjuntos (opcional)
+            </label>
+            <span className="text-[10px] font-bold tabular-nums text-slate-400">
+              {attachments.length} / {EMAIL_ATTACHMENTS_MAX_FILES} · {formatMB(attachmentsBytes)} de{" "}
+              {formatMB(EMAIL_ATTACHMENTS_MAX_BYTES)}
+            </span>
+          </div>
+
+          {attachments.length > 0 && (
+            <ul className="space-y-1.5">
+              {attachments.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
+                >
+                  <FileText className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span className="flex-1 min-w-0 text-xs font-semibold text-slate-700 truncate" title={a.fileName}>
+                    {a.fileName}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 tabular-nums flex-shrink-0">
+                    {formatMB(a.size)}
+                  </span>
+                  <button
+                    onClick={() => removeAttachment(a.id)}
+                    disabled={sending || scheduling}
+                    title="Quitar archivo"
+                    className="text-slate-400 hover:text-red-600 cursor-pointer disabled:opacity-50"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => addFiles(e.target.files)}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending || scheduling || uploading || attachments.length >= EMAIL_ATTACHMENTS_MAX_FILES}
+            className="px-3 py-2 rounded-xl bg-white border border-dashed border-slate-300 text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+            {uploading ? "Subiendo..." : attachments.length ? "Agregar más archivos" : "Adjuntar archivos"}
+          </button>
+          <p className="text-[10px] font-semibold text-slate-400">
+            Puedes elegir varios a la vez (PDF, imágenes, Word, Excel...). Llegan los mismos archivos a todos
+            los destinatarios. La prueba también los lleva, para que veas que llegan bien.
+          </p>
+        </div>
+
         {/* Vista previa en vivo: se actualiza sola al marcar a alguien abajo
             o al escribir, sin tener que mandar nada. */}
         <div className="pt-4 border-t border-slate-100">
@@ -501,6 +702,12 @@ export default function EmailComposer({
               <span className="text-slate-400">Asunto: </span>
               {previewSubject}
             </div>
+            {attachments.length > 0 && (
+              <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-600 truncate">
+                <Paperclip className="w-3 h-3 inline -mt-0.5 mr-1 text-slate-400" />
+                {attachments.map((a) => a.fileName).join(", ")}
+              </div>
+            )}
             <iframe
               title="Vista previa del correo"
               srcDoc={previewHtml}
@@ -623,13 +830,83 @@ export default function EmailComposer({
       </div>
 
       {/* Enviar */}
-      <div className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <div>
-          <p className="text-sm font-bold text-slate-800">{selected.size} destinatario(s) seleccionados</p>
-          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">Se envían en tramos de {CHUNK_SIZE}, espaciados</p>
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="flex bg-slate-50 border border-slate-200 rounded-xl p-1 w-fit">
+          {[
+            { id: "now" as const, label: "Enviar ahora", icon: Send },
+            { id: "schedule" as const, label: "Programar envío", icon: CalendarClock },
+          ].map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setSendMode(m.id)}
+              disabled={sending || scheduling}
+              className={cn(
+                "px-3 py-1.5 text-[11px] font-bold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50",
+                sendMode === m.id ? "bg-brand-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
+              )}
+            >
+              <m.icon className="w-3.5 h-3.5" />
+              {m.label}
+            </button>
+          ))}
         </div>
 
-        {sending ? (
+        {sendMode === "schedule" && (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Día</label>
+                <input
+                  type="date"
+                  value={schedDate}
+                  min={chileNow.fecha}
+                  onChange={(e) => setSchedDate(e.target.value)}
+                  disabled={scheduling}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:border-brand-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Hora (Chile)
+                </label>
+                <input
+                  type="time"
+                  value={schedTime}
+                  onChange={(e) => setSchedTime(e.target.value)}
+                  disabled={scheduling}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:border-brand-500 outline-none"
+                />
+              </div>
+            </div>
+            <p className={cn("text-[10px] font-semibold", scheduleError ? "text-red-700" : "text-slate-400")}>
+              {scheduleError
+                ? scheduleError
+                : `Sale el ${formatoFechaHoraChile(scheduledAt)} hora de Chile (ahora en Chile son las ${chileNow.hora}).`}{" "}
+              {!scheduleError &&
+                "Los montos y días de mora se calculan a esa hora, y a quien ya no esté en el segmento (por ejemplo, porque pagó) no le llega."}
+            </p>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-slate-800">{selected.size} destinatario(s) seleccionados</p>
+          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+            Se envían en tramos de {CHUNK_SIZE}, espaciados
+            {attachments.length > 0 && ` · ${attachments.length} adjunto(s)`}
+          </p>
+        </div>
+
+        {sendMode === "schedule" ? (
+          <button
+            onClick={() => setConfirmOpen(true)}
+            disabled={selected.size === 0 || loading || !configured || scheduling || uploading || !!scheduleError}
+            className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
+          >
+            {scheduling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarClock className="w-3.5 h-3.5" />}
+            Programar a {selected.size}
+          </button>
+        ) : sending ? (
           <button
             onClick={() => (stopRef.current = true)}
             className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
@@ -640,13 +917,14 @@ export default function EmailComposer({
         ) : (
           <button
             onClick={() => setConfirmOpen(true)}
-            disabled={selected.size === 0 || loading || !configured}
+            disabled={selected.size === 0 || loading || !configured || uploading}
             className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
           >
             <Send className="w-3.5 h-3.5" />
             Enviar a {selected.size}
           </button>
         )}
+        </div>
       </div>
 
       {/* Progreso */}
@@ -690,9 +968,26 @@ export default function EmailComposer({
             className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-bold text-slate-900">¿Enviar a {selected.size} clientes?</h3>
+            <h3 className="text-base font-bold text-slate-900">
+              {sendMode === "schedule"
+                ? `¿Programar el envío a ${selected.size} clientes?`
+                : `¿Enviar a ${selected.size} clientes?`}
+            </h3>
             <p className="text-xs font-medium text-slate-500 leading-relaxed">
               Asunto: <span className="font-bold text-slate-700">{subject}</span>
+              {attachments.length > 0 && (
+                <>
+                  <br />
+                  Adjuntos: <span className="font-bold text-slate-700">{attachments.map((a) => a.fileName).join(", ")}</span>
+                </>
+              )}
+              {sendMode === "schedule" && (
+                <>
+                  <br />
+                  Sale el <span className="font-bold text-slate-700">{formatoFechaHoraChile(scheduledAt)}</span>{" "}
+                  (hora de Chile). Hasta esa hora lo puedes cancelar en «Programados».
+                </>
+              )}
               <br />
               Esto no se puede deshacer una vez enviado. Considera mandar antes una prueba a tu propio
               correo.
@@ -705,10 +1000,10 @@ export default function EmailComposer({
                 Cancelar
               </button>
               <button
-                onClick={runBatch}
+                onClick={sendMode === "schedule" ? runSchedule : runBatch}
                 className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
               >
-                Sí, enviar
+                {sendMode === "schedule" ? "Sí, programar" : "Sí, enviar"}
               </button>
             </div>
           </div>

@@ -21,6 +21,8 @@ const BUZON_BY_PROJECT: Record<string, Buzon> = {
 };
 
 const DEFAULT_TIMEOUT_MS = 20_000;
+/** Con adjuntos el cuerpo pesa varios MB y Gmail tarda mas en aceptarlo. */
+const ATTACHMENT_TIMEOUT_MS = 60_000;
 
 export function knownEmailProjectSlugs(): string[] {
   return Object.keys(BUZON_BY_PROJECT);
@@ -66,7 +68,15 @@ export type EmailPayload = {
   indice: number;
   total: number;
   enviadoPor: string;
+  /**
+   * Archivos adjuntos en base64 (sin el prefijo "data:"). En n8n, el nodo
+   * "Adjuntos a binario" los convierte en binarios adjunto_0, adjunto_1...
+   * que el nodo Gmail adjunta al correo.
+   */
+  adjuntos?: EmailAttachmentPayload[];
 };
+
+export type EmailAttachmentPayload = { nombre: string; mimetype: string; base64: string };
 
 export type SendResult = { ok: true } | { ok: false; error: string };
 
@@ -103,7 +113,10 @@ export async function sendEmail(payload: EmailPayload): Promise<SendResult> {
     indice: payload.indice,
     total: payload.total,
     enviado_por: payload.enviadoPor,
+    adjuntos: payload.adjuntos ?? [],
+    cantidad_adjuntos: payload.adjuntos?.length ?? 0,
   };
+  const timeoutMs = payload.adjuntos?.length ? ATTACHMENT_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
 
   try {
     const res = await fetch(url, {
@@ -113,7 +126,7 @@ export async function sendEmail(payload: EmailPayload): Promise<SendResult> {
         [authHeader]: authValue,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: "no-store",
     });
 
@@ -132,7 +145,7 @@ export async function sendEmail(payload: EmailPayload): Promise<SendResult> {
   } catch (error: any) {
     const reason =
       error?.name === "TimeoutError" || error?.name === "AbortError"
-        ? `El webhook no respondió en ${DEFAULT_TIMEOUT_MS / 1000}s`
+        ? `El webhook no respondió en ${timeoutMs / 1000}s`
         : error?.message || "No se pudo contactar el webhook de correo";
     return { ok: false, error: reason };
   }
