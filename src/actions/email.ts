@@ -32,14 +32,14 @@ import {
   EMAIL_REGEX,
   loadEmailAttachments,
   sendEmailsToReservations,
-  type EmailAudience,
-  type EmailChunkResult,
 } from "@/lib/correoMasivo";
+import type { EmailAudience, EmailChunkResult } from "@/lib/correoMasivo";
 import { chileLocalToUtc, formatoFechaHoraChile } from "@/lib/horaChile";
 
-// Solo tipos: se borran al compilar, asi que no rompen la regla de que un
-// archivo "use server" exporte unicamente funciones async.
-export type { EmailAudience, EmailChunkResult };
+// OJO: no re-exportar tipos desde aca ("export type { X }"). El compilador de
+// acciones de servidor lo convierte en una referencia real a X, que en
+// ejecucion no existe, y todo el modulo revienta al cargar ("EmailAudience is
+// not defined"). Quien necesite los tipos los importa de lib/correoMasivo.
 
 /**
  * Modulo de correo masivo: postventa escribe asunto + cuerpo, elige a quien,

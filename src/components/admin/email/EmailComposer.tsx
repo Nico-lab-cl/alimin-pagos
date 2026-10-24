@@ -25,8 +25,8 @@ import {
   uploadEmailAttachment,
   deleteEmailAttachment,
   scheduleEmailBatch,
-  type EmailAudience,
 } from "@/actions/email";
+import type { EmailAudience } from "@/lib/correoMasivo";
 import {
   EMAIL_SUBJECT_MAX,
   EMAIL_BODY_MAX,
