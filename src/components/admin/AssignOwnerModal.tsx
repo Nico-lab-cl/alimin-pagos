@@ -48,7 +48,8 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
   const handleSubmit = async () => {
     if (!form.name.trim()) return setError("El nombre es obligatorio.");
     if (!form.email.trim()) return setError("El correo es obligatorio.");
-    if (!form.phone.trim()) return setError("El teléfono es obligatorio.");
+    // El telefono puede faltar: hay promesas que llegan sin el. Sin telefono el
+    // cliente no recibe WhatsApp hasta que postventa lo agregue en la ficha.
 
     setSaving(true);
     setError("");
@@ -127,7 +128,7 @@ export default function AssignOwnerModal({ lot, projectSlug, onClose, onSuccess 
                 <input type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="ejemplo@correo.com" className={inputCls} />
               </div>
               <div className="col-span-2 sm:col-span-1">
-                <label className={labelCls}>Teléfono *</label>
+                <label className={labelCls}>Teléfono</label>
                 <input value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="+569..." className={inputCls} />
               </div>
               <div className="col-span-2 sm:col-span-1">
