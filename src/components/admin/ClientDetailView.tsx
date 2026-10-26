@@ -21,6 +21,7 @@ import {
 } from "@/actions/documents";
 import PreviewModal from "@/components/shared/PreviewModal";
 import ClientPOVModal from "@/components/admin/ClientPOVModal";
+import CoTitularesCard from "@/components/admin/CoTitularesCard";
 import DocumentosCliente from "@/components/shared/DocumentosCliente";
 import { cn } from "@/lib/utils";
 
@@ -1313,6 +1314,12 @@ export default function ClientDetailView({ selectedClient, onBack, onUpdate, pro
                 </div>
               )}
             </div>
+
+            <CoTitularesCard
+              reservationId={selectedClient.id}
+              coOwners={selectedClient.coOwners || []}
+              onUpdate={onUpdate}
+            />
 
           </div>
 

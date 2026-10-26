@@ -13,6 +13,7 @@ import {
 } from "@/lib/financials";
 import { memoryCache } from "@/lib/cache";
 import { detectarFichasFantasma } from "@/lib/fichasDuplicadas";
+import { coTitularesPorReserva } from "@/lib/coTitulares";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -59,6 +60,8 @@ export async function computePostventaData(projectSlug: string) {
         },
       },
     });
+
+    const coTitulares = await coTitularesPorReserva(allReservations.map((r) => r.id));
 
     const currentDate = getChileToday();
     const fiveDaysFromNow = new Date(currentDate);
@@ -468,6 +471,9 @@ export async function computePostventaData(projectSlug: string) {
         clientEmail: res.user?.email || res.email,
         secondaryEmail: res.secondary_email,
         clientPhone: res.phone,
+        // Segunda persona que firmo la promesa: recibe los mismos correos y
+        // WhatsApp que el titular (ver lib/coTitulares.ts).
+        coOwners: coTitulares.get(res.id) || [],
         rut: res.rut,
         lotNumber: lot.number,
         lotStage: lot.stage,

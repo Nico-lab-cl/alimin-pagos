@@ -29,6 +29,7 @@ import { prisma } from "@/lib/prisma";
 import { buildInstallmentConcept } from "@/lib/financials";
 import { normalizePhone } from "@/lib/phone";
 import { resolveInstance } from "@/lib/evolution";
+import { coTitularesPorReserva } from "@/lib/coTitulares";
 import { enqueueMessage, recordUndeliverable, type QueuedMessage } from "@/lib/whatsappOutbox";
 import {
   CONFIRMATION_PHRASES,
@@ -182,14 +183,6 @@ export async function notifyPaymentApproved(input: PaymentNoticeInput): Promise<
       sentBy: input.sentBy ?? null,
     };
 
-    // El telefono se valida con el mismo criterio estricto que la cobranza: si
-    // no resuelve sin ambiguedad a un movil, no se adivina. Queda registrado
-    // como fallido para que postventa corrija la ficha.
-    if (!phone.ok) {
-      await recordUndeliverable({ ...base, instanceName: instance?.name ?? null }, phone.reason);
-      return;
-    }
-
     if (!instance) {
       await recordUndeliverable(
         { ...base, instanceName: null },
@@ -198,7 +191,30 @@ export async function notifyPaymentApproved(input: PaymentNoticeInput): Promise<
       return;
     }
 
-    await enqueueMessage({ ...base, instanceName: instance.name });
+    // El telefono se valida con el mismo criterio estricto que la cobranza: si
+    // no resuelve sin ambiguedad a un movil, no se adivina. Queda registrado
+    // como fallido para que postventa corrija la ficha.
+    if (!phone.ok) {
+      await recordUndeliverable({ ...base, instanceName: instance.name }, phone.reason);
+    } else {
+      await enqueueMessage({ ...base, instanceName: instance.name });
+    }
+
+    // Co-titulares: el mismo aviso, con su propia llave para que el indice
+    // unico de event_key siga frenando el doble clic en "Aprobar". Sin
+    // telefono no se registra nada: es normal que postventa lo agregue despues.
+    const coTitulares = (await coTitularesPorReserva([reservation.id])).get(reservation.id) || [];
+    for (const co of coTitulares) {
+      const coPhone = normalizePhone(co.phone);
+      if (!coPhone.ok || (phone.ok && coPhone.e164 === phone.e164)) continue;
+      await enqueueMessage({
+        ...base,
+        instanceName: instance.name,
+        clientName: co.name || clientName,
+        phone: coPhone.e164,
+        eventKey: `${input.eventKey}:co:${co.id.slice(0, 8)}`,
+      });
+    }
   } catch (error) {
     // Deliberado: el pago ya esta aprobado y esa es la operacion que importa.
     console.error("[aviso-pago] no se pudo preparar el aviso de WhatsApp:", error);

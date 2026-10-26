@@ -152,6 +152,13 @@ export function validEmails(client: any): string[] {
   ) {
     out.push(client.secondaryEmail);
   }
+  // Co-titulares: les llega el mismo correo que al titular.
+  for (const co of client.coOwners || []) {
+    const email = String(co?.email || "").trim().toLowerCase();
+    if (email && EMAIL_REGEX.test(email) && !out.some((e) => e.toLowerCase() === email)) {
+      out.push(email);
+    }
+  }
   return out;
 }
 

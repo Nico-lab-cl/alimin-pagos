@@ -33,6 +33,7 @@ import {
 import { construirDocumentosCliente } from "@/lib/documentosCliente";
 import { detectarFichasFantasma } from "@/lib/fichasDuplicadas";
 import { computePostventaData } from "@/lib/postventaData";
+import { usuariosCoTitulares, faltaMigracionCoTitulares } from "@/lib/coTitulares";
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -1114,14 +1115,19 @@ export async function rejectReceipt(receiptId: string, reason: string) {
     });
 
     // Create persistent notification in DB
+    // Al titular y a los co-titulares: cualquiera de los dos pudo subir el comprobante.
     if (receipt?.reservation?.user_id) {
-      await prisma.notification.create({
-        data: {
-          user_id: receipt.reservation.user_id,
+      const destinatarios = [
+        receipt.reservation.user_id,
+        ...(await usuariosCoTitulares(receipt.reservation_id)),
+      ];
+      await prisma.notification.createMany({
+        data: destinatarios.map((user_id) => ({
+          user_id,
           type: "PAYMENT_REJECTED",
           title: "Pago Observado",
           message: `Tu comprobante de ${receipt.scope === 'PIE' ? 'Pie' : 'Cuota'} por $${receipt.amount_clp.toLocaleString('es-CL')} fue rechazado: ${reason}`,
-        }
+        })),
       });
     }
 
@@ -3110,6 +3116,107 @@ export async function getProjectLedgerStats(
 }
 
 /**
+ * Correo de bienvenida al portal con usuario y clave temporal (via n8n). Lo usan
+ * la activacion del titular y la de un co-titular.
+ */
+function enviarCorreoBienvenida(d: { nombre: string; correo: string; tempPassword: string; proyecto: string; projectSlug: string }) {
+  // Determine webhook URL based on project
+  let webhookUrl = "";
+  if (d.projectSlug === "arena-y-sol") {
+    webhookUrl = "https://n8n.aliminlomasdelmar.com/webhook/517e9ba2-64af-4b34-b926-c9265cbfed88";
+  } else if (d.projectSlug === "libertad-y-alegria") {
+    webhookUrl = "https://n8n.aliminlomasdelmar.com/webhook/8aa897b9-d275-401c-a32b-333bbc0b20ee";
+  } else {
+    webhookUrl = "https://n8n.aliminlomasdelmar.com/webhook/517e9ba2-64af-4b34-b926-c9265cbfed88"; // Fallback
+  }
+
+  // Prepare payload with HTML template
+  const subject = `✨ ¡Bienvenido! Tu acceso al Portal de Pagos de ${d.proyecto} ya está activo`;
+  
+  const htmlTemplate = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+      body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+      .container { max-width: 600px; margin: 0 auto; background: #fff; }
+      .header { background: linear-gradient(135deg, #1a5f2a 0%, #2d8f4a 100%); color: #fff; padding: 35px 30px; text-align: center; }
+      .header img { max-width: 130px; height: auto; margin-bottom: 15px; }
+      .header h1 { margin: 0; font-size: 24px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+      .content { padding: 40px 30px; }
+      .welcome-badge { background: #e8f5e9; border: 1px solid #4caf50; border-radius: 50px; padding: 8px 18px; display: inline-block; margin-bottom: 25px; }
+      .welcome-badge span { color: #2e7d32; font-weight: 600; font-size: 13px; text-transform: uppercase; }
+      .greeting { font-size: 22px; color: #1a5f2a; margin-bottom: 20px; font-weight: 600; }
+      .login-card { background: #f8faf8; border: 1px solid #e0e0e0; border-radius: 12px; padding: 30px; margin: 25px 0; border-left: 5px solid #1a5f2a; }
+      .login-item { margin-bottom: 15px; }
+      .login-item:last-child { margin-bottom: 0; }
+      .login-label { color: #777; font-size: 13px; text-transform: uppercase; display: block; margin-bottom: 5px; font-weight: bold; }
+      .login-value { color: #333; font-size: 16px; font-weight: 600; font-family: 'Courier New', monospace; background: #fff; padding: 8px 12px; border-radius: 4px; border: 1px solid #eee; display: inline-block; min-width: 200px; }
+      .btn-container { text-align: center; margin: 40px 0; }
+      .btn-portal { background-color: #1a5f2a; color: #ffffff !important; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 10px rgba(26,95,42,0.2); transition: all 0.3s ease; }
+      .security-note { background: #fff3e0; border-radius: 8px; padding: 15px 20px; font-size: 14px; color: #666; margin-top: 30px; }
+      .footer { background: #1a5f2a; color: #fff; padding: 30px; text-align: center; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+      <div class="header">
+          <img src="https://lh3.googleusercontent.com/d/1yWAhY7_vZVJOVwyxZsgILoKd58_na516" alt="ALIMIN Logo">
+          <h1>Portal de Pagos</h1>
+      </div>
+      <div class="content">
+          <div class="welcome-badge">
+              <span>✨ Nueva plataforma disponible</span>
+          </div>
+          <p class="greeting">¡Hola ${d.nombre}!</p>
+          <p>Estamos felices de presentarte nuestro nuevo <strong>Portal de Pagos Oficial</strong>. A partir de ahora, podrás gestionar tus cuotas, revisar tus estados de cuenta y realizar pagos de forma más rápida y segura.</p>
+          <p style="margin-top: 25px; color: #555;">Aquí tienes tus credenciales de acceso:</p>
+          <div class="login-card">
+              <div class="login-item">
+                  <span class="login-label">Usuario / Correo:</span>
+                  <span class="login-value">${d.correo}</span>
+              </div>
+              <div class="login-item">
+                  <span class="login-label">Contraseña Temporal:</span>
+                  <span class="login-value">${d.tempPassword}</span>
+              </div>
+          </div>
+          <div class="btn-container">
+              <a href="https://pagos.aliminspa.cl" class="btn-portal">
+                  IR A MI PORTAL
+              </a>
+          </div>
+          <div class="security-note">
+              <p style="margin: 0;"><strong>🔐 Nota de seguridad:</strong> Por tu protección, el sistema te solicitará cambiar esta contraseña temporal al momento de ingresar por primera vez.</p>
+          </div>
+      </div>
+      <div class="footer">
+          <p><strong>ALIMIN SPA</strong><br>Gestión Inmobiliaria y Financiera</p>
+          <p style="opacity: 0.6; margin-top: 10px;">Este correo contiene información confidencial. Si no eres el destinatario, por favor ignóralo.</p>
+      </div>
+  </div>
+</body>
+</html>`;
+
+  const payload = {
+    asunto: subject,
+    nombre: d.nombre,
+    correo: d.correo,
+    contraseña: d.tempPassword,
+    proyecto: d.proyecto,
+    html: htmlTemplate
+  };
+
+  // Trigger webhook in background (don't await to avoid blocking)
+  fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }).catch(err => console.error("Error triggering webhook:", err));
+}
+
+/**
  * Activates a client's portal access.
  * Generates a temporary password, updates the DB, and triggers the webhook.
  */
@@ -3151,100 +3258,13 @@ export async function activateClientProfile(reservationId: string) {
       }
     });
 
-    // Determine webhook URL based on project
-    let webhookUrl = "";
-    if (reservation.project.slug === "arena-y-sol") {
-      webhookUrl = "https://n8n.aliminlomasdelmar.com/webhook/517e9ba2-64af-4b34-b926-c9265cbfed88";
-    } else if (reservation.project.slug === "libertad-y-alegria") {
-      webhookUrl = "https://n8n.aliminlomasdelmar.com/webhook/8aa897b9-d275-401c-a32b-333bbc0b20ee";
-    } else {
-      webhookUrl = "https://n8n.aliminlomasdelmar.com/webhook/517e9ba2-64af-4b34-b926-c9265cbfed88"; // Fallback
-    }
-
-    // Prepare payload with HTML template
-    const subject = `✨ ¡Bienvenido! Tu acceso al Portal de Pagos de ${reservation.project.name} ya está activo`;
-    
-    const htmlTemplate = `<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; }
-        .header { background: linear-gradient(135deg, #1a5f2a 0%, #2d8f4a 100%); color: #fff; padding: 35px 30px; text-align: center; }
-        .header img { max-width: 130px; height: auto; margin-bottom: 15px; }
-        .header h1 { margin: 0; font-size: 24px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-        .content { padding: 40px 30px; }
-        .welcome-badge { background: #e8f5e9; border: 1px solid #4caf50; border-radius: 50px; padding: 8px 18px; display: inline-block; margin-bottom: 25px; }
-        .welcome-badge span { color: #2e7d32; font-weight: 600; font-size: 13px; text-transform: uppercase; }
-        .greeting { font-size: 22px; color: #1a5f2a; margin-bottom: 20px; font-weight: 600; }
-        .login-card { background: #f8faf8; border: 1px solid #e0e0e0; border-radius: 12px; padding: 30px; margin: 25px 0; border-left: 5px solid #1a5f2a; }
-        .login-item { margin-bottom: 15px; }
-        .login-item:last-child { margin-bottom: 0; }
-        .login-label { color: #777; font-size: 13px; text-transform: uppercase; display: block; margin-bottom: 5px; font-weight: bold; }
-        .login-value { color: #333; font-size: 16px; font-weight: 600; font-family: 'Courier New', monospace; background: #fff; padding: 8px 12px; border-radius: 4px; border: 1px solid #eee; display: inline-block; min-width: 200px; }
-        .btn-container { text-align: center; margin: 40px 0; }
-        .btn-portal { background-color: #1a5f2a; color: #ffffff !important; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 10px rgba(26,95,42,0.2); transition: all 0.3s ease; }
-        .security-note { background: #fff3e0; border-radius: 8px; padding: 15px 20px; font-size: 14px; color: #666; margin-top: 30px; }
-        .footer { background: #1a5f2a; color: #fff; padding: 30px; text-align: center; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <img src="https://lh3.googleusercontent.com/d/1yWAhY7_vZVJOVwyxZsgILoKd58_na516" alt="ALIMIN Logo">
-            <h1>Portal de Pagos</h1>
-        </div>
-        <div class="content">
-            <div class="welcome-badge">
-                <span>✨ Nueva plataforma disponible</span>
-            </div>
-            <p class="greeting">¡Hola ${reservation.name}!</p>
-            <p>Estamos felices de presentarte nuestro nuevo <strong>Portal de Pagos Oficial</strong>. A partir de ahora, podrás gestionar tus cuotas, revisar tus estados de cuenta y realizar pagos de forma más rápida y segura.</p>
-            <p style="margin-top: 25px; color: #555;">Aquí tienes tus credenciales de acceso:</p>
-            <div class="login-card">
-                <div class="login-item">
-                    <span class="login-label">Usuario / Correo:</span>
-                    <span class="login-value">${reservation.user.email}</span>
-                </div>
-                <div class="login-item">
-                    <span class="login-label">Contraseña Temporal:</span>
-                    <span class="login-value">${tempPassword}</span>
-                </div>
-            </div>
-            <div class="btn-container">
-                <a href="https://pagos.aliminspa.cl" class="btn-portal">
-                    IR A MI PORTAL
-                </a>
-            </div>
-            <div class="security-note">
-                <p style="margin: 0;"><strong>🔐 Nota de seguridad:</strong> Por tu protección, el sistema te solicitará cambiar esta contraseña temporal al momento de ingresar por primera vez.</p>
-            </div>
-        </div>
-        <div class="footer">
-            <p><strong>ALIMIN SPA</strong><br>Gestión Inmobiliaria y Financiera</p>
-            <p style="opacity: 0.6; margin-top: 10px;">Este correo contiene información confidencial. Si no eres el destinatario, por favor ignóralo.</p>
-        </div>
-    </div>
-</body>
-</html>`;
-
-    const payload = {
-      asunto: subject,
+    enviarCorreoBienvenida({
       nombre: reservation.name,
       correo: reservation.user.email,
-      contraseña: tempPassword,
+      tempPassword,
       proyecto: reservation.project.name,
-      html: htmlTemplate
-    };
-
-    // Trigger webhook in background (don't await to avoid blocking)
-    fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }).catch(err => console.error("Error triggering webhook:", err));
+      projectSlug: reservation.project.slug,
+    });
 
     memoryCache.deleteByPrefix("postventa_");
     memoryCache.deleteByPrefix("user_data_");
@@ -4765,5 +4785,245 @@ export async function getAuditLogs({
   } catch (error) {
     console.error("Error getting audit logs:", error);
     return { error: "Error al cargar auditoría", logs: [], total: 0, entityGroups: [] };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Co-titulares (promesa firmada por dos personas)
+// ---------------------------------------------------------------------------
+// El co-titular entra al portal con su propio correo y ve la misma reserva que
+// el titular; recibe los mismos correos y WhatsApp. Los pagos siguen viviendo
+// solo en la reserva. Ver lib/coTitulares.ts y migracion 13.
+
+type DatosCoTitular = {
+  name: string;
+  rut?: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  marital_status?: string;
+  profession?: string;
+  nationality?: string;
+};
+
+const MIGRACION_13_PENDIENTE =
+  "Falta aplicar la migración 13 (co-titulares) en la base de datos";
+
+function limpiarOpcional(valor?: string): string | null {
+  const v = (valor ?? "").trim();
+  return v ? v : null;
+}
+
+async function requireAdminCoTitular() {
+  const session = await auth();
+  const adminUser = session?.user as any;
+  if (!session?.user || adminUser?.role !== "ADMIN") return null;
+  return adminUser;
+}
+
+export async function agregarCoTitular(reservationId: string, data: DatosCoTitular) {
+  const adminUser = await requireAdminCoTitular();
+  if (!adminUser) return { error: "No autorizado" };
+
+  const nombre = (data.name || "").trim();
+  const correo = (data.email || "").toLowerCase().trim();
+  if (!nombre) return { error: "Falta el nombre del co-titular" };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return { error: "El correo no es válido" };
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { user: true, lot: true },
+    });
+    if (!reservation) return { error: "Reserva no encontrada" };
+    if (reservation.user.email.toLowerCase() === correo) {
+      return { error: "Ese correo es el del titular: el co-titular necesita su propio correo" };
+    }
+
+    // Si la persona ya tiene cuenta (por ejemplo, es titular de otro lote) se
+    // reutiliza: con un solo login ve todos sus lotes.
+    let user = await prisma.user.findUnique({ where: { email: correo } });
+    if (user && user.role !== "USER") {
+      return { error: "Ese correo pertenece a una cuenta de administración" };
+    }
+    if (!user) {
+      // Clave al azar que nadie conoce: el acceso real se entrega con "Enviar acceso".
+      const hashedPassword = await hash(crypto.randomBytes(16).toString("hex"), 10);
+      user = await prisma.user.create({
+        data: { email: correo, name: nombre, password: hashedPassword, role: "USER" },
+      });
+    }
+
+    const coTitular = await prisma.reservationCoOwner.create({
+      data: {
+        reservation_id: reservation.id,
+        user_id: user.id,
+        name: nombre,
+        email: correo,
+        rut: limpiarOpcional(data.rut),
+        phone: limpiarOpcional(data.phone),
+        address: limpiarOpcional(data.address),
+        marital_status: limpiarOpcional(data.marital_status),
+        profession: limpiarOpcional(data.profession),
+        nationality: limpiarOpcional(data.nationality) ?? "Chilena",
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "CREATE",
+        entity: "Reservation",
+        entity_id: reservation.id,
+        details: `Co-titular agregado: ${nombre} (${correo}${coTitular.rut ? `, RUT ${coTitular.rut}` : ""}) - Lote #${reservation.lot.number}. Ve la misma ficha en el portal y recibe los mismos avisos.`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+    return { success: true, id: coTitular.id };
+  } catch (error: any) {
+    if (error?.code === "P2002") return { error: "Esa persona ya es co-titular de este lote" };
+    if (faltaMigracionCoTitulares(error)) return { error: MIGRACION_13_PENDIENTE };
+    console.error("Error agregando co-titular:", error);
+    return { error: "Error al agregar el co-titular" };
+  }
+}
+
+/** Corrige los datos de contacto. El correo no se cambia aca: es su login. */
+export async function actualizarCoTitular(coTitularId: string, data: Omit<DatosCoTitular, "email">) {
+  const adminUser = await requireAdminCoTitular();
+  if (!adminUser) return { error: "No autorizado" };
+
+  const nombre = (data.name || "").trim();
+  if (!nombre) return { error: "Falta el nombre del co-titular" };
+
+  try {
+    const actual = await prisma.reservationCoOwner.findUnique({ where: { id: coTitularId } });
+    if (!actual) return { error: "Co-titular no encontrado" };
+
+    const nuevo = {
+      name: nombre,
+      rut: limpiarOpcional(data.rut),
+      phone: limpiarOpcional(data.phone),
+      address: limpiarOpcional(data.address),
+      marital_status: limpiarOpcional(data.marital_status),
+      profession: limpiarOpcional(data.profession),
+      nationality: limpiarOpcional(data.nationality),
+    };
+    const cambios = (Object.keys(nuevo) as (keyof typeof nuevo)[])
+      .filter((k) => (actual[k] ?? null) !== nuevo[k])
+      .map((k) => `${k}: "${actual[k] ?? "—"}" -> "${nuevo[k] ?? "—"}"`);
+    if (cambios.length === 0) return { success: true };
+
+    await prisma.reservationCoOwner.update({ where: { id: coTitularId }, data: nuevo });
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "Reservation",
+        entity_id: actual.reservation_id,
+        details: `Co-titular ${actual.name} (${actual.email}) actualizado: ${cambios.join(", ")}`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    revalidatePath("/admin/clients");
+    return { success: true };
+  } catch (error) {
+    if (faltaMigracionCoTitulares(error)) return { error: MIGRACION_13_PENDIENTE };
+    console.error("Error actualizando co-titular:", error);
+    return { error: "Error al actualizar el co-titular" };
+  }
+}
+
+/** Le quita el acceso a ESTE lote. Su cuenta queda (puede tener otros lotes). */
+export async function quitarCoTitular(coTitularId: string) {
+  const adminUser = await requireAdminCoTitular();
+  if (!adminUser) return { error: "No autorizado" };
+
+  try {
+    const actual = await prisma.reservationCoOwner.findUnique({ where: { id: coTitularId } });
+    if (!actual) return { error: "Co-titular no encontrado" };
+
+    await prisma.reservationCoOwner.delete({ where: { id: coTitularId } });
+    await prisma.auditLog.create({
+      data: {
+        action: "DELETE",
+        entity: "Reservation",
+        entity_id: actual.reservation_id,
+        details: `Co-titular quitado: ${actual.name} (${actual.email}). Ya no ve este lote en su portal ni recibe sus avisos.`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    memoryCache.deleteByPrefix("user_data_");
+    revalidatePath("/admin/clients");
+    return { success: true };
+  } catch (error) {
+    if (faltaMigracionCoTitulares(error)) return { error: MIGRACION_13_PENDIENTE };
+    console.error("Error quitando co-titular:", error);
+    return { error: "Error al quitar el co-titular" };
+  }
+}
+
+/**
+ * Genera una clave temporal para el co-titular y le manda el mismo correo de
+ * bienvenida que recibe el titular. Sirve tambien para reenviarle el acceso.
+ */
+export async function enviarAccesoCoTitular(coTitularId: string) {
+  const adminUser = await requireAdminCoTitular();
+  if (!adminUser) return { error: "No autorizado" };
+
+  try {
+    const coTitular = await prisma.reservationCoOwner.findUnique({
+      where: { id: coTitularId },
+      include: { user: true, reservation: { include: { project: true } } },
+    });
+    if (!coTitular) return { error: "Co-titular no encontrado" };
+
+    const tempPassword = crypto.randomBytes(4).toString("hex");
+    await prisma.user.update({
+      where: { id: coTitular.user_id },
+      data: {
+        password: await hash(tempPassword, 10),
+        must_change_password: true,
+        portal_active: true,
+        temp_password: tempPassword,
+        activated_at: new Date(),
+      },
+    });
+
+    enviarCorreoBienvenida({
+      nombre: coTitular.name,
+      correo: coTitular.user.email,
+      tempPassword,
+      proyecto: coTitular.reservation.project.name,
+      projectSlug: coTitular.reservation.project.slug,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "UPDATE",
+        entity: "Reservation",
+        entity_id: coTitular.reservation_id,
+        details: `Acceso al portal enviado al co-titular ${coTitular.name} (${coTitular.user.email}).`,
+        user_id: adminUser.id,
+        user_email: adminUser.email,
+      },
+    });
+
+    memoryCache.deleteByPrefix("postventa_");
+    revalidatePath("/admin/clients");
+    return { success: true, tempPassword };
+  } catch (error) {
+    if (faltaMigracionCoTitulares(error)) return { error: MIGRACION_13_PENDIENTE };
+    console.error("Error enviando acceso al co-titular:", error);
+    return { error: "Error al enviar el acceso" };
   }
 }

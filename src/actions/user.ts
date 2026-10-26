@@ -18,6 +18,7 @@ import {
 import { memoryCache } from "@/lib/cache";
 import { fechaDePagoComprobante, receiptHasFile } from "@/lib/receiptDocs";
 import { construirDocumentosCliente } from "@/lib/documentosCliente";
+import { filtroReservasDelUsuario } from "@/lib/coTitulares";
 
 const CACHE_TTL = 300;
 
@@ -52,9 +53,11 @@ export async function getUserLots() {
   if (cached) return cached;
 
   try {
+    // Las suyas como titular y las que comparte como co-titular (promesa
+    // firmada por dos personas): las dos ven el mismo lote.
     const reservations = await prisma.reservation.findMany({
       where: {
-        user_id: userId,
+        ...(await filtroReservasDelUsuario(userId)),
         status: { in: ["active", "COMPLETED"] },
       },
       include: {
@@ -559,7 +562,9 @@ export async function uploadPaymentReceipt({
 
   try {
     const reservation = await prisma.reservation.findFirst({
-      where: isAdmin ? { id: reservationId } : { id: reservationId, user_id: userId },
+      where: isAdmin
+        ? { id: reservationId }
+        : { id: reservationId, ...(await filtroReservasDelUsuario(userId)) },
       include: { lot: true },
     });
 

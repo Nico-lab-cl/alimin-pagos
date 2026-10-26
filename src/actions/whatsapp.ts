@@ -90,6 +90,51 @@ function formatDateCL(date: Date | string | null | undefined): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Co-titulares (promesa firmada por dos personas): les llega el mismo mensaje
+ * que acaba de recibir el titular, cada uno con su fila en el historial. Un
+ * co-titular sin telefono valido se salta sin hacer ruido: postventa lo agrega
+ * a la ficha cuando lo tenga.
+ */
+async function enviarACoTitulares(opts: {
+  client: any;
+  instanceName: string;
+  slug: string;
+  reservationId: string;
+  category: string;
+  message: string;
+  titularPhone: string;
+  sentBy: string;
+  media?: { type: string | null; name: string | null };
+  send: (phoneE164: string) => Promise<any>;
+}) {
+  for (const co of opts.client.coOwners || []) {
+    const phone = normalizePhone(co.phone);
+    if (!phone.ok || phone.e164 === opts.titularPhone) continue;
+
+    await sleep(DELAY_MIN_MS + Math.random() * (DELAY_MAX_MS - DELAY_MIN_MS));
+    const sent = await opts.send(phone.e164);
+
+    await prisma.whatsappMessage.create({
+      data: {
+        reservation_id: opts.reservationId,
+        project_slug: opts.slug,
+        instance: opts.instanceName,
+        category: opts.category,
+        client_name: co.name || opts.client.clientName || "?",
+        phone: phone.e164,
+        message: opts.message,
+        status: sent.ok ? "SENT" : "FAILED",
+        error: sent.ok ? null : String(sent.error || "").slice(0, 500),
+        evolution_id: sent.ok ? sent.evolutionId : null,
+        sent_by: opts.sentBy,
+        media_type: opts.media?.type ?? null,
+        media_name: opts.media?.name ?? null,
+      },
+    });
+  }
+}
+
 async function requireAdmin() {
   const session = await auth();
   const user = session?.user as any;
@@ -807,6 +852,18 @@ export async function sendWhatsappChunk(data: {
         },
       });
 
+      await enviarACoTitulares({
+        client,
+        instanceName: instance.name,
+        slug,
+        reservationId,
+        category: data.category,
+        message,
+        titularPhone: phone.e164,
+        sentBy: user.email,
+        send: (to) => sendText(instance, to, message),
+      });
+
       results.push({
         reservationId,
         clientName: label,
@@ -1217,6 +1274,29 @@ export async function sendWhatsappMassChunk(data: {
           media_type: data.attachment?.mediatype ?? null,
           media_name: data.attachment?.fileName ?? null,
         },
+      });
+
+      const attachment = data.attachment;
+      await enviarACoTitulares({
+        client,
+        instanceName: instance.name,
+        slug,
+        reservationId,
+        category: "DIFUSION",
+        message: renderedMessage,
+        titularPhone: phone.e164,
+        sentBy: user.email,
+        media: { type: attachment?.mediatype ?? null, name: attachment?.fileName ?? null },
+        send: (to) =>
+          attachment && attachment.media
+            ? sendMedia(instance, to, {
+                media: attachment.media,
+                mediatype: attachment.mediatype,
+                caption: renderedMessage,
+                fileName: attachment.fileName,
+                mimetype: attachment.mimetype,
+              })
+            : sendText(instance, to, renderedMessage),
       });
 
       results.push({

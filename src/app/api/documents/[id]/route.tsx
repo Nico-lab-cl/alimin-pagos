@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderToStream } from "@react-pdf/renderer";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { puedeVerReserva } from "@/lib/coTitulares";
 import { getInstallmentDueDate, getNominalInstallmentAmount } from "@/lib/financials";
 import { getReceiptLegalInfo } from "@/lib/receiptLegalInfo";
 import {
@@ -54,7 +55,7 @@ export async function GET(
 
       const user = session.user as any;
       if (user.role !== "ADMIN" && user.role !== "LEGAL") {
-        if (reservation.user_id !== user.id) {
+        if (!(await puedeVerReserva(user.id, reservation))) {
           return new NextResponse("Forbidden", { status: 403 });
         }
       }
@@ -138,7 +139,7 @@ export async function GET(
 
       const user = session.user as any;
       if (user.role !== "ADMIN" && user.role !== "LEGAL") {
-        if (receipt.reservation.user_id !== user.id) {
+        if (!(await puedeVerReserva(user.id, receipt.reservation))) {
           return new NextResponse("Forbidden", { status: 403 });
         }
       }
@@ -300,9 +301,9 @@ export async function GET(
     if (user.role !== "ADMIN" && user.role !== "LEGAL") {
         const reservation = await prisma.reservation.findUnique({
             where: { id: reservationId },
-            select: { user_id: true }
+            select: { id: true, user_id: true }
         });
-        if (!reservation || reservation.user_id !== user.id) {
+        if (!(await puedeVerReserva(user.id, reservation))) {
             return new NextResponse("Forbidden", { status: 403 });
         }
     }

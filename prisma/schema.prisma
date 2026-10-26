@@ -88,6 +88,7 @@ model User {
   feedback               Feedback[]
   notifications          Notification[]
   reservations           Reservation[]
+  coOwnerships           ReservationCoOwner[]
 
   @@index([email], map: "idx_users_email")
   @@index([role], map: "idx_users_role")
@@ -148,6 +149,7 @@ model Reservation {
   emailMessages          EmailMessage[]
   receipts               PaymentReceipt[]
   documents              ReservationDocument[]
+  coOwners               ReservationCoOwner[]
   lot                    Lot                   @relation(fields: [lot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   project                Project               @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   user                   User                  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -158,6 +160,33 @@ model Reservation {
   @@index([status], map: "idx_reservations_status")
   @@index([user_id], map: "idx_reservations_user")
   @@map("reservations")
+  @@schema("pagos")
+}
+
+/// Co-titular de un lote (promesa firmada por dos personas). Entra al portal con
+/// su propio usuario y ve la misma reserva que el titular; los pagos siguen
+/// viviendo solo en la reserva. Ver prisma/migrations_manual/13_co_titulares.sql.
+model ReservationCoOwner {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reservation_id String      @db.Uuid
+  user_id        String      @db.Uuid
+  name           String      @db.VarChar(255)
+  rut            String?     @db.VarChar(20)
+  email          String      @db.VarChar(255)
+  phone          String?     @db.VarChar(50)
+  address        String?     @db.VarChar(255)
+  marital_status String?     @db.VarChar(50)
+  profession     String?     @db.VarChar(100)
+  nationality    String?     @default("Chilena") @db.VarChar(100)
+  created_at     DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?   @default(now()) @updatedAt @db.Timestamptz(6)
+  reservation    Reservation @relation(fields: [reservation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user           User        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([reservation_id, user_id], map: "uq_co_owner_reservation_user")
+  @@index([user_id], map: "idx_co_owners_user")
+  @@index([reservation_id], map: "idx_co_owners_reservation")
+  @@map("reservation_co_owners")
   @@schema("pagos")
 }
 
