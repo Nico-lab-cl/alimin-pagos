@@ -47,6 +47,8 @@ cliente tal cual; `codigo` es para que la app decida qué hacer.
 | POST | `/api/mobile/notifications/:id/read` | Marca un aviso como leído |
 | POST | `/api/mobile/push-token` | `{ token, platform: "android" \| "ios" }`. Guarda el token de Firebase |
 | POST | `/api/mobile/receipts` | `multipart/form-data`: `reservationId`, `amount`, `scope` (`INSTALLMENT` o `PIE`), `installmentsCount`, `file` (JPG, PNG, HEIC o PDF, hasta 10 MB). Queda PENDING para postventa |
+| GET | `/api/mobile/proyectos` | `{ proyectos }`: por cada proyecto del cliente, `portada`, `fotos` y `novedades` publicadas desde /admin/proyecto-app |
+| GET | `/api/mobile/proyecto/fotos/:id` | La imagen. Solo para clientes con terreno en ese proyecto (y admins con acceso, para la vista previa) |
 | GET | `/api/documents/:id` | La misma ruta del portal. Con el token Bearer sirve los recibos, comprobantes y documentos del cliente |
 
 ### `lots` en `/api/mobile/me`
@@ -78,6 +80,6 @@ pago (`isMoraFrozen`, y la fila `isHistorical` de `upcomingInstallments`).
 
 ## Pendiente
 
-- Fotos y novedades de "Mi proyecto": tablas nuevas, sección en el admin y su
-  endpoint.
-- Notificaciones push que dispara el portal.
+- Notificaciones push que dispara el portal. Por ahora, publicar una novedad
+  con "Avisar a los clientes" deja un aviso (tipo `PROJECT_NEWS`) que se ve en
+  `/api/mobile/notifications`, sin push.
