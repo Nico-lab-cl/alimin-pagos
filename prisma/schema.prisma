@@ -30,6 +30,8 @@ model Project {
   updated_at           DateTime?     @default(now()) @updatedAt @db.Timestamptz(6)
   lots                 Lot[]
   reservations         Reservation[]
+  posts                ProjectPost[]
+  photos               ProjectPhoto[]
 
   @@index([slug], map: "idx_projects_slug")
   @@index([status], map: "idx_projects_status")
@@ -503,5 +505,47 @@ enum ActionType {
   OTHER
 
   @@map("action_type")
+  @@schema("pagos")
+}
+
+/// Novedad de un proyecto para "Mi proyecto" en Alimin app. La publica
+/// postventa desde /admin/proyecto-app. Ver prisma/migrations_manual/14_mi_proyecto_app.sql.
+model ProjectPost {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id   String         @db.Uuid
+  title        String         @db.VarChar(160)
+  body         String
+  /// DRAFT o PUBLISHED. Solo las PUBLISHED llegan a la app.
+  status       String         @default("DRAFT") @db.VarChar(20)
+  published_at DateTime?      @db.Timestamptz(6)
+  created_by   String?        @db.Uuid
+  created_at   DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
+  project      Project        @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  photos       ProjectPhoto[]
+
+  @@index([project_id, status, published_at(sort: Desc)], map: "idx_project_posts_project")
+  @@map("project_posts")
+  @@schema("pagos")
+}
+
+/// Foto de un proyecto para Alimin app: de la galeria (post_id NULL) o de una
+/// novedad. Guardada en base64 como el resto de los archivos del portal.
+model ProjectPhoto {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id     String       @db.Uuid
+  post_id        String?      @db.Uuid
+  caption        String?      @db.VarChar(160)
+  mime_type      String       @db.VarChar(50)
+  base64_content String
+  sort_order     Int          @default(0)
+  is_cover       Boolean      @default(false)
+  created_by     String?      @db.Uuid
+  created_at     DateTime?    @default(now()) @db.Timestamptz(6)
+  project        Project      @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  post           ProjectPost? @relation(fields: [post_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([project_id, post_id, sort_order], map: "idx_project_photos_project")
+  @@map("project_photos")
   @@schema("pagos")
 }

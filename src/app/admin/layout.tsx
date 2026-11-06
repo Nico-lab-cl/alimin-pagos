@@ -27,7 +27,8 @@ import {
   MessageSquare,
   MessageCircle,
   FileSearch,
-  Scale
+  Scale,
+  Smartphone
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { SearchProvider, useSearch } from "@/context/SearchContext";
@@ -58,6 +59,7 @@ const menuItems = [
   { href: "/admin/lots", label: "Lotes", icon: Map },
   { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/admin/email", label: "Email", icon: Mail },
+  { href: "/admin/proyecto-app", label: "Mi proyecto (app)", icon: Smartphone },
   // OJO: /admin/email-marketing es la pagina de Informes, no el canal de correo.
   // El nombre de la carpeta quedo de antes; el canal de correo es /admin/email.
   { href: "/admin/email-marketing", label: "Informes", icon: BarChart3 },
