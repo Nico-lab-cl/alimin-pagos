@@ -25,7 +25,7 @@ export async function registrarComprobanteCliente({
   scope: "PIE" | "INSTALLMENT";
   receiptBase64: string;
   installmentsCount?: number;
-}) {
+}): Promise<{ success?: boolean; error?: string }> {
   if (!receiptHasFile(receiptBase64)) {
     return { error: "El archivo del comprobante llegó vacío. Descárgalo en tu teléfono y vuelve a adjuntarlo." };
   }

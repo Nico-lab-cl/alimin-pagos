@@ -1,4 +1,5 @@
 import { cargarTerrenosDelUsuario } from "@/lib/terrenosCliente";
+import { reglasDePago, totalParaItems, type CuotaPorPagar } from "@/lib/planDePago";
 import { falla, noAutorizado, respuesta, usuarioDeLaPeticion } from "@/lib/movil/http";
 
 /**
@@ -13,15 +14,29 @@ export async function GET(request: Request) {
   if ("error" in resultado && resultado.error) return falla(500, "error_servidor", resultado.error);
 
   type Recibo = { receipt_url?: string | null } & Record<string, unknown>;
-  const lots = (resultado.lots || []).map((lot: { receipts?: Recibo[] } & Record<string, unknown>) => ({
-    ...lot,
-    // El comprobante viene como data-URL completa (pueden ser varios MB): la
-    // app lo baja aparte desde la URL del documento cuando el cliente lo abre.
-    receipts: (lot.receipts || []).map(({ receipt_url, ...r }) => ({
-      ...r,
-      hasFile: !!receipt_url,
-    })),
-  }));
+  type Lote = { receipts?: Recibo[]; upcomingInstallments?: CuotaPorPagar[] } & Record<string, unknown>;
+  const lots = (resultado.lots || []).map((lot: Lote) => {
+    const cuotas = lot.upcomingInstallments || [];
+    const reglas = reglasDePago(cuotas);
+    return {
+      ...lot,
+      // El comprobante viene como data-URL completa (pueden ser varios MB): la
+      // app lo baja aparte desde la URL del documento cuando el cliente lo abre.
+      receipts: (lot.receipts || []).map(({ receipt_url, ...r }) => ({
+        ...r,
+        hasFile: !!receipt_url,
+      })),
+      // Lo minimo para quedar al dia, con la misma regla que /user/pay/[id].
+      pago: {
+        ...reglas,
+        minimo: totalParaItems(cuotas, reglas.minimoItems),
+        // Vencidas pero todavia en gracia: no entran al minimo, se ofrecen sin multa.
+        cuotasEnGracia: cuotas
+          .filter((c) => c.number > 0 && c.isOverdue && !c.hasPenalty)
+          .map((c) => ({ number: c.number, dueDate: c.dueDate, multaDesde: c.interestStartDate, amount: c.baseAmount ?? c.amount })),
+      },
+    };
+  });
 
   return respuesta({ user: usuario, lots });
 }

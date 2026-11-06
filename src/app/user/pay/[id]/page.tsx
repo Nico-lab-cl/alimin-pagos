@@ -2,6 +2,7 @@
 import { useEffect, useState, use } from "react";
 import { getUserLots, uploadPaymentReceipt } from "@/actions/user";
 import { formatCLP, cn, formatInstallmentsLabel } from "@/lib/utils";
+import { reglasDePago, totalParaItems } from "@/lib/planDePago";
 import { 
   Home as HomeIcon, 
   CreditCard, 
@@ -70,9 +71,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => {
     if (lot && lot.upcomingInstallments && lot.upcomingInstallments.length > 0) {
-      const hasHist = lot.upcomingInstallments.some((c: any) => c.number === 0 || c.isHistorical);
-      const overdue = lot.upcomingInstallments.filter((c: any) => c.number > 0 && c.hasPenalty).length;
-      const minCount = (hasHist ? 1 : 0) + Math.max(1, overdue);
+      const minCount = reglasDePago(lot.upcomingInstallments).minimoItems;
       if (installmentsCount < minCount) {
         setInstallmentsCount(minCount);
       }
@@ -234,24 +233,19 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     );
   }
 
-  const overdueCount = lot.upcomingInstallments?.filter((c: any) => c.number > 0 && c.hasPenalty).length || 0;
-  const hasHistoricalItem = lot.upcomingInstallments?.some((c: any) => c.number === 0 || c.isHistorical) || false;
-  const histOffset = hasHistoricalItem ? 1 : 0;
-  // mandatoryCount = historical slot (if any) + all overdue cuotas (min 1 real cuota)
-  const mandatoryCount = histOffset + Math.max(1, overdueCount);
-  const maxInstallmentsCount = histOffset + (lot.upcomingInstallments?.filter((c: any) => c.number > 0).length || 1);
+  // Misma regla que la app movil (src/lib/planDePago.ts): mora historica (si hay)
+  // + todas las cuotas con multa, minimo una cuota.
+  const reglas = reglasDePago(lot.upcomingInstallments);
+  const overdueCount = reglas.cuotasConMulta;
+  const mandatoryCount = reglas.minimoItems;
+  const maxInstallmentsCount = reglas.maximoItems;
 
   // Breakdown Calculations
   const selectedInstallments = lot.upcomingInstallments?.slice(0, installmentsCount) || [];
   const realCuotasForCards = selectedInstallments.filter((c: any) => c.number > 0);
   const cuotasBaseSum = realCuotasForCards.reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
   const totalMoraCuotas = realCuotasForCards.reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0);
-  const historicalMoraItem = selectedInstallments.find((c: any) => c.number === 0 || c.isHistorical);
-  const moraHistorica = historicalMoraItem ? (historicalMoraItem.penaltyAmount || historicalMoraItem.amount || 0) : 0;
-
-  const baseAmount = selectedInstallments.filter((c: any) => !c.isHistorical).reduce((acc: number, c: any) => acc + (c.baseAmount || c.amount), 0);
-  const penaltyAmount = realCuotasForCards.reduce((acc: number, c: any) => acc + (c.penaltyAmount || 0), 0);
-  const totalAmount = baseAmount + penaltyAmount + moraHistorica;
+  const { baseAmount, penaltyAmount, moraHistorica, totalAmount } = totalParaItems(lot.upcomingInstallments, installmentsCount);
 
   // Split penalty into displays matching mockup style
   const adminCharge = 5000;
