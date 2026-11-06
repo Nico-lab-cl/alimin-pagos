@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderToStream } from "@react-pdf/renderer";
 import { auth } from "@/auth";
+import { usuarioDeLaPeticion } from "@/lib/movil/http";
 import { prisma } from "@/lib/prisma";
 import { puedeVerReserva } from "@/lib/coTitulares";
 import { getInstallmentDueDate, getNominalInstallmentAmount } from "@/lib/financials";
@@ -21,7 +22,13 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
+  // La app movil no tiene la cookie del portal: manda su token Bearer, y el
+  // cliente queda con el mismo rol USER que tendria su sesion web.
+  let session: { user?: any } | null = await auth();
+  if (!session?.user) {
+    const movil = await usuarioDeLaPeticion(request);
+    if (movil) session = { user: { id: movil.id, email: movil.email, role: "USER" } };
+  }
   if (!session?.user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }

@@ -10,6 +10,22 @@ export default auth((req) => {
   const isMaintenanceMode = process.env.MAINTENANCE_MODE === "true";
   const isAdmin = user?.role === "ADMIN";
 
+  // La app movil de clientes trae su propio token Bearer, no la cookie del
+  // portal: sus endpoints validan la sesion adentro. Con mantenimiento activo
+  // reciben un 503 en JSON en vez de una redireccion que la app no entiende.
+  const esApiMovil = pathname.startsWith("/api/mobile");
+  const conTokenMovil =
+    pathname.startsWith("/api/documents") && /^Bearer\s/i.test(req.headers.get("authorization") || "");
+  if (esApiMovil || conTokenMovil) {
+    if (isMaintenanceMode) {
+      return NextResponse.json(
+        { error: { codigo: "mantenimiento", mensaje: "Estamos haciendo mejoras. Vuelve a intentar en un rato." } },
+        { status: 503 }
+      );
+    }
+    return NextResponse.next();
+  }
+
   if (isMaintenanceMode) {
     // Admins can bypass maintenance mode
     if (!isAdmin && pathname !== "/mantenimiento") {
