@@ -61,6 +61,18 @@ Campos que más usa la app: `projectName`, `projectSlug`, `lotNumber`,
 `acquisitionProgress`, `isUpToDate`, `penaltyAmount`, `lateDays`,
 `upcomingInstallments` (con la mora de cada cuota), `bank` y `documentos`.
 
+Cada lote trae además `pago`, calculado con `src/lib/planDePago.ts`, la misma
+regla de la pantalla de pago del portal:
+
+- `minimoItems`: cuántos elementos de `upcomingInstallments` hay que pagar sí o
+  sí (la mora histórica, si hay, más todas las cuotas con multa; mínimo una).
+- `minimo`: `{ baseAmount, penaltyAmount, moraHistorica, totalAmount }` de ese
+  mínimo. `totalAmount` es el "para quedar al día" que muestra la app.
+- `cuotasEnGracia`: cuotas que ya vencieron pero siguen en sus días de gracia.
+  No entran al mínimo; la app las ofrece como opcionales, "sin multa hasta"
+  el día anterior a `multaDesde`.
+- `maximoItems`: hasta cuántas se pueden pagar adelantadas.
+
 Pendiente de decidir en la app: no mostrar la mora congelada ni los acuerdos de
 pago (`isMoraFrozen`, y la fila `isHistorical` de `upcomingInstallments`).
 
