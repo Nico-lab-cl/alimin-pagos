@@ -75,8 +75,13 @@ regla de la pantalla de pago del portal:
   el día anterior a `multaDesde`.
 - `maximoItems`: hasta cuántas se pueden pagar adelantadas.
 
-Pendiente de decidir en la app: no mostrar la mora congelada ni los acuerdos de
-pago (`isMoraFrozen`, y la fila `isHistorical` de `upcomingInstallments`).
+Y `pendientes`: los comprobantes que el cliente envió y siguen `PENDING`, más los
+`REJECTED` de los últimos 60 días (con `rejection_reason`). Sin el archivo. La
+app los muestra en Movimientos como "En revisión" y "Rechazado"; los aprobados
+ya vienen en `receipts`.
+
+Decidido: la app no muestra la mora congelada ni los acuerdos de pago
+(`isMoraFrozen`, y la fila `isHistorical` de `upcomingInstallments`).
 
 ## Pendiente
 
