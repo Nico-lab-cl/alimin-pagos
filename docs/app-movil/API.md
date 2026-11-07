@@ -83,8 +83,23 @@ ya vienen en `receipts`.
 Decidido: la app no muestra la mora congelada ni los acuerdos de pago
 (`isMoraFrozen`, y la fila `isHistorical` de `upcomingInstallments`).
 
-## Pendiente
+## Notificaciones
 
-- Notificaciones push que dispara el portal. Por ahora, publicar una novedad
-  con "Avisar a los clientes" deja un aviso (tipo `PROJECT_NEWS`) que se ve en
-  `/api/mobile/notifications`, sin push.
+Todas pasan por `avisarAClientes` (`src/lib/avisosCliente.ts`): dejan el aviso
+en la bandeja (`notifications`, la misma del portal) y mandan push por Firebase
+al `fcm_token` del cliente, con `data.ruta` = pantalla que abre la app al tocarla.
+
+| Tipo | Cuándo | A quién | Abre |
+|---|---|---|---|
+| `PAYMENT_APPROVED` | Postventa aprueba un comprobante de pie o cuota, o un abono a intereses | Titular y co-titulares | `/movimientos` |
+| `PAYMENT_REJECTED` | Postventa rechaza un comprobante | Titular y co-titulares | `/movimientos` |
+| `PROJECT_NEWS` | Se publica una novedad con "Avisar a los clientes" | Clientes del proyecto | `/proyecto` |
+| `INSTALLMENT_DUE` | La próxima cuota vence en 3 días o menos (revisión diaria 10:00 a 12:59 de Chile, `src/lib/programadorAvisosCuota.ts`) | Clientes al día con la app instalada | `/pagar` |
+
+- Firebase: proyecto `pagos-alimin`, app Android `cl.aliminspa.clientes`
+  (el `google-services.json` está en la raíz de la app). El servidor usa
+  `FIREBASE_SERVICE_ACCOUNT`, la misma de la app de postventa.
+- iPhone: el token es de APNs y Firebase no lo acepta; hasta tener la cuenta de
+  Apple Developer esos clientes solo ven el aviso en la bandeja.
+- Un token que Firebase da por muerto (app desinstalada) se borra solo.
+- `AVISO_CUOTA_AUTO=false` apaga el aviso de cuota por vencer.

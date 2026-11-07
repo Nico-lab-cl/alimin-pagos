@@ -5,5 +5,7 @@ export async function register() {
     iniciarProgramadorResumen();
     const { iniciarProgramadorCorreos } = await import("./lib/programadorCorreos");
     iniciarProgramadorCorreos();
+    const { iniciarProgramadorAvisosCuota } = await import("./lib/programadorAvisosCuota");
+    iniciarProgramadorAvisosCuota();
   }
 }

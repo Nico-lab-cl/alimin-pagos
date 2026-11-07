@@ -745,13 +745,25 @@ export async function approveReceipt(
 
     // Notificación: se envía solo si la transacción anterior tuvo éxito (si hubiese
     // fallado, ya habríamos salido por el catch y el recibo seguiría PENDIENTE).
-    if (receipt.reservation.user.fcm_token) {
-      const { sendPushNotification } = await import("@/lib/notifications");
-      sendPushNotification({
-        token: receipt.reservation.user.fcm_token,
-        title: "¡Pago Aprobado!",
-        body: `Tu pago de ${new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(receipt.amount_clp)} ha sido procesado con éxito.`,
-      });
+    // Al titular y a los co-titulares, en la bandeja y al telefono. Solo PIE e
+    // INSTALLMENT, por lo mismo que el aviso de WhatsApp de mas abajo.
+    if (receipt.scope === "PIE" || receipt.scope === "INSTALLMENT") {
+      const { avisarAClientes, pesos } = await import("@/lib/avisosCliente");
+      const queCubre =
+        receipt.scope === "PIE"
+          ? "tu pie"
+          : installmentsInReceipt > 1
+            ? `las cuotas #${approvedInstNum} a #${approvedInstNum + installmentsInReceipt - 1}`
+            : `tu cuota #${approvedInstNum}`;
+      await avisarAClientes(
+        [receipt.reservation.user_id, ...(await usuariosCoTitulares(receipt.reservation_id).catch(() => []))],
+        {
+          tipo: "PAYMENT_APPROVED",
+          titulo: "Pago confirmado",
+          mensaje: `Aprobamos tu pago de ${pesos(montoReal)} por ${queCubre}. Tu recibo oficial ya está en Documentos.`,
+          ruta: "/movimientos",
+        }
+      );
     }
 
     // Acá se guardaba un segundo PDF del pago, con el diseño antiguo. El recibo
@@ -917,13 +929,17 @@ export async function approveReceiptAsInterestPayment(
       },
     });
 
-    if (receipt.reservation.user.fcm_token) {
-      const { sendPushNotification } = await import("@/lib/notifications");
-      sendPushNotification({
-        token: receipt.reservation.user.fcm_token,
-        title: "¡Abono a intereses aprobado!",
-        body: `Tu pago de ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(appliedToMora)} fue aplicado a tu mora.`,
-      });
+    {
+      const { avisarAClientes, pesos } = await import("@/lib/avisosCliente");
+      await avisarAClientes(
+        [receipt.reservation.user_id, ...(await usuariosCoTitulares(receipt.reservation_id).catch(() => []))],
+        {
+          tipo: "PAYMENT_APPROVED",
+          titulo: "Pago confirmado",
+          mensaje: `Aprobamos tu pago de ${pesos(appliedToMora)}, que se abonó a tus intereses.`,
+          ruta: "/movimientos",
+        }
+      );
     }
 
     // El recibo del abono de intereses ya no se guarda como archivo: se emite al
@@ -1116,28 +1132,20 @@ export async function rejectReceipt(receiptId: string, reason: string) {
 
     // Create persistent notification in DB
     // Al titular y a los co-titulares: cualquiera de los dos pudo subir el comprobante.
+    // Mismo texto en la bandeja que antes; ahora tambien llega al telefono de
+    // todos (antes el push iba solo al titular).
     if (receipt?.reservation?.user_id) {
       const destinatarios = [
         receipt.reservation.user_id,
         ...(await usuariosCoTitulares(receipt.reservation_id)),
       ];
-      await prisma.notification.createMany({
-        data: destinatarios.map((user_id) => ({
-          user_id,
-          type: "PAYMENT_REJECTED",
-          title: "Pago Observado",
-          message: `Tu comprobante de ${receipt.scope === 'PIE' ? 'Pie' : 'Cuota'} por $${receipt.amount_clp.toLocaleString('es-CL')} fue rechazado: ${reason}`,
-        })),
-      });
-    }
-
-    // Send Push Notification
-    if (receipt?.reservation?.user?.fcm_token) {
-      const { sendPushNotification } = await import("@/lib/notifications");
-      sendPushNotification({
-        token: receipt.reservation.user.fcm_token,
-        title: "Observación en tu Pago",
-        body: `Tu comprobante ha sido rechazado: ${reason}. Por favor, revisa los detalles.`,
+      const { avisarAClientes } = await import("@/lib/avisosCliente");
+      await avisarAClientes(destinatarios, {
+        tipo: "PAYMENT_REJECTED",
+        titulo: "Pago Observado",
+        mensaje: `Tu comprobante de ${receipt.scope === 'PIE' ? 'Pie' : 'Cuota'} por $${receipt.amount_clp.toLocaleString('es-CL')} fue rechazado: ${reason}`,
+        push: `Tu comprobante de $${receipt.amount_clp.toLocaleString('es-CL')} fue rechazado: ${reason}. Toca para ver el detalle.`,
+        ruta: "/movimientos",
       });
     }
 

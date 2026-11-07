@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { clientesDelProyecto, faltaMigracionMiProyecto, leerFotoDataUrl, urlFoto } from "@/lib/miProyecto";
+import { avisarAClientes } from "@/lib/avisosCliente";
 
 /**
  * Admin de "Mi proyecto" (/admin/proyecto-app): postventa publica novedades y
@@ -122,13 +123,11 @@ export async function crearNovedad({
 async function avisarClientes(projectId: string, projectName: string, titulo: string) {
   const usuarios = await clientesDelProyecto(projectId);
   if (usuarios.length === 0) return 0;
-  await prisma.notification.createMany({
-    data: usuarios.map((user_id) => ({
-      user_id,
-      type: "PROJECT_NEWS",
-      title: `Novedad en ${projectName}`,
-      message: titulo,
-    })),
+  await avisarAClientes(usuarios, {
+    tipo: "PROJECT_NEWS",
+    titulo: `Novedad en ${projectName}`,
+    mensaje: titulo,
+    ruta: "/proyecto",
   });
   return usuarios.length;
 }

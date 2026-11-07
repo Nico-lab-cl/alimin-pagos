@@ -43,16 +43,20 @@ export async function sendPushNotification({
         priority: "high" as const,
         notification: {
           sound: "default",
+          // Canal que crea la Alimin app ("Avisos de Alimin"). En la app de
+          // postventa no existe y Android usa el canal por defecto.
+          channelId: "default",
+          color: "#4ba646",
           vibrateTimingsMillis: [0, 500, 200, 500], // Vibration pattern
         },
       },
     };
 
     const response = await admin.messaging().send(message);
-    console.log("Successfully sent message:", response);
-    return { success: true, response };
+    return { success: true as const, response };
   } catch (error) {
-    console.error("Error sending push notification:", error);
-    return { error: "Failed to send notification" };
+    const code = (error as { code?: string } | null)?.code;
+    console.error("Error sending push notification:", code || error);
+    return { error: "Failed to send notification", code };
   }
 }
