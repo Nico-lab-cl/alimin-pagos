@@ -36,6 +36,7 @@ import { getFullPostventaData, getAdminProjects } from "@/actions/postventa";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import LogoAlimin from "@/components/shared/LogoAlimin";
+import AsistentePostventa from "@/components/admin/AsistentePostventa";
 
 const menuItems = [
   { 
@@ -374,6 +375,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           onClick={() => setIsOpen(false)}
         />
       )}
+
+      <AsistentePostventa />
     </div>
   );
 }
